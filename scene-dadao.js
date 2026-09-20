@@ -144,10 +144,10 @@
 
   // ── the wharf on the river, west: pier and junks until the road took over; a park path since ──
   const PZ = -214;
-  part(-25, -0.2, PZ, 8, 38, LK(0.6, 0.6, 0, 'haze', 'haze'));                       // pier deck
+  part(-22.5, -0.2, PZ, 4.5, 38, LK(0.6, 0.6, 0, 'haze', 'haze'));                    // pier deck (kept east of x -25: the engine scatters city blocks on the river beyond)
   const veh = [];
-  for (let z = PZ - 17; z <= PZ + 17; z += 6.8) [-21.3, -28.7].forEach(x => veh.push({ x, y: -0.3, z, w: 0.3, d: 0.3, r: 0, c: C('ink'), h: H(1.1, 1.1, 0) }));
-  for (let i = 0; i < 7; i++) goods.push({ x: -24 + rnd() * 3, y: 0.4, z: PZ - 15 + rnd() * 30, w: 0.9, d: 0.9, r: rnd() * 1.5, c: C(i % 2 ? 'bone' : 'haze'), h: H(0.7, 0.7, 0) });
+  for (let z = PZ - 17; z <= PZ + 17; z += 6.8) [-20.6, -24.4].forEach(x => veh.push({ x, y: -0.3, z, w: 0.3, d: 0.3, r: 0, c: C('ink'), h: H(1.1, 1.1, 0) }));
+  for (let i = 0; i < 7; i++) goods.push({ x: -23.6 + rnd() * 2.2, y: 0.4, z: PZ - 15 + rnd() * 30, w: 0.9, d: 0.9, r: rnd() * 1.5, c: C(i % 2 ? 'bone' : 'haze'), h: H(0.7, 0.7, 0) });
   function junk(x, z, r, sail) {
     const sn = Math.sin(r), cs = Math.cos(r), off = dz => [x + dz * sn, z + dz * cs];
     const d = off(1.2), m = off(-1.3);
@@ -156,9 +156,9 @@
     part(m[0], 0.75, m[1], 0.16, 0.16, LK(6.2, 6.2, 0, 'ink', 'ink'), r);            // mast
     part(m[0] + 0.12, 1.9, m[1], 0.06, 2.8, LK(4, 4, 0, sail, sail), r);             // sail
   }
-  junk(-31.6, PZ + 11, 0.12, 'lamp');     // moored along the pier's river side
-  junk(-32.2, PZ - 3, -0.1, 'bone');
-  junk(-31.4, PZ - 15, 0.06, 'lamp');
+  junk(-26.6, PZ + 11, 0.12, 'lamp');     // moored along the pier's river side
+  junk(-27.2, PZ - 3, -0.1, 'bone');
+  junk(-26.5, PZ - 15, 0.06, 'lamp');
   part(-21.5, 0, PZ + 8, 3, 80, only(T, 0.1, 'bone'));                               // riverside path, tower
   part(-23.1, 0, PZ + 8, 0.08, 80, only(T, 0.9, 'haze'));                            // its railing
   for (let i = 0; i < 8; i++) veh.push({ x: -21.6 + (rnd() - 0.5) * 0.8, z: PZ + 40 - i * 9.5, w: 0.18, d: 1.5, r: 0.35 + rnd() * 0.3, c: C('haze'), h: H(0, 0, 0.85) });

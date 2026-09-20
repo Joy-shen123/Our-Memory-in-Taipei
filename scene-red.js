@@ -5,7 +5,7 @@
   if (!window.SCENE) return;
   const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors } = window.SCENE;
   const RH = anchors.redhouse;              // { x: 11, z: -70 } — the octagon, east side
-  const RED = ['red'], ALL3 = ['red', 'dadao', 'tower'];
+  const RED = ['red'];
 
   // ── shared geometry ─────────────────────────────────────────────────────────
   const pyr = new THREE.CylinderGeometry(0, 1, 1, 4); pyr.translate(0, 0.5, 0);           // hip roof / tent top
@@ -41,12 +41,13 @@
   function signPart(x, y, z, w, h, look, tex, rotY) {
     const p = part(x, y, z, w, 1, look, rotY || 0, planeGeo);
     const m = p.mesh.material;
-    m.map = tex; m.emissiveMap = tex; m.emissive = C('bone'); m.emissiveIntensity = 0.7; m.needsUpdate = true; // letters stay legible through the print pass
+    m.map = tex; m.emissiveMap = tex; m.emissive = C('bone'); m.emissiveIntensity = 0.45; m.needsUpdate = true; // the board stays bone on its unlit face
     return p;
   }
-  // 'WEST GATE MARKET 1908' over the camera-facing face of the octagon, red era only
-  signPart(RH.x, 3.65, RH.z + 5.15, 6.4, 1.3, only(RED, 1.3, 'bone'),
-    signTex([{ text: 'WEST GATE MARKET', size: 118, y: 100 }, { text: '1908', size: 82, y: 200 }], 'ink', 'bone', 1024, 256, 'verm'));
+  // 'WEST GATE MARKET 1908' on the camera-facing face of the octagon, red era only. Ink on bone: the
+  // print pass keeps pale ground and dark strokes; pale strokes on a dark board vanish.
+  signPart(RH.x, 3.0, RH.z + 5.15, 7.4, 2.0, only(RED, 2.0, 'bone'),
+    signTex([{ text: 'WEST GATE MARKET', size: 124, y: 96 }, { text: '1908', size: 96, y: 206 }], 'bone', 'ink', 1024, 276, 'verm'));
   // modern plaza sign, tower era only: a board on a post at the plaza corner
   part(12.5, 0, -47.4, 0.16, 0.16, only(['tower'], 1.3, 'ink'));
   signPart(12.5, 1.3, -47.3, 3.2, 1.2, only(['tower'], 1.2, 'bone'),

@@ -8,13 +8,13 @@
   // ── tunables ──────────────────────────────────────────────────────────────────
   const FOG_LEAD = 44;        // how far ahead of the camera the fog frontier sits
   const FOG_SOFT = 28;        // width of the soft edge, in world units
-  const HAZE_DENSITY = 0.006; // gentle distance haze so looking back still has depth
+  const HAZE_DENSITY = 0.0022; // gentle distance haze so looking back still has depth
   const DAMP = 5.5;           // scroll damping. higher = snappier
   const ERA_MS = 500;         // the world re-renders into the next era over this long
   const LABEL_NEAR = 70;      // anchor labels fade in inside this distance
   // per-era mix of the five colours: sky/fog darkens, lamp light grows, print fades
-  const ERA_MIX = { red: { night: 0.0, lamp: 0.55, hemi: 0.7 }, dadao: { night: 0.4, lamp: 0.95, hemi: 0.5 },
-                    tower: { night: 0.75, lamp: 1.25, hemi: 0.35 } };
+  const ERA_MIX = { red: { night: 0.0, lamp: 1.1, hemi: 1.1 }, dadao: { night: 0.05, lamp: 1.2, hemi: 1.0 },
+                    tower: { night: 0.45, lamp: 1.1, hemi: 0.75 } };
 
   // ── fog: directional, permanent, and cheap ───────────────────────────────────
   // three.js fog is distance-from-camera. The brief's fog is "the part of the century you
@@ -85,9 +85,9 @@
     const m = new THREE.Mesh(g, withFog(new THREE.MeshLambertMaterial({ color: C(col) })));
     m.position.set(x, y, z); scene.add(m); return m;
   };
-  flat(400, 900, 'ink', 0, 0, -200);
-  flat(GRID.roadWidth, 620, 'haze', 0, 0.02, -200);
-  flat(60, 620, 'haze', -50, -0.3, -200);
+  flat(400, 900, 'leaf', 0, 0, -200).material.color.lerp(C('ink'), 0.45);
+  flat(GRID.roadWidth, 620, 'road', 0, 0.02, -200);
+  flat(60, 620, 'sky', -50, -0.3, -200).material.color.lerp(C('haze'), 0.5);
 
   // ── year markings painted on the road at each era boundary ───────────────────
   // Digits drawn to a canvas with the system font (no font files, no images), laid flat on
@@ -143,8 +143,8 @@
 
   const ALL = ERAS.map(e => e.key);
 
-  // Ximen Red House — the 1908 octagon: eight-sided red brick drum, a low roof, a lantern on top
-  (() => {
+  // Ximen Red House — the 1908 octagon. Replaced by the asset library's model when it is loaded.
+  if (!window.NOSTALGIA_ASSETS) (() => {
     const A = anchors.redhouse, x = A.x, z = A.z;
     const oct = new THREE.CylinderGeometry(1, 1, 1, 8); oct.translate(0, 0.5, 0);
     part(x, 0, z, 5.2, 5.2, only(ALL, 5, 'verm'), Math.PI / 8, oct);              // the drum
@@ -163,7 +163,7 @@
     const A = anchors.dihua, x = A.x, z0 = A.z + 20;
     for (let i = 0; i < 5; i++) {
       const z = z0 - i * 10, v = (i % 2) * 0.4;
-      part(x, 0, z, 9, 9, { red: { h: 3.2, col: 'bone' }, dadao: { h: 3.6, col: 'bone' }, tower: { h: 3.6, col: 'bone' } });
+      part(x, 0, z, 9, 9, { red: { h: 3.2, col: 'brick' }, dadao: { h: 3.6, col: 'brick' }, tower: { h: 3.6, col: 'brick' } });
       part(x + 1.2, 3.2, z, 6.6, 9, { red: { h: 1.6 + v, col: 'haze' }, dadao: { h: 4.4 + v, col: 'bone' }, tower: { h: 4.4 + v, col: 'bone' } });
       part(x - 2.6, 3.4, z, 1.2, 9, only(['dadao', 'tower'], 5.2 + v, 'bone'));   // pilasters
       part(x - 2.6, 8.6 + v, z, 1.4, 4, only(['dadao', 'tower'], 1.4, 'bone'));   // parapet crest
@@ -193,16 +193,16 @@
   const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 0 };
   (() => {
     const A = anchors.tower101, x = A.x, z = A.z;
-    part(x, 0, z, 26, 26, only(['tower'], 6, 'haze'));                          // podium
-    part(x, 6, z, 15, 15, only(['tower'], 14, 'haze'));                         // base shaft
+    part(x, 0, z, 26, 26, only(['tower'], 6, 'walk'));                          // podium
+    part(x, 6, z, 15, 15, only(['tower'], 14, 'glass'));                        // base shaft
     let y = 20;
     for (let i = 0; i < 8; i++) {                                               // the eight segments
       const w = 12 + (i % 2) * 0.6;
-      part(x, y, z, w - 2.5, w - 2.5, only(['tower'], 9, 'haze'));
-      part(x, y + 5.5, z, w, w, only(['tower'], 3.5, 'haze'));                  // the flared top of each segment
+      part(x, y, z, w - 2.5, w - 2.5, only(['tower'], 9, 'glass'));
+      part(x, y + 5.5, z, w, w, only(['tower'], 3.5, 'glass'));                  // the flared top of each segment
       y += 9;
     }
-    part(x, y, z, 6, 6, only(['tower'], 5, 'haze'));                            // crown
+    part(x, y, z, 6, 6, only(['tower'], 5, 'glass'));                           // crown
     part(x, y + 5, z, 1.2, 1.2, only(['tower'], 14, 'bone'));                   // spire
     TOWER.h = y + 5;
     A.top = y + 19;
@@ -301,14 +301,14 @@
   // sidewalks and curbs
   const walkX = GRID.roadWidth / 2 + 1.6;
   [-1, 1].forEach(s => {
-    const m = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') })));
+    const m = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('walk') })));
     m.position.set(s * walkX, 0, -200); m.scale.set(3.2, 0.22, 620); scene.add(m);
   });
   // road surface pattern: dirt at first, then a painted centre line — drawn to a canvas, repeated
   function roadTexture(kind) {
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
     const g = cv.getContext('2d');
-    g.fillStyle = PALETTE.haze; g.fillRect(0, 0, 128, 256);
+    g.fillStyle = PALETTE.road; g.fillRect(0, 0, 128, 256);
     if (kind === 'dirt') { for (let i = 0; i < 260; i++) { g.fillStyle = 'rgba(10,12,16,0.35)'; g.fillRect(Math.random() * 128, Math.random() * 256, 2, 2); } }
     if (kind === 'tram') { g.fillStyle = PALETTE.ink; g.fillRect(40, 0, 3, 256); g.fillRect(85, 0, 3, 256); }
     if (kind === 'lines') { g.fillStyle = PALETTE.bone; g.fillRect(62, 20, 4, 90); g.fillRect(6, 0, 3, 256); g.fillRect(119, 0, 3, 256); }
@@ -374,7 +374,7 @@
       crowns.push({ x: s * (walkX - 0.8), z, w: 2.8 + rnd(), d: 2.8 + rnd(), h: { red: 0, dadao: 2.4, tower: 3 }, yOf: trunks[trunks.length - 1] });
     });
     instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), trunks);
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('ink') }), crowns);
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('leaf') }), crowns);
   })();
   // people on the sidewalks: more each era
   (() => {
@@ -413,7 +413,9 @@
                    speed: (big ? 9 : 14) + rnd() * 8, c: i % 4 === 0 ? C('bone') : (i % 9 === 0 ? C('verm') : C('haze')),
                    h: { red: i < 3 ? 1.3 : 0, dadao: i < 12 ? 1.2 : 0, tower: big ? 2.2 : 1.3 } });
     }
-    return instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items, { colors: true });
+    const set = instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items, { colors: true });
+    set.mesh.visible = false; // traffic switched off: nothing moves on the road except the girl
+    return set;
   })();
   function updateVehicles(dt, key) {
     const front = FOG_U.frontier.value;
@@ -437,6 +439,43 @@
     });
   }
 
+
+
+  // ── the childhood street: the teammate's Ximending asset library laid along both sides ──
+  // Loaded before app.js from asset/3d/. Each build() returns a Group, origin at its base, front +Z.
+  const nostalgia = new THREE.Group();
+  (() => {
+    const REG = window.NOSTALGIA_ASSETS, Core = window.NostalgiaCore;
+    if (!REG || !Core) return;
+    const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; m.needsUpdate = true; }); } });
+    const box = new THREE.Box3(), size = new THREE.Vector3();
+    const place = (obj, side, zc) => {
+      obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;    // front faces the road
+      obj.updateMatrixWorld(true);
+      box.setFromObject(obj); box.getSize(size);
+      obj.position.set(side * (6.6 + size.x / 2), 0.2, zc);
+      unfog(obj); nostalgia.add(obj);
+      return size.z;
+    };
+    // the Red House itself sits on its anchor lot
+    const A = anchors.redhouse;
+    const rh = (REG['ximen-2000s'] || []).find(a => a.id === 'red-house');
+    if (rh) { const o = rh.build(Core); o.rotation.y = -Math.PI / 2; o.position.set(A.x + 1, 0.2, A.z); o.scale.setScalar(1.6); unfog(o); nostalgia.add(o); }
+    // everything else, alternating sides from the street start
+    const order = [].concat(REG['ximen-1980s'] || [], REG['ximen-1990s'] || [], REG['ximen-2000s'] || []).filter(a => a.id !== 'red-house');
+    let zE = 34, zW = 30;
+    order.forEach((a, i) => {
+      const side = i % 2 ? 1 : -1;
+      if (side > 0 && Math.abs(zE - A.z) < 14) zE = A.z - 14;     // leave the Red House lot free
+      const obj = a.build(Core);
+      obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
+      const depth = size.x;                                        // after the rotation, x becomes depth along z
+      const zc = (side > 0 ? zE : zW) - depth / 2;
+      place(obj, side, zc);
+      if (side > 0) zE -= depth + 3; else zW -= depth + 3;
+    });
+  })();
+  scene.add(nostalgia);
 
   // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
   // part(x, y, z, w, d, lookByEra, rotY?, geo?)  lookByEra: { red:{h,col}, dadao:{h,col}, tower:{h,col} }
@@ -496,6 +535,7 @@
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
     mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, print: mixCur.print };
     eraFrom = eraIdx; eraIdx = i;
+    nostalgia.visible = ERAS[i].key === 'red';
     eraT0 = instant ? now - ERA_MS : now;
     swapEraLabel(ERAS[i], instant);
   }
@@ -520,11 +560,12 @@
     mixCur.hemi = mixFrom.hemi + (M.hemi - mixFrom.hemi) * e;
     mixCur.print = mixFrom.print + (era.uPrint - mixFrom.print) * e;
     // photograph: the sky darkens toward ink. print: unreached fog is blank paper.
-    skyC.copy(C('haze')).lerp(C('ink'), mixCur.night * 0.85).lerp(C('bone'), Math.max(0, mixCur.print - 0.3) * 1.2);
+    // horizon: pale day → warm dusk. top: blue → deep blue.
+    skyC.copy(C('bone')).lerp(C('sky'), 0.35).lerp(C('lamp'), mixCur.night * 0.7);
     scene.fog.color.copy(skyC);
     skyMat.uniforms.horizon.value.copy(skyC);
-    skyMat.uniforms.top.value.copy(skyC).lerp(C('ink'), 0.55 + mixCur.night * 0.4);
-    mountainMat.color.copy(skyC).lerp(C('ink'), 0.18 + mixCur.night * 0.25);
+    skyMat.uniforms.top.value.copy(C('sky')).lerp(C('ink'), 0.1 + mixCur.night * 0.7);
+    mountainMat.color.copy(C('haze')).lerp(C('sky'), 0.35).lerp(C('ink'), mixCur.night * 0.4);
     moon.material.opacity = Math.max(0, mixCur.night - 0.3) * 1.3;
     sky.position.copy(camera.position);
     moon.position.set(camera.position.x + 160, camera.position.y + 190, camera.position.z - 330);
@@ -706,15 +747,14 @@
     driftY += (-mouseY * 0.25 - driftY) * (1 - Math.exp(-2 * dt));
 
     const camZ = placeCamera(progress);
-    frontier = Math.min(frontier, camZ - FOG_LEAD); // forward only: behind you stays clear
-    FOG_U.frontier.value = frontier;
+    frontier = Math.min(frontier, camZ - FOG_LEAD);
+    FOG_U.frontier.value = -1e5; // mist switched off: the whole street is visible in daylight
 
     setEra(eraAtU(progress), false);
     updateWorld(now);
     updateMan(progress);
     updateGirl(progress, camZ, dt);
     updateWords(progress);
-    updateVehicles(dt, ERAS[eraIdx].key);
     updateLabels();
     closingEl.style.opacity = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6)).toFixed(2);
 

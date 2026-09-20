@@ -5,11 +5,17 @@
 
   // ── THE FIVE COLOURS ──────────────────────────────────────────────────────────
   const PALETTE = {
-    ink:  '#0A0C10',   // print: ink, outlines.          photo: unlit ground and sky
-    haze: '#2A3442',   // print: second ink, mid-tones.  photo: fog and distance
-    lamp: '#E8A54B',   // print: flat warm block.        photo: real light
-    bone: '#E8E3D8',   // print: the paper.              photo: text, pale facades, moon
-    verm: '#C8422E',   // the one accent. sparingly.
+    ink:  '#2b2f3a',   // dark: roofs, trunks, outlines
+    haze: '#9fb6c9',   // distance and shade
+    lamp: '#ffb347',   // warm light, lit windows
+    bone: '#f7f2e8',   // pale facades, text
+    verm: '#d9483b',   // red accent
+    sky:  '#8ecbff',   // daytime sky
+    brick:'#b8664c',   // Dihua Street brick arcades
+    glass:'#5fb0bf',   // Taipei 101 curtain wall
+    leaf: '#6fae6a',   // trees
+    road: '#6d6f75',   // asphalt
+    walk: '#e2dccb',   // pavement
   };
 
   // ── WORLD GRID ────────────────────────────────────────────────────────────────
@@ -19,13 +25,13 @@
   // ── THE THREE CHAPTERS ────────────────────────────────────────────────────────
   // A chapter's road marking is painted at zRange[0]; the world flips as the camera crosses it.
   const ERAS = [
-    { key: 'red',   start: 1908, end: 1930, years: '1908–1929', label: 'Childhood', zh: '西門紅樓 · Ximen Red House',
-      zRange: [60, -140],   uPrint: 1.0,  traffic: 3,
+    { key: 'red',   start: 1985, end: 2000, years: '1985–1999', label: 'Childhood', zh: '西門町 · Ximending',
+      zRange: [60, -140],   uPrint: 0.0,  traffic: 6,
       palette: { ground: 'ink', roof: 'haze', accent: 'verm' } },
-    { key: 'dadao', start: 1930, end: 2004, years: '1930–2003', label: 'Spring Festival', zh: '大稻埕 · Dadaocheng',
-      zRange: [-140, -290], uPrint: 0.5,  traffic: 12,
+    { key: 'dadao', start: 2000, end: 2020, years: '2000–2019', label: 'Spring Festival', zh: '大稻埕 · Dadaocheng',
+      zRange: [-140, -290], uPrint: 0.0,  traffic: 14,
       palette: { ground: 'haze', roof: 'bone', accent: 'lamp' } },
-    { key: 'tower', start: 2004, end: 2026, years: '2004–',     label: 'The Future',      zh: '台北101 · Taipei 101',
+    { key: 'tower', start: 2020, end: 2040, years: '2020–',     label: 'The Future',      zh: '台北101 · Taipei 101',
       zRange: [-290, -460], uPrint: 0.0,  traffic: 30,
       palette: { ground: 'haze', roof: 'bone', accent: 'verm' } },
   ];
@@ -55,8 +61,8 @@
     { id: 'redhouse', grid: [1, 7], size: [10, 10], hero: true,
       name: { en: 'Ximen Red House', zh: '西門紅樓' },
       byEra: {
-        red:   { built: true, caption: 'Built in 1908 as Taipei’s first public market, an octagon of red brick where the city bought its groceries.' },
-        dadao: { built: true, caption: 'The market became a theatre, then a cinema. Every generation found a new use for the same eight walls.' },
+        red:   { built: true, caption: 'The octagon of red brick at the West Gate. We bought comics, cassettes and shaved ice in the streets around it.' },
+        dadao: { built: true, caption: 'Restored in 2002. The market became a theatre, a cinema, and now a creative market.' },
         tower: { built: true, caption: 'Still standing at the West Gate. It has outlived the wall it was named after.' },
       } },
     { id: 'dihua', grid: [1, 22], size: [10, 50], hero: true,
@@ -78,14 +84,14 @@
       byEra: {
         red:   { built: false, caption: 'Rice paddies.' },
         dadao: { built: false, caption: 'Still fields, on the far east edge of the city.' },
-        tower: { built: true, caption: 'Finished in 2004. For six years the tallest building on earth, eight stacked boxes like a bamboo stem.' },
+        tower: { built: true, caption: 'Eight stacked segments like a bamboo stem, 508 metres of blue-green glass. For six years the tallest building on earth.' },
       } },
   ];
 
   // ── GENERIC STREET-SIDE BUILDINGS ─────────────────────────────────────────────
   const TYPES = {
-    shophouse: { red: { h: 3.5, col: 'bone' }, dadao: { h: 7, col: 'bone' }, tower: { h: 9, col: 'haze' } },
-    market:    { red: { h: 4, col: 'haze' },   dadao: { h: 8, col: 'bone' }, tower: { h: 12, col: 'haze' } },
+    shophouse: { red: { h: 0 },                dadao: { h: 7, col: 'bone' }, tower: { h: 9, col: 'haze' } },
+    market:    { red: { h: 0 },                dadao: { h: 8, col: 'bone' }, tower: { h: 12, col: 'haze' } },
     baroque:   { red: { h: 0 },                dadao: { h: 8, col: 'bone' }, tower: { h: 8, col: 'bone' } },
     block:     { red: { h: 0 },                dadao: { h: 0 },              tower: { h: 10, col: 'haze' } },
     highrise:  { red: { h: 0 },                dadao: { h: 0 },              tower: { h: 13, col: 'haze' } },
