@@ -220,7 +220,7 @@
   function updateMan(u) {
     const i = ERAS.length - 1, f = Math.min(1, Math.max(0, (u - BOUNDS[i]) / (BOUNDS[i + 1] - BOUNDS[i])));
     man.visible = ERAS[eraIdx].key === 'tower';
-    const climb = Math.pow(f, 1.4) * TOWER.h * 0.93 + 6;
+    const climb = 6 + Math.pow(f, 1.4) * (TOWER.h - 20);
     man.position.set(TOWER.x - 6.1, climb, TOWER.z + 1.5);
     const t = performance.now() / 1000;
     armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
