@@ -25,10 +25,13 @@
 <body>
 <canvas id="scene"></canvas>
 <div class="bar">
-  <b>西門町懷舊素材</b>
-  <button data-era="ximen-1980s">1980s</button>
-  <button data-era="ximen-1990s">1990s</button>
-  <button data-era="ximen-2000s">2000s</button>
+  <b>懷舊素材</b>
+  <button data-era="ximen-1980s">西門 1980s</button>
+  <button data-era="ximen-1990s">西門 1990s</button>
+  <button data-era="ximen-2000s">西門 2000s</button>
+  <button data-era="dadaocheng-1980s">大稻埕 1980s</button>
+  <button data-era="dadaocheng-1990s">大稻埕 1990s</button>
+  <button data-era="dadaocheng-2000s">大稻埕 2000s</button>
   <select id="pick"></select>
   <button id="prev">← 上一個</button>
   <button id="next">下一個 →</button>
@@ -53,12 +56,16 @@
 <script src="assets-ximen-1980s.js"></script>
 <script src="assets-ximen-1990s.js"></script>
 <script src="assets-ximen-2000s.js"></script>
+<script src="assets-dadaocheng-1980s.js"></script>
+<script src="assets-dadaocheng-1990s.js"></script>
+<script src="assets-dadaocheng-2000s.js"></script>
 <script>
 (function () {
   'use strict';
   var C = window.NostalgiaCore;
   var REG = window.NOSTALGIA_ASSETS || {};
-  var ERAS = ['ximen-1980s', 'ximen-1990s', 'ximen-2000s'];
+  var ERAS = ['ximen-1980s', 'ximen-1990s', 'ximen-2000s',
+              'dadaocheng-1980s', 'dadaocheng-1990s', 'dadaocheng-2000s'];
 
   var canvas = document.getElementById('scene');
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
@@ -107,8 +114,10 @@
   });
   canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist *= (e.deltaY > 0 ? 1.1 : 0.9); }, { passive: false });
 
-  // 狀態
+  // 狀態（支援網址 hash 直接指定年代，例如 preview.html#dadaocheng-1980s）
   var era = ERAS[0], idx = 0, rowMode = false;
+  var hashEra = (location.hash || '').replace('#', '');
+  if (ERAS.indexOf(hashEra) >= 0) era = hashEra;
   var holder = new THREE.Group();
   scene.add(holder);
 
@@ -186,7 +195,9 @@
       show();
     });
   });
-  document.querySelector('button[data-era]').classList.add('on');
+  document.querySelectorAll('button[data-era]').forEach(function (b) {
+    b.classList.toggle('on', b.getAttribute('data-era') === era);
+  });
   document.getElementById('prev').addEventListener('click', function () { idx--; rowMode = false; syncModeBtn(); show(); });
   document.getElementById('next').addEventListener('click', function () { idx++; rowMode = false; syncModeBtn(); show(); });
   document.getElementById('pick').addEventListener('change', function (e) { idx = +e.target.value; rowMode = false; syncModeBtn(); show(); });

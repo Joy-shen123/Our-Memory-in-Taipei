@@ -1,7 +1,8 @@
-# 西門町懷舊 3D 素材庫（three.js）
+# 台北懷舊 3D 素材庫（three.js）——西門町 × 大稻埕
 
-從 `asset/ximen-1980s.md`、`ximen-1990s.md`、`ximen-2000s.md` 的街道元素清單中，
-挑選「一眼辨識年代」的代表性元素，以**程序化 low-poly** 方式產生的 three.js 3D 素材。
+從 `asset/` 裡六個年代 md 檔（西門町與大稻埕各三個年代）的街道元素清單中，
+挑選代表性元素，以**程序化 low-poly** 方式產生的 three.js 3D 素材。
+西門町走「一眼辨識年代」的流行文化路線；大稻埕走「生活感」路線（不放動漫明星）。
 不需要任何模型檔或圖片——全部由程式碼與 Canvas 文字貼圖產生，直接用 script 標籤載入。
 
 ## 檔案與載入順序
@@ -12,7 +13,12 @@
 <script src="assets-ximen-1980s.js"></script>
 <script src="assets-ximen-1990s.js"></script>
 <script src="assets-ximen-2000s.js"></script>
+<script src="assets-dadaocheng-1980s.js"></script>
+<script src="assets-dadaocheng-1990s.js"></script>
+<script src="assets-dadaocheng-2000s.js"></script>
 ```
+
+年代檔各自獨立，只載入需要的年代也可以。
 
 純全域 script 架構（無 ES module），與隊友專案（three.min.js → data.js → app.js）相同風格。
 
@@ -20,7 +26,9 @@
 
 ```js
 // registry：三個年代各是一個素材陣列
-var list = NOSTALGIA_ASSETS['ximen-1980s'];   // 也有 'ximen-1990s'、'ximen-2000s'
+var list = NOSTALGIA_ASSETS['ximen-1980s'];
+// registry keys：ximen-1980s / ximen-1990s / ximen-2000s /
+//               dadaocheng-1980s / dadaocheng-1990s / dadaocheng-2000s
 
 // 每個素材：{ id, name, category, build }
 // build(NostalgiaCore) 回傳 THREE.Group，可直接 scene.add
@@ -83,3 +91,6 @@ python -m http.server 8000   # 然後開 http://localhost:8000/preview.html
 - **ximen-1980s**：中華商場門面（霓虹招牌）、電影街手繪看板牆、唱片行（卡帶＋黑膠）、租書店（小叮噹書背）、紅色公共電話亭、野狼 125
 - **ximen-1990s**：淘兒音樂城黃色門面、投幣式電玩機台、漫畫出租店（灌籃高手書背）、皮卡丘配色扭蛋機、BB Call／大哥大廣告立牌、拍貼機
 - **ximen-2000s**：西門紅樓八角樓、簽唱會舞台（周杰倫／S.H.E 背板）、網咖門面、張君雅零食貨架、Nokia／Sony Ericsson 手機行櫥窗、F4 海報牆
+- **dadaocheng-1980s**：南北貨行門面、永樂市場布行攤位、霞海城隍廟門面、中藥行櫃檯（百子櫃）、波麗路西餐廳門面、三輪車
+- **dadaocheng-1990s**：年貨大街入口牌樓、年貨攤位、旗袍布莊門面、廟埕茶桌（象棋）、藍色小貨車、紅磚拱廊騎樓段
+- **dadaocheng-2000s**：霞海城隍廟月老參拜區、年貨大街全盛攤位（張君雅禮盒）、柑仔店冰櫃門面、大稻埕碼頭一角、文創咖啡店門面、巴洛克山牆街屋立面
