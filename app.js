@@ -384,7 +384,8 @@
       el = L.el;
       el.style.opacity = vis.toFixed(2);
       el.classList.toggle('on', vis > 0.6);
-      el.style.transform = `translate(${((wp.x + 1) / 2 * innerWidth).toFixed(0)}px, ${((1 - wp.y) / 2 * innerHeight).toFixed(0)}px)`;
+      const lx = Math.min(innerWidth - Math.min(380, innerWidth * 0.7 + 20), (wp.x + 1) / 2 * innerWidth);
+      el.style.transform = `translate(${lx.toFixed(0)}px, ${((1 - wp.y) / 2 * innerHeight).toFixed(0)}px)`;
     });
   }
   let el;
