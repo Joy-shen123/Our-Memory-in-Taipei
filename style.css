@@ -1,0 +1,113 @@
+/* 時代迷霧 · 大稻埕 — the five colours come from data.js as --ink --haze --lamp --bone --verm.
+   No hex codes here. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* the world: fixed, full viewport, under everything */
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  z-index: 0;
+}
+
+/* the scroll runway. 6 sections = opening, four eras, closing. */
+.scroll { position: relative; z-index: 1; pointer-events: none; }
+.scroll section { height: 120vh; }
+
+/* the overlay: oversized, left-aligned, generous space, small technical labels, fine rules */
+.hud {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  padding: clamp(20px, 4vw, 56px);
+}
+
+.hud-title {
+  position: absolute;
+  top: clamp(20px, 4vw, 56px);
+  right: clamp(20px, 4vw, 56px);
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  opacity: 0.85;
+  border-top: 1px solid var(--bone);
+  padding-top: 8px;
+}
+.hud-title span { opacity: 0.6; margin-left: 0.6em; }
+
+.hud-era {
+  position: absolute;
+  left: clamp(20px, 4vw, 56px);
+  bottom: clamp(24px, 6vh, 72px);
+  transition: opacity 240ms ease;
+}
+.hud-era.swap { opacity: 0; }
+.hud-era-label {
+  font-size: clamp(56px, 11vw, 168px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 24px var(--ink);
+}
+.hud-era-years {
+  margin-top: 14px;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  opacity: 0.8;
+  border-top: 1px solid var(--bone);
+  display: inline-block;
+  padding-top: 8px;
+  min-width: 140px;
+}
+
+.hud-year {
+  position: absolute;
+  right: clamp(20px, 4vw, 56px);
+  bottom: clamp(24px, 6vh, 72px);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(22px, 3vw, 40px);
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-shadow: 0 2px 24px var(--ink);
+}
+.hud-year-k {
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  opacity: 0.7;
+  margin-right: 0.6em;
+  vertical-align: middle;
+}
+
+@media (max-width: 480px) {
+  .hud-title { font-size: 10px; letter-spacing: 0.24em; }
+  .hud-era { bottom: 84px; }
+  .hud-year { bottom: 28px; left: 20px; right: auto; text-align: left; }
+}
+
+/* anchor labels: pinned to the building, fade in when near, caption revealed character by character */
+#labels { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.label {
+  position: absolute; left: 0; top: 0;
+  width: min(360px, 70vw);
+  padding-left: 12px;
+  border-left: 1px solid var(--bone);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.label-name { font-size: clamp(18px, 2vw, 26px); font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 16px var(--ink); }
+.label-en { font-size: 11px; letter-spacing: 0.24em; opacity: 0.7; margin-top: 2px; }
+.label-cap { font-size: clamp(13px, 1.1vw, 15px); line-height: 1.6; margin-top: 10px; opacity: 0.95; text-shadow: 0 1px 10px var(--ink); }
+.label-cap span { opacity: 0; transition: opacity 260ms ease; }
+.label.on .label-cap span { opacity: 1; }
