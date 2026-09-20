@@ -277,8 +277,9 @@
         const to = it.h[key] || 0, h = set.from[i] + (to - set.from[i]) * e;
         it.cur = h;
         Q.setFromAxisAngle(Y, it.r || 0);
-        S3.set(it.w, Math.max(h, 0.0001), it.d);
-        P3.set(it.x, it.y || 0, it.z);
+        const on = h > 0.01;                                     // absent items vanish entirely, no flat footprint
+        S3.set(on ? it.w : 0.0001, Math.max(h, 0.0001), on ? it.d : 0.0001);
+        P3.set(it.x, on ? (it.y || 0) : -50, it.z);
         set.mesh.setMatrixAt(i, M4.compose(P3, Q, S3));
       });
       set.mesh.instanceMatrix.needsUpdate = true;
@@ -716,7 +717,8 @@
       el.style.opacity = vis.toFixed(2);
       el.classList.toggle('on', vis > 0.6);
       const lx = Math.min(innerWidth - Math.min(380, innerWidth * 0.7 + 20), (wp.x + 1) / 2 * innerWidth);
-      el.style.transform = `translate(${lx.toFixed(0)}px, ${((1 - wp.y) / 2 * innerHeight).toFixed(0)}px)`;
+      const ly = Math.max(110, (1 - wp.y) / 2 * innerHeight);
+      el.style.transform = `translate(${lx.toFixed(0)}px, ${ly.toFixed(0)}px)`;
     });
   }
   let el;
