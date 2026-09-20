@@ -143,70 +143,10 @@
 
   const ALL = ERAS.map(e => e.key);
 
-  // Ximen Red House — the 1908 octagon. Replaced by the asset library's model when it is loaded.
-  if (!window.NOSTALGIA_ASSETS) (() => {
-    const A = anchors.redhouse, x = A.x, z = A.z;
-    const oct = new THREE.CylinderGeometry(1, 1, 1, 8); oct.translate(0, 0.5, 0);
-    part(x, 0, z, 5.2, 5.2, only(ALL, 5, 'verm'), Math.PI / 8, oct);              // the drum
-    part(x, 5, z, 5.8, 5.8, only(ALL, 0.6, 'ink'), Math.PI / 8, oct);             // eave slab
-    const cone = new THREE.CylinderGeometry(0.15, 1, 1, 8); cone.translate(0, 0.5, 0);
-    part(x, 5.6, z, 5.4, 5.4, only(ALL, 2.6, 'ink'), Math.PI / 8, cone);          // roof
-    part(x, 8.2, z, 1, 1, only(ALL, 1.2, 'bone'), Math.PI / 8, oct);              // lantern
-    part(x + 6.5, 0, z, 6, 9, { red: { h: 3.6, col: 'bone' }, dadao: { h: 3.6, col: 'bone' }, tower: { h: 3.6, col: 'bone' } }); // the cross-shaped market wing
-    part(x - 3.6, 0, z - 5.4, 0.5, 0.5, only(ALL, 3, 'lamp'));                    // lamps at the door
-    part(x + 3.6, 0, z - 5.4, 0.5, 0.5, only(ALL, 3, 'lamp'));
-    A.top = 9.4;
-  })();
-
-  // Dihua Street — five shophouses: arcade at street level, upper floor set back, Baroque crests from 1930
-  (() => {
-    const A = anchors.dihua, x = A.x, z0 = A.z + 20;
-    for (let i = 0; i < 5; i++) {
-      const z = z0 - i * 10, v = (i % 2) * 0.4;
-      part(x, 0, z, 9, 9, { red: { h: 3.2, col: 'brick' }, dadao: { h: 3.6, col: 'brick' }, tower: { h: 3.6, col: 'brick' } });
-      part(x + 1.2, 3.2, z, 6.6, 9, { red: { h: 1.6 + v, col: 'haze' }, dadao: { h: 4.4 + v, col: 'bone' }, tower: { h: 4.4 + v, col: 'bone' } });
-      part(x - 2.6, 3.4, z, 1.2, 9, only(['dadao', 'tower'], 5.2 + v, 'bone'));   // pilasters
-      part(x - 2.6, 8.6 + v, z, 1.4, 4, only(['dadao', 'tower'], 1.4, 'bone'));   // parapet crest
-      part(x - 3.2, 2.2, z, 0.3, 7, only(['tower'], 0.6, 'verm'));                // shop sign band
-    }
-    A.top = 10;
-  })();
-
-  // Xiahai City God Temple — hall, roof, lamp posts, and the queue outside it today
-  (() => {
-    const A = anchors.chenghuang, x = A.x, z = A.z;
-    part(x, 0, z, 8, 8, only(ALL, 4.5, 'verm'));
-    part(x, 4.5, z, 9.6, 9.6, only(ALL, 1.1, 'ink'));
-    part(x, 5.4, z, 1.6, 10.2, only(ALL, 1.6, 'ink'), Math.PI / 4);
-    part(x - 3.3, 0, z - 5.6, 0.5, 0.5, only(ALL, 3.2, 'lamp'));
-    part(x + 3.3, 0, z - 5.6, 0.5, 0.5, only(ALL, 3.2, 'lamp'));
-    part(x + 4, 0, z + 5.2, 0.6, 0.6, only(ALL, 2.4, 'lamp'));
-    part(x - 4, 0, z + 5.2, 0.6, 0.6, only(ALL, 2.4, 'lamp'));
-    for (let i = 0; i < 14; i++) { // the queue, today only, along the street side (east face)
-      const qx = x + 4.8 + (i % 3) * 0.35, qz = z + 4.6 - i * 1.15 + (i % 2) * 0.25;
-      part(qx, 0, qz, 0.55, 0.45, only(['tower'], 1.6 + (i % 3) * 0.1, i % 5 === 0 ? 'verm' : 'bone'));
-    }
-    A.top = 7.5;
-  })();
-
-  // Taipei 101 — podium, eight stacked flared segments, spire. Empty field before 2004.
-  const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 0 };
-  (() => {
-    const A = anchors.tower101, x = A.x, z = A.z;
-    part(x, 0, z, 26, 26, only(['tower'], 6, 'walk'));                          // podium
-    part(x, 6, z, 15, 15, only(['tower'], 14, 'glass'));                        // base shaft
-    let y = 20;
-    for (let i = 0; i < 8; i++) {                                               // the eight segments
-      const w = 12 + (i % 2) * 0.6;
-      part(x, y, z, w - 2.5, w - 2.5, only(['tower'], 9, 'glass'));
-      part(x, y + 5.5, z, w, w, only(['tower'], 3.5, 'glass'));                  // the flared top of each segment
-      y += 9;
-    }
-    part(x, y, z, 6, 6, only(['tower'], 5, 'glass'));                           // crown
-    part(x, y + 5, z, 1.2, 1.2, only(['tower'], 14, 'bone'));                   // spire
-    TOWER.h = y + 5;
-    A.top = y + 19;
-  })();
+  // The four anchors themselves are built in the scene files (scene-red.js: the Red House;
+  // scene-dadao.js: Dihua Street and the temple; scene-tower.js: Taipei 101), each from a real
+  // reference. They set anchors[id].top for the label and, for the tower, TOWER.h / TOWER.faceX.
+  const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 100, faceX: null };
 
   // the man climbing the west face: a small figure whose height follows the scroll in the last chapter
   const man = new THREE.Group();
@@ -221,7 +161,8 @@
     const i = ERAS.length - 1, f = Math.min(1, Math.max(0, (u - BOUNDS[i]) / (BOUNDS[i + 1] - BOUNDS[i])));
     man.visible = ERAS[eraIdx].key === 'tower';
     const climb = 6 + Math.pow(f, 1.4) * (TOWER.h - 20);
-    man.position.set(TOWER.x - 6.1, climb, TOWER.z + 1.5);
+    const fx = TOWER.faceX ? TOWER.faceX(climb) : TOWER.x - 6.1;
+    man.position.set(fx, climb, TOWER.z + 1.5);
     const t = performance.now() / 1000;
     armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
   }
@@ -293,6 +234,7 @@
     for (let i = 0; i < 320; i++) {
       const side = i % 2 ? 1 : -1, x = side * (30 + rnd() * 90), z = 60 - rnd() * 560;
       const w = 5 + rnd() * 9, d = 5 + rnd() * 9, far = Math.abs(x) / 120;
+      if (x < -28 && z < -186 && z > -244) continue;                              // the river behind the Dadaocheng wharf
       items.push({ x, z, w, d, h: { red: 2 + rnd() * 3, dadao: 3 + rnd() * 6, tower: 6 + rnd() * (10 + 30 * far) } });
     }
     instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items);
@@ -316,7 +258,7 @@
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 62); t.anisotropy = 8;
     return t;
   }
-  const roadMaps = { red: roadTexture('dirt'), dadao: roadTexture('tram'), tower: roadTexture('lines') };
+  const roadMaps = { red: roadTexture('dirt'), dadao: roadTexture('plain'), tower: roadTexture('lines') }; // Dihua Street: plain asphalt, no tram, no centre line
   const roadMesh = scene.children.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.width === GRID.roadWidth);
   roadMesh.material.map = roadMaps.red; roadMesh.material.needsUpdate = true;
 
@@ -370,7 +312,8 @@
   (() => {
     const trunks = [], crowns = [];
     for (let z = 34; z > -460; z -= 15) [-1, 1].forEach(s => {
-      if (Math.abs(z + 420) < 30) return;
+      if (Math.abs(z + 405) < 45) return;                       // the 101 plaza and the base shot
+      if (z < -138 && z > -292) return;                          // Dihua Street has no street trees
       trunks.push({ x: s * (walkX - 0.8), z, w: 0.35, d: 0.35, h: { red: 0, dadao: 2.6, tower: 3.2 } });
       crowns.push({ x: s * (walkX - 0.8), z, w: 2.8 + rnd(), d: 2.8 + rnd(), h: { red: 0, dadao: 2.4, tower: 3 }, yOf: trunks[trunks.length - 1] });
     });
@@ -393,7 +336,8 @@
     for (let i = 0; i < 70; i++) {
       const s = i % 2 ? 1 : -1, z = 20 - rnd() * 440, y = 3 + rnd() * 5;
       const c = i % 3 === 0 ? C('verm') : (i % 3 === 1 ? C('lamp') : C('bone'));
-      items.push({ x: s * (GRID.roadWidth / 2 + 3.2), z, y, w: 1.4, d: 0.25, c, h: { red: i % 6 === 0 ? 0.8 : 0, dadao: i % 2 === 0 ? 1.6 : 0, tower: 2.2 } });
+      const ximen = z > -140;                                                     // Ximending 1985–1999 already wore a wall of signs
+      items.push({ x: s * (GRID.roadWidth / 2 + 3.2), z, y, w: 1.4, d: 0.25, c, h: { red: ximen ? (i % 2 === 0 ? 1.6 : 0) : (i % 6 === 0 ? 0.8 : 0), dadao: i % 2 === 0 ? 1.6 : 0, tower: 2.2 } });
     }
     instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('bone'), emissive: C('lamp'), emissiveIntensity: 0.25 }), items, { colors: true });
   })();
@@ -442,46 +386,41 @@
 
 
 
-  // ── the childhood street: the teammate's Ximending asset library laid along both sides ──
-  // Loaded before app.js from asset/3d/. Each build() returns a Group, origin at its base, front +Z.
-  const nostalgia = new THREE.Group();
-  (() => {
-    const REG = window.NOSTALGIA_ASSETS, Core = window.NostalgiaCore;
-    if (!REG || !Core) return;
-    const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; m.needsUpdate = true; }); } });
-    const box = new THREE.Box3(), size = new THREE.Vector3();
-    const place = (obj, side, zc) => {
-      obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;    // front faces the road
-      obj.updateMatrixWorld(true);
-      box.setFromObject(obj); box.getSize(size);
-      obj.position.set(side * (6.6 + size.x / 2), 0.2, zc);
-      unfog(obj); nostalgia.add(obj);
-      return size.z;
-    };
-    // the Red House itself sits on its anchor lot
-    const A = anchors.redhouse;
-    const rh = (REG['ximen-2000s'] || []).find(a => a.id === 'red-house');
-    if (rh) { const o = rh.build(Core); o.rotation.y = -Math.PI / 2; o.position.set(A.x + 1, 0.2, A.z); o.scale.setScalar(1.6); unfog(o); nostalgia.add(o); }
-    // everything else, alternating sides from the street start
-    const order = [].concat(REG['ximen-1980s'] || [], REG['ximen-1990s'] || [], REG['ximen-2000s'] || []).filter(a => a.id !== 'red-house');
-    let zE = 34, zW = 30;
-    order.forEach((a, i) => {
-      const side = i % 2 ? 1 : -1;
-      if (side > 0 && Math.abs(zE - A.z) < 14) zE = A.z - 14;     // leave the Red House lot free
-      const obj = a.build(Core);
-      obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
-      const depth = size.x;                                        // after the rotation, x becomes depth along z
-      const zc = (side > 0 ? zE : zW) - depth / 2;
-      place(obj, side, zc);
-      if (side > 0) zE -= depth + 3; else zW -= depth + 3;
-    });
-  })();
-  scene.add(nostalgia);
+  // ── the teammate's asset library (asset/3d/), placed by the scene files ──────
+  // Each build() returns a Group, origin at its base, front facing +Z. libGroup(eras) makes a
+  // group that is only visible in those eras; asset() builds one library item into it.
+  // Library materials are unfogged: the mist is off and its shader chunk is not theirs.
+  const libGroups = [];
+  function libGroup(eras) {
+    const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g); return g;
+  }
+  const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; m.needsUpdate = true; }); } });
+  const libBox = new THREE.Box3(), libSize = new THREE.Vector3();
+  function findAsset(id) {
+    const REG = window.NOSTALGIA_ASSETS || {};
+    for (const k in REG) { const a = REG[k].find(a => a.id === id); if (a) return a; }
+    return null;
+  }
+  // asset(id, group, x, z, rotY, scale?) → the placed Group (or null when the library is missing).
+  // The returned group carries userData.size = its world-space bounding box size after rotation.
+  function asset(id, group, x, z, rotY, scale) {
+    const a = findAsset(id), Core = window.NostalgiaCore;
+    if (!a || !Core) return null;
+    const o = a.build(Core);
+    o.rotation.y = rotY || 0;
+    if (scale) o.scale.setScalar(scale);
+    o.position.set(x, 0.2, z);
+    o.updateMatrixWorld(true);
+    libBox.setFromObject(o); libBox.getSize(libSize);
+    o.userData.size = libSize.clone();
+    unfog(o); group.add(o);
+    return o;
+  }
 
   // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
   // part(x, y, z, w, d, lookByEra, rotY?, geo?)  lookByEra: { red:{h,col}, dadao:{h,col}, tower:{h,col} }
   // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX };
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
 
 
   // ── the girl running down the middle of the street, always a little ahead of the camera ──
@@ -536,7 +475,7 @@
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
     mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, print: mixCur.print };
     eraFrom = eraIdx; eraIdx = i;
-    nostalgia.visible = ERAS[i].key === 'red';
+    libGroups.forEach(g => { g.visible = g.userData.eras.indexOf(ERAS[i].key) >= 0; });
     eraT0 = instant ? now - ERA_MS : now;
     swapEraLabel(ERAS[i], instant);
   }
