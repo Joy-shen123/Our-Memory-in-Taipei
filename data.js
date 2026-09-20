@@ -100,7 +100,7 @@
     // 3 · approach — the tower rises out of the fog at the end of the street
     { p: [2, 5, -300],     t: [0, 40, -420],   fov: 55 },
     // 4 · the base — looking straight up the west face
-    { p: [-9, 3, -372],    t: [-4, 50, -420],  fov: 62 },
+    { p: [-3, 3, -372],    t: [-4, 50, -420],  fov: 62 },
     // 5 · closing — high beside the tower, the man near the top
     { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 50 },
   ];

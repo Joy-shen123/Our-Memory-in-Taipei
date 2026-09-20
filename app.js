@@ -226,12 +226,231 @@
     armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
   }
 
+  // ── BACKGROUND: sky dome, moon, mountains, distant city ──────────────────────
+  const skyMat = new THREE.ShaderMaterial({
+    uniforms: { top: { value: C('ink') }, horizon: { value: C('haze') } },
+    vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 top, horizon; varying vec3 vP; void main(){ float h = clamp(normalize(vP).y, 0.0, 1.0); gl_FragColor = vec4(mix(horizon, top, pow(h, 0.55)), 1.0); }`,
+    side: THREE.BackSide, depthWrite: false, fog: false
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(520, 24, 12), skyMat);
+  scene.add(sky);
+  scene.background = null;
+
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(9, 24), new THREE.MeshBasicMaterial({ color: C('bone'), fog: false, transparent: true, opacity: 0 }));
+  scene.add(moon);
+
+  const mountainMat = new THREE.MeshBasicMaterial({ color: C('haze'), fog: false });
+  const coneGeo = new THREE.ConeGeometry(1, 1, 7); coneGeo.translate(0, 0.5, 0);
+  const mountains = new THREE.InstancedMesh(coneGeo, mountainMat, 26);
+  (() => {
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < 26; i++) {
+      const a = -Math.PI * 0.05 + (i / 26) * Math.PI * 2.1, r = 430 + (i % 3) * 30;
+      const h = 60 + ((i * 37) % 70), w = 140 + ((i * 53) % 120);
+      m.makeScale(w, h, w).setPosition(Math.sin(a) * r, -6, -200 + Math.cos(a) * r);
+      mountains.setMatrixAt(i, m);
+    }
+    mountains.instanceMatrix.needsUpdate = true;
+  })();
+  scene.add(mountains);
+
+  // per-era instanced sets: each instance has a place and a height per era, tweened together
+  const instSets = [];
+  function instSet(geo, mat, items, opts) {
+    const mesh = new THREE.InstancedMesh(geo, withFog(mat), items.length);
+    mesh.frustumCulled = false;
+    if (opts && opts.colors) {
+      items.forEach((it, i) => mesh.setColorAt(i, it.c || C('haze')));
+      mesh.instanceColor.needsUpdate = true;
+    }
+    scene.add(mesh);
+    const set = { mesh, items, from: items.map(() => 0) };
+    instSets.push(set);
+    return set;
+  }
+  const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), S3 = new THREE.Vector3(), P3 = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+  function instSnapshot() { instSets.forEach(set => set.items.forEach((it, i) => { set.from[i] = it.cur == null ? 0 : it.cur; })); }
+  function instUpdate(e, key) {
+    instSets.forEach(set => {
+      set.items.forEach((it, i) => {
+        const to = it.h[key] || 0, h = set.from[i] + (to - set.from[i]) * e;
+        it.cur = h;
+        Q.setFromAxisAngle(Y, it.r || 0);
+        S3.set(it.w, Math.max(h, 0.0001), it.d);
+        P3.set(it.x, it.y || 0, it.z);
+        set.mesh.setMatrixAt(i, M4.compose(P3, Q, S3));
+      });
+      set.mesh.instanceMatrix.needsUpdate = true;
+    });
+  }
+  const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+
+  // distant city on both sides of the street: low roofs, then a skyline
+  (() => {
+    const items = [];
+    for (let i = 0; i < 320; i++) {
+      const side = i % 2 ? 1 : -1, x = side * (30 + rnd() * 90), z = 60 - rnd() * 560;
+      const w = 5 + rnd() * 9, d = 5 + rnd() * 9, far = Math.abs(x) / 120;
+      items.push({ x, z, w, d, h: { red: 2 + rnd() * 3, dadao: 3 + rnd() * 6, tower: 6 + rnd() * (10 + 30 * far) } });
+    }
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items);
+  })();
+
+  // ── STREET DETAIL ────────────────────────────────────────────────────────────
+  // sidewalks and curbs
+  const walkX = GRID.roadWidth / 2 + 1.6;
+  [-1, 1].forEach(s => {
+    const m = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') })));
+    m.position.set(s * walkX, 0, -200); m.scale.set(3.2, 0.22, 620); scene.add(m);
+  });
+  // road surface pattern: dirt at first, then a painted centre line — drawn to a canvas, repeated
+  function roadTexture(kind) {
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
+    const g = cv.getContext('2d');
+    g.fillStyle = PALETTE.haze; g.fillRect(0, 0, 128, 256);
+    if (kind === 'dirt') { for (let i = 0; i < 260; i++) { g.fillStyle = 'rgba(10,12,16,0.35)'; g.fillRect(Math.random() * 128, Math.random() * 256, 2, 2); } }
+    if (kind === 'tram') { g.fillStyle = PALETTE.ink; g.fillRect(40, 0, 3, 256); g.fillRect(85, 0, 3, 256); }
+    if (kind === 'lines') { g.fillStyle = PALETTE.bone; g.fillRect(62, 20, 4, 90); g.fillRect(6, 0, 3, 256); g.fillRect(119, 0, 3, 256); }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 62); t.anisotropy = 8;
+    return t;
+  }
+  const roadMaps = { red: roadTexture('dirt'), dadao: roadTexture('tram'), tower: roadTexture('lines') };
+  const roadMesh = scene.children.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.width === GRID.roadWidth);
+  roadMesh.material.map = roadMaps.red; roadMesh.material.needsUpdate = true;
+
+  // windows on every generic building: dark grid on the facade, lit at night via emissive
+  function windowTexture(cols, rows, lit) {
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128;
+    const g = cv.getContext('2d');
+    g.fillStyle = lit ? '#000' : '#fff'; g.fillRect(0, 0, 128, 128);
+    const cw = 128 / cols, ch = 128 / rows;
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+      const on = lit ? ((i * 7 + j * 13) % 5 !== 0) : true;
+      g.fillStyle = lit ? (on ? PALETTE.lamp : '#000') : 'rgba(0,0,0,0.55)';
+      g.fillRect(i * cw + cw * 0.28, j * ch + ch * 0.25, cw * 0.44, ch * 0.5);
+    }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  }
+  const winMap = windowTexture(3, 3, false), winLit = windowTexture(3, 3, true);
+  parts.forEach(p => {
+    if (p.mesh.geometry !== boxGeo || p.mesh.scale.x < 4) return;
+    const mat = p.mesh.material;
+    mat.map = winMap.clone(); mat.map.needsUpdate = true;
+    mat.emissiveMap = winLit.clone(); mat.emissiveMap.needsUpdate = true;
+    mat.emissive = C('lamp'); mat.emissiveIntensity = 0;
+    mat.needsUpdate = true;
+    p.windows = true;
+  });
+  function updateWindows(key) {
+    parts.forEach(p => {
+      if (!p.windows) return;
+      const h = p.mesh.scale.y, w = p.mesh.scale.x;
+      p.mesh.material.map.repeat.set(w / 3, h / 3);
+      p.mesh.material.emissiveMap.repeat.set(w / 3, h / 3);
+      p.mesh.material.emissiveIntensity = key === 'tower' ? 0.9 * eraE : (key === 'dadao' ? 0.35 * eraE : 0);
+    });
+  }
+
+  // lampposts on both sidewalks: gas lamps sparse, then dense
+  (() => {
+    const posts = [], heads = [];
+    for (let z = 40; z > -460; z -= 12) [-1, 1].forEach(s => {
+      const k = Math.round(z / 12) % 3 === 0;
+      const h = { red: k ? 4 : 0, dadao: 5, tower: 6 };
+      posts.push({ x: s * (walkX + 0.9), z, w: 0.22, d: 0.22, h });
+      heads.push({ x: s * (walkX + 0.9), z, y: 0, w: 0.7, d: 0.7, h: { red: k ? 0.5 : 0, dadao: 0.5, tower: 0.5 }, lift: true });
+    });
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), posts);
+    const headSet = instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('lamp'), emissive: C('lamp'), emissiveIntensity: 0.6 }), heads);
+    headSet.items.forEach((it, i) => { it.yOf = posts[i]; });
+  })();
+  // trees along the sidewalks from the 1930s
+  (() => {
+    const trunks = [], crowns = [];
+    for (let z = 34; z > -460; z -= 15) [-1, 1].forEach(s => {
+      if (Math.abs(z + 420) < 30) return;
+      trunks.push({ x: s * (walkX - 0.8), z, w: 0.35, d: 0.35, h: { red: 0, dadao: 2.6, tower: 3.2 } });
+      crowns.push({ x: s * (walkX - 0.8), z, w: 2.8 + rnd(), d: 2.8 + rnd(), h: { red: 0, dadao: 2.4, tower: 3 }, yOf: trunks[trunks.length - 1] });
+    });
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), trunks);
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('ink') }), crowns);
+  })();
+  // people on the sidewalks: more each era
+  (() => {
+    const items = [];
+    for (let i = 0; i < 90; i++) {
+      const s = i % 2 ? 1 : -1, z = 40 - rnd() * 500, x = s * (walkX - 1.2 + rnd() * 2.4);
+      const c = i % 7 === 0 ? C('verm') : (i % 3 === 0 ? C('haze') : C('bone'));
+      items.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c, h: { red: i < 12 ? 1.6 : 0, dadao: i < 36 ? 1.6 : 0, tower: 1.6 } });
+    }
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('bone') }), items, { colors: true });
+  })();
+  // shop signs hanging off the facades: a few painted boards, then a wall of neon
+  (() => {
+    const items = [];
+    for (let i = 0; i < 70; i++) {
+      const s = i % 2 ? 1 : -1, z = 20 - rnd() * 440, y = 3 + rnd() * 5;
+      const c = i % 3 === 0 ? C('verm') : (i % 3 === 1 ? C('lamp') : C('bone'));
+      items.push({ x: s * (GRID.roadWidth / 2 + 3.2), z, y, w: 1.4, d: 0.25, c, h: { red: i % 6 === 0 ? 0.8 : 0, dadao: i % 2 === 0 ? 1.6 : 0, tower: 2.2 } });
+    }
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('bone'), emissive: C('lamp'), emissiveIntensity: 0.25 }), items, { colors: true });
+  })();
+  // utility poles, from the 1930s
+  (() => {
+    const items = [];
+    for (let z = 30; z > -460; z -= 22) items.push({ x: walkX + 2.2, z, w: 0.3, d: 0.3, h: { red: 0, dadao: 7, tower: 8 } });
+    for (let z = 30; z > -460; z -= 22) items.push({ x: walkX + 2.2, z, y: 6.5, w: 2.4, d: 0.2, h: { red: 0, dadao: 0.2, tower: 0.2 } });
+    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('ink') }), items);
+  })();
+
+  // traffic: moving wallpaper. Only on ground already reached. Density per era is the point.
+  const vehicles = (() => {
+    const items = [], n = 34;
+    for (let i = 0; i < n; i++) {
+      const lane = i % 2 ? 1 : -1, big = i % 5 === 0;
+      items.push({ x: lane * 2.6, z: 40 - rnd() * 500, w: big ? 2.2 : 1.7, d: big ? 5.5 : 3.6, lane, big,
+                   speed: (big ? 9 : 14) + rnd() * 8, c: i % 4 === 0 ? C('bone') : (i % 9 === 0 ? C('verm') : C('haze')),
+                   h: { red: i < 3 ? 1.3 : 0, dadao: i < 12 ? 1.2 : 0, tower: big ? 2.2 : 1.3 } });
+    }
+    return instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items, { colors: true });
+  })();
+  function updateVehicles(dt, key) {
+    const front = FOG_U.frontier.value;
+    const slow = key === 'red' ? 0.25 : key === 'dadao' ? 0.6 : 1;
+    vehicles.items.forEach((v, i) => {
+      v.z += v.lane * v.speed * slow * dt;              // one lane each way
+      if (v.z < -470) v.z = 50; if (v.z > 50) v.z = -470;
+      const to = (v.h[key] || 0) * (v.z < front + 4 ? 0 : 1);
+      const h = vehicles.from[i] + (to - vehicles.from[i]) * eraE;
+      v.cur = h;
+      S3.set(v.w, Math.max(h, 0.0001), v.d); P3.set(v.x, 0.2, v.z); Q.set(0, 0, 0, 1);
+      vehicles.mesh.setMatrixAt(i, M4.compose(P3, Q, S3));
+    });
+    vehicles.mesh.instanceMatrix.needsUpdate = true;
+  }
+  // lamp heads and tree crowns sit on top of their post/trunk
+  function liftTops() {
+    instSets.forEach(set => {
+      if (!set.items[0] || !set.items[0].yOf) return;
+      set.items.forEach(it => { it.y = it.yOf.cur || 0; });
+    });
+  }
+
+
+  // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
+  // part(x, y, z, w, d, lookByEra, rotY?, geo?)  lookByEra: { red:{h,col}, dadao:{h,col}, tower:{h,col} }
+  // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX };
+
   // ── era state and the 500ms re-render ────────────────────────────────────────
   let eraIdx = 0, eraT0 = -1e9, eraFrom = 0, eraE = 1;
   function setEra(i, instant) {
     if (i === eraIdx && !instant) return;
     const now = performance.now();
     parts.forEach(p => { p.fromH = p.mesh.scale.y; p.fromC = p.mesh.material.color.clone(); });
+    instSnapshot();
+    roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
     mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, print: mixCur.print };
     eraFrom = eraIdx; eraIdx = i;
     eraT0 = instant ? now - ERA_MS : now;
@@ -259,8 +478,17 @@
     mixCur.print = mixFrom.print + (era.uPrint - mixFrom.print) * e;
     // photograph: the sky darkens toward ink. print: unreached fog is blank paper.
     skyC.copy(C('haze')).lerp(C('ink'), mixCur.night * 0.85).lerp(C('bone'), Math.max(0, mixCur.print - 0.3) * 1.2);
-    scene.background.copy(skyC);
     scene.fog.color.copy(skyC);
+    skyMat.uniforms.horizon.value.copy(skyC);
+    skyMat.uniforms.top.value.copy(skyC).lerp(C('ink'), 0.55 + mixCur.night * 0.4);
+    mountainMat.color.copy(skyC).lerp(C('ink'), 0.18 + mixCur.night * 0.25);
+    moon.material.opacity = Math.max(0, mixCur.night - 0.3) * 1.3;
+    sky.position.copy(camera.position);
+    moon.position.set(camera.position.x + 160, camera.position.y + 190, camera.position.z - 330);
+    moon.lookAt(camera.position);
+    liftTops();
+    instUpdate(e, key);
+    updateWindows(key);
     key.intensity = mixCur.lamp;
     hemi.intensity = mixCur.hemi;
     post.uniforms.uPrint.value = mixCur.print;
@@ -441,6 +669,7 @@
     setEra(eraAtU(progress), false);
     updateWorld(now);
     updateMan(progress);
+    updateVehicles(dt, ERAS[eraIdx].key);
     updateLabels();
     closingEl.style.opacity = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6)).toFixed(2);
 
