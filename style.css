@@ -55,11 +55,11 @@ html, body {
 }
 .hud-era.swap { opacity: 0; }
 .hud-era-label {
-  font-size: clamp(40px, 7vw, 116px);
+  font-size: clamp(26px, 3.6vw, 56px);
   font-weight: 700;
   line-height: 0.95;
-  letter-spacing: -0.03em;
-  max-width: 70vw;
+  letter-spacing: -0.02em;
+  max-width: 60vw;
   text-shadow: 0 2px 24px var(--ink);
 }
 .hud-era-years {
@@ -126,3 +126,30 @@ html, body {
   opacity: 0;
   text-shadow: 0 2px 24px var(--ink);
 }
+
+/* the words: big, centred, one at a time */
+.hud-word {
+  position: absolute;
+  left: clamp(20px, 4vw, 56px);
+  right: clamp(20px, 4vw, 56px);
+  top: 26vh;
+  opacity: 0;
+  text-align: left;
+  max-width: 900px;
+}
+.word-big {
+  font-size: clamp(44px, 8.5vw, 132px);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  text-shadow: 0 3px 30px var(--ink), 0 0 2px var(--ink);
+}
+.word-sub {
+  margin-top: 18px;
+  font-size: clamp(15px, 1.5vw, 22px);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  text-shadow: 0 2px 16px var(--ink);
+}
+@media (max-width: 480px) { .hud-word { top: 18vh; } .word-big { font-size: 44px; } }

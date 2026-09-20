@@ -19,15 +19,29 @@
   // ── THE THREE CHAPTERS ────────────────────────────────────────────────────────
   // A chapter's road marking is painted at zRange[0]; the world flips as the camera crosses it.
   const ERAS = [
-    { key: 'red',   start: 1908, end: 1930, years: '1908–1929', label: 'Ximen Red House', zh: '西門紅樓',
+    { key: 'red',   start: 1908, end: 1930, years: '1908–1929', label: 'Childhood', zh: '西門紅樓 · Ximen Red House',
       zRange: [60, -140],   uPrint: 1.0,  traffic: 3,
       palette: { ground: 'ink', roof: 'haze', accent: 'verm' } },
-    { key: 'dadao', start: 1930, end: 2004, years: '1930–2003', label: 'Dadaocheng',      zh: '大稻埕',
+    { key: 'dadao', start: 1930, end: 2004, years: '1930–2003', label: 'Spring Festival', zh: '大稻埕 · Dadaocheng',
       zRange: [-140, -290], uPrint: 0.5,  traffic: 12,
       palette: { ground: 'haze', roof: 'bone', accent: 'lamp' } },
-    { key: 'tower', start: 2004, end: 2026, years: '2004–',     label: 'Taipei 101',      zh: '台北101',
+    { key: 'tower', start: 2004, end: 2026, years: '2004–',     label: 'The Future',      zh: '台北101 · Taipei 101',
       zRange: [-290, -460], uPrint: 0.0,  traffic: 30,
       palette: { ground: 'haze', roof: 'bone', accent: 'verm' } },
+  ];
+
+  // ── THE WORDS — big lines that surface as you scroll. at = scroll progress 0..1
+  const WORDS = [
+    { at: 0.03, big: 'Memory in Us',                  sub: 'Three generations. One street.' },
+    { at: 0.10, big: 'We were children.',             sub: 'We felt happiness.' },
+    { at: 0.17, big: 'Nostalgia.',                    sub: 'Toys, candy, playful things.' },
+    { at: 0.25, big: 'We remember the small things.', sub: '' },
+    { at: 0.37, big: 'We grow older.',                sub: '' },
+    { at: 0.45, big: 'Spring Festival.',              sub: 'The street fills with red.' },
+    { at: 0.53, big: 'We carry responsibility.',      sub: '' },
+    { at: 0.62, big: 'We build things.',              sub: '' },
+    { at: 0.74, big: 'The future.',                   sub: '' },
+    { at: 0.82, big: 'Where do we go?',               sub: '' },
   ];
 
   // ── THE CLOSING LINE ──────────────────────────────────────────────────────────
@@ -107,5 +121,5 @@
 
   const root = document.documentElement;
   Object.keys(PALETTE).forEach(k => root.style.setProperty('--' + k, PALETTE[k]));
-  window.DATA = { PALETTE, GRID, ERAS, TILES, CAM, CLOSING };
+  window.DATA = { PALETTE, GRID, ERAS, TILES, CAM, CLOSING, WORDS };
 })();

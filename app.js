@@ -2,7 +2,7 @@
 // the 月下老人 queue beat, and the uPrint post pass (woodblock → night photograph).
 
 (function () {
-  const { PALETTE, GRID, ERAS, TILES, CAM, CLOSING } = window.DATA;
+  const { PALETTE, GRID, ERAS, TILES, CAM, CLOSING, WORDS } = window.DATA;
   const C = k => new THREE.Color(PALETTE[k]);
 
   // ── tunables ──────────────────────────────────────────────────────────────────
@@ -443,6 +443,49 @@
   // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
   window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX };
 
+
+  // ── the girl running down the middle of the street, always a little ahead of the camera ──
+  const girl = new THREE.Group();
+  const gMat = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
+  const gSkin = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
+  const gInk = withFog(new THREE.MeshLambertMaterial({ color: C('ink') }));
+  const skirtGeo = new THREE.ConeGeometry(0.55, 1, 10); skirtGeo.translate(0, 0.5, 0);
+  const skirt = new THREE.Mesh(skirtGeo, gMat); skirt.scale.set(1, 0.9, 1); skirt.position.y = 0.75; girl.add(skirt);
+  const torso = new THREE.Mesh(boxGeo, gMat); torso.scale.set(0.5, 0.55, 0.3); torso.position.y = 1.6; girl.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), gSkin); head.position.y = 2.42; girl.add(head);
+  const hair = new THREE.Mesh(boxGeo, gInk); hair.scale.set(0.16, 0.5, 0.16); hair.position.set(0, 2.05, 0.3); hair.rotation.x = -0.9; girl.add(hair);
+  const legL = new THREE.Mesh(boxGeo, gSkin); legL.scale.set(0.16, 0.8, 0.16); legL.position.set(-0.15, 0.8, 0); legL.rotation.x = Math.PI; girl.add(legL);
+  const legR = new THREE.Mesh(boxGeo, gSkin); legR.scale.set(0.16, 0.8, 0.16); legR.position.set(0.15, 0.8, 0); legR.rotation.x = Math.PI; girl.add(legR);
+  const gArmL = new THREE.Mesh(boxGeo, gSkin); gArmL.scale.set(0.13, 0.6, 0.13); gArmL.position.set(-0.36, 2.1, 0); gArmL.rotation.x = Math.PI; girl.add(gArmL);
+  const gArmR = new THREE.Mesh(boxGeo, gSkin); gArmR.scale.set(0.13, 0.6, 0.13); gArmR.position.set(0.36, 2.1, 0); gArmR.rotation.x = Math.PI; girl.add(gArmR);
+  girl.scale.setScalar(1.15);
+  scene.add(girl);
+  let stride = 0, lastProg = 0, run = 0;
+  function updateGirl(u, camZ, dt) {
+    const speed = Math.abs(u - lastProg) / Math.max(dt, 1e-3); lastProg = u;      // scroll speed drives the run
+    run += (Math.min(1, speed * 6) - run) * (1 - Math.exp(-6 * dt));
+    stride += (0.4 + run * 14) * dt * 2.2;
+    const z = Math.max(-398, camZ - 18 + run * 4);
+    girl.position.set(Math.sin(stride * 0.15) * 0.6, Math.abs(Math.sin(stride)) * 0.12 * run, z);
+    const sw = Math.sin(stride) * (0.25 + run * 0.9);
+    legL.rotation.x = Math.PI + sw; legR.rotation.x = Math.PI - sw;
+    gArmL.rotation.x = Math.PI - sw * 0.8; gArmR.rotation.x = Math.PI + sw * 0.8;
+    hair.rotation.x = -0.9 - run * 0.5;
+    girl.rotation.y = 0;
+  }
+
+  // ── the words ──────────────────────────────────────────────────────────────
+  const wordEl = document.getElementById('word'), wordBig = wordEl.children[0], wordSub = wordEl.children[1];
+  let wordShown = -1;
+  function updateWords(u) {
+    let best = -1, bestA = 0;
+    WORDS.forEach((w, i) => { const a = Math.max(0, 1 - Math.abs(u - w.at) / 0.045); if (a > bestA) { bestA = a; best = i; } });
+    if (best !== wordShown && best >= 0) { wordShown = best; wordBig.textContent = WORDS[best].big; wordSub.textContent = WORDS[best].sub || ''; }
+    const a = Math.min(1, bestA * 1.6);
+    wordEl.style.opacity = a.toFixed(2);
+    wordEl.style.transform = `translateY(${((1 - a) * 18).toFixed(1)}px)`;
+  }
+
   // ── era state and the 500ms re-render ────────────────────────────────────────
   let eraIdx = 0, eraT0 = -1e9, eraFrom = 0, eraE = 1;
   function setEra(i, instant) {
@@ -669,6 +712,8 @@
     setEra(eraAtU(progress), false);
     updateWorld(now);
     updateMan(progress);
+    updateGirl(progress, camZ, dt);
+    updateWords(progress);
     updateVehicles(dt, ERAS[eraIdx].key);
     updateLabels();
     closingEl.style.opacity = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6)).toFixed(2);
