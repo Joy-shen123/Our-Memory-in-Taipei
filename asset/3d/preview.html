@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>西門町懷舊 3D 素材陳列室</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #17171c; color: #f0f0f0;
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; overflow: hidden; }
+  #scene { position: fixed; inset: 0; display: block; }
+  .bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; background: rgba(20,20,26,.82); backdrop-filter: blur(6px); z-index: 10;
+    flex-wrap: wrap; border-bottom: 1px solid #2c2c34; }
+  .bar b { color: #ff4fd8; margin-right: 6px; }
+  button, select { background: #26262e; color: #eee; border: 1px solid #3a3a44; border-radius: 6px;
+    padding: 6px 12px; font-size: 14px; cursor: pointer; font-family: inherit; }
+  button:hover { border-color: #ff4fd8; }
+  button.on { background: #ff4fd8; color: #17171c; border-color: #ff4fd8; font-weight: 700; }
+  #info { position: fixed; left: 14px; bottom: 14px; z-index: 10; background: rgba(20,20,26,.82);
+    border: 1px solid #2c2c34; border-radius: 8px; padding: 10px 14px; line-height: 1.6; font-size: 13px; }
+  #info .n { font-size: 17px; font-weight: 700; color: #ffd23e; }
+  #hint { position: fixed; right: 14px; bottom: 14px; z-index: 10; color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="bar">
+  <b>西門町懷舊素材</b>
+  <button data-era="ximen-1980s">1980s</button>
+  <button data-era="ximen-1990s">1990s</button>
+  <button data-era="ximen-2000s">2000s</button>
+  <select id="pick"></select>
+  <button id="prev">← 上一個</button>
+  <button id="next">下一個 →</button>
+  <button id="mode">切換：整排陳列</button>
+</div>
+<div id="info"></div>
+<div id="hint">拖曳旋轉視角．滾輪縮放</div>
+<div id="err" style="display:none; position:fixed; top:60px; left:14px; right:14px; z-index:20;
+  background:#5c1010; border:1px solid #ff5555; border-radius:8px; padding:12px 16px;
+  color:#ffd0d0; font-size:14px; white-space:pre-wrap;"></div>
+<script>
+  // 錯誤提示：任何 JS 錯誤都顯示在畫面上，避免整頁悄悄一片黑
+  window.addEventListener('error', function (e) {
+    var box = document.getElementById('err');
+    box.style.display = 'block';
+    box.textContent += '錯誤：' + e.message + (e.filename ? '\n檔案：' + e.filename + ' (第 ' + e.lineno + ' 行)' : '') + '\n';
+  });
+</script>
+
+<script src="three.min.js"></script>
+<script src="assets-core.js"></script>
+<script src="assets-ximen-1980s.js"></script>
+<script src="assets-ximen-1990s.js"></script>
+<script src="assets-ximen-2000s.js"></script>
+<script>
+(function () {
+  'use strict';
+  var C = window.NostalgiaCore;
+  var REG = window.NOSTALGIA_ASSETS || {};
+  var ERAS = ['ximen-1980s', 'ximen-1990s', 'ximen-2000s'];
+
+  var canvas = document.getElementById('scene');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x17171c);
+  scene.fog = new THREE.Fog(0x17171c, 40, 120);
+  var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+
+  // 燈光與地面
+  scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x2a2118, 0.9));
+  var sun = new THREE.DirectionalLight(0xfff2d8, 0.9);
+  sun.position.set(8, 14, 10);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+  sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
+  scene.add(sun);
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(300, 300),
+    new THREE.MeshStandardMaterial({ color: 0x232329, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+  scene.add(new THREE.GridHelper(300, 150, 0x3a3a44, 0x2a2a32));
+
+  // 自製球面座標軌道控制
+  var orbit = { theta: 0.6, phi: 1.15, dist: 10, cx: 0, cy: 1.2, cz: 0, drag: false, px: 0, py: 0 };
+  function applyCam() {
+    orbit.phi = Math.max(0.15, Math.min(1.52, orbit.phi));
+    orbit.dist = Math.max(2, Math.min(90, orbit.dist));
+    camera.position.set(
+      orbit.cx + orbit.dist * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+      orbit.cy + orbit.dist * Math.cos(orbit.phi),
+      orbit.cz + orbit.dist * Math.sin(orbit.phi) * Math.cos(orbit.theta));
+    camera.lookAt(orbit.cx, orbit.cy, orbit.cz);
+  }
+  canvas.addEventListener('mousedown', function (e) { orbit.drag = true; orbit.px = e.clientX; orbit.py = e.clientY; });
+  window.addEventListener('mouseup', function () { orbit.drag = false; });
+  window.addEventListener('mousemove', function (e) {
+    if (!orbit.drag) return;
+    orbit.theta -= (e.clientX - orbit.px) * 0.006;
+    orbit.phi -= (e.clientY - orbit.py) * 0.006;
+    orbit.px = e.clientX; orbit.py = e.clientY;
+  });
+  canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist *= (e.deltaY > 0 ? 1.1 : 0.9); }, { passive: false });
+
+  // 狀態
+  var era = ERAS[0], idx = 0, rowMode = false;
+  var holder = new THREE.Group();
+  scene.add(holder);
+
+  function assets() { return REG[era] || []; }
+
+  function frameObject(obj, pad) {
+    var box = new THREE.Box3().setFromObject(obj);
+    var size = box.getSize(new THREE.Vector3());
+    var center = box.getCenter(new THREE.Vector3());
+    orbit.cx = center.x; orbit.cy = center.y; orbit.cz = center.z;
+    orbit.dist = Math.max(size.x, size.y, size.z) * (pad || 1.6) + 2;
+  }
+
+  function build(entry) {
+    try {
+      var g = entry.build(C);
+      g.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      return g;
+    } catch (err) {
+      console.error('build 失敗: ' + entry.id, err);
+      var fallback = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({ color: 0xb3261e }));
+      fallback.position.y = 0.5;
+      var wrap = new THREE.Group(); wrap.add(fallback);
+      return wrap;
+    }
+  }
+
+  function show() {
+    while (holder.children.length) holder.remove(holder.children[0]);
+    var list = assets();
+    var info = document.getElementById('info');
+    if (!list.length) { info.innerHTML = '<span class="n">此年代尚無素材（檔案未載入）</span>'; return; }
+    if (rowMode) {
+      var x = 0;
+      list.forEach(function (entry) {
+        var g = build(entry);
+        var w = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3()).x;
+        g.position.x = x + w / 2;
+        holder.add(g);
+        if (C && C.textPlane) {
+          var label = C.textPlane(entry.name, Math.min(w, 3), { fontSize: 48, color: '#ffd23e' });
+          label.position.set(x + w / 2, -0.02, 3.2);
+          label.rotation.x = -Math.PI / 2;
+          holder.add(label);
+        }
+        x += w + 3;
+      });
+      frameObject(holder, 0.75);
+      info.innerHTML = '<span class="n">' + era + ' 整排陳列</span><br>共 ' + list.length + ' 件，拖曳／縮放瀏覽';
+    } else {
+      idx = ((idx % list.length) + list.length) % list.length;
+      var entry = list[idx];
+      var g = build(entry);
+      holder.add(g);
+      frameObject(g);
+      info.innerHTML = '<span class="n">' + entry.name + '</span><br>id: ' + entry.id +
+        '　category: ' + (entry.category || '-') + '<br>era: ' + era + '　(' + (idx + 1) + '/' + list.length + ')';
+    }
+    var pick = document.getElementById('pick');
+    pick.innerHTML = '';
+    list.forEach(function (entry, i) {
+      var o = document.createElement('option');
+      o.value = i; o.textContent = entry.name + ' (' + entry.id + ')';
+      if (i === idx) o.selected = true;
+      pick.appendChild(o);
+    });
+  }
+
+  // 工具列事件
+  document.querySelectorAll('button[data-era]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      era = b.getAttribute('data-era'); idx = 0;
+      document.querySelectorAll('button[data-era]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      show();
+    });
+  });
+  document.querySelector('button[data-era]').classList.add('on');
+  document.getElementById('prev').addEventListener('click', function () { idx--; rowMode = false; syncModeBtn(); show(); });
+  document.getElementById('next').addEventListener('click', function () { idx++; rowMode = false; syncModeBtn(); show(); });
+  document.getElementById('pick').addEventListener('change', function (e) { idx = +e.target.value; rowMode = false; syncModeBtn(); show(); });
+  function syncModeBtn() {
+    document.getElementById('mode').textContent = rowMode ? '切換：單件檢視' : '切換：整排陳列';
+  }
+  document.getElementById('mode').addEventListener('click', function () { rowMode = !rowMode; syncModeBtn(); show(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') { idx--; rowMode = false; syncModeBtn(); show(); }
+    if (e.key === 'ArrowRight') { idx++; rowMode = false; syncModeBtn(); show(); }
+  });
+
+  function resize() {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  show();
+
+  (function loop() {
+    requestAnimationFrame(loop);
+    if (!rowMode && !orbit.drag) orbit.theta += 0.003; // 單件檢視時緩慢自轉
+    applyCam();
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
+</body>
+</html>
