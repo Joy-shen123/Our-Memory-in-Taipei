@@ -1,6 +1,8 @@
 // scene-dadao.js — Dadaocheng 1930–2003. The Dihua Street arcade (sacks, jars, dried goods,
 // tin signs), the temple forecourt, the wharf on the river, parked bicycles then scooters,
-// and the 年貨大街 that fills the whole road once the tower era arrives.
+// and the 年貨大街 that fills the whole road. The engine only flips to the tower era once the
+// camera passes z -290, south of this street, so the festival lives in the dadao era (and stays
+// for tower) — that is the only era in which this stretch is ever in frame.
 (function () {
   if (!window.SCENE) return;
   const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd } = window.SCENE;
@@ -66,7 +68,7 @@
     for (let b = 0; b < 4; b++) {
       const z = s.z - hz + 0.5 + b * 0.75;
       goods.push({ x: gx - side * 0.24, y: WALK + (b % 2 ? 0.5 : 0.92), z, w: 0.04, d: 0.38, r: (rnd() - 0.5) * 0.3,
-                   c: C(b < 2 ? 'bone' : 'verm'), h: b < 2 ? H(0, 0.42, 0.42) : H(0, 0, 0.46) });
+                   c: C(b < 2 ? 'bone' : 'verm'), h: b < 2 ? H(0, 0.42, 0.42) : H(0, 0.46, 0.46) });
     }
     // crates with jars on top, second half of the front
     for (let j = 0; j < 2; j++) {
@@ -89,11 +91,11 @@
       signs.push({ x: sx, y: sy, z, w: 0.9, d: 0.12, r: 0, c: C(lampSign ? 'lamp' : 'bone'), h: H(0, sh, sh) });
       if (!lampSign) signs.push({ x: sx, y: sy + sh - 0.55, z, w: 0.92, d: 0.15, r: 0, c: C('verm'), h: H(0, 0.45, 0.45) });
     });
-    // tower era: a second, denser layer of acrylic boxes sticking out over the arcade
+    // a second, denser layer of acrylic boxes sticking out over the arcade
     for (let a = 0; a < 3; a++) {
       const z = s.z - hz + 0.9 + a * (hz - 0.9) + (rnd() - 0.5) * 0.8, hh = 0.9 + rnd() * 1.2;
       const ww = s.hero ? 1.4 + rnd() * 0.5 : 1.0, ax = s.hero ? PIL - ww / 2 : s.fx - side * ww / 2;
-      signs.push({ x: ax, y: 3.8 + rnd() * 2.4, z, w: ww, d: 0.14, r: 0, c: C(a % 2 ? 'lamp' : (rnd() < 0.5 ? 'bone' : 'haze')), h: H(0, 0, hh) });
+      signs.push({ x: ax, y: 3.8 + rnd() * 2.4, z, w: ww, d: 0.14, r: 0, c: C(a % 2 ? 'lamp' : (rnd() < 0.5 ? 'bone' : 'haze')), h: H(0, hh, hh) });
     }
   });
   // painted shop names on the hero pilasters and the two west shops
@@ -124,7 +126,7 @@
   part(G.x - 0.16, 1.3, YZ + 0.12, 0.1, 0.1, only(ALL, 2.0, 'bone'));
   part(G.x + 4.3, 0, YZ + 0.3, 0.25, 9, only(ALL, 0.7, 'bone'));             // low wall, road side
   part(G.x, 0, YZ + 4.7, 8.4, 0.25, only(ALL, 0.7, 'bone'));                 // low wall, south
-  signPart('月老', 'verm', 'bone', true, 'x', G.x + 4.5, WALK, G.z + 6, 1.8, T); // the matchmaker board at the queue head
+  signPart('月老', 'verm', 'bone', true, 'x', G.x + 4.5, WALK, G.z + 6, 1.8, DT); // the matchmaker board at the queue head
   const lant = [];
   [-14, -12, -10, -8].forEach(x => lant.push({ x, y: 3.7, z: G.z + 4.4, w: 0.5, d: 0.5, r: 0, c: C('verm'), h: H(0.5, 0.5, 0.5) }));
   [-1.5, 1.5].forEach(dz => lant.push({ x: G.x + 4.5, y: 3.7, z: G.z + dz, w: 0.5, d: 0.5, r: 0, c: C('verm'), h: H(0.5, 0.5, 0.5) }));
@@ -132,12 +134,13 @@
   // ── people: the 年貨大街 crowd in the road, the queue extended, the old men at the temple ──
   const figs = [];
   for (let i = 0; i < 170; i++) {
-    const z = -196 - rnd() * 90, x = -4 + rnd() * 8, c = i % 10 === 0 ? 'verm' : (i % 3 === 0 ? 'haze' : 'bone');
-    figs.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(c), h: H(0, 0, 1.45 + rnd() * 0.3) });
+    const z = -196 - rnd() * 90, x = (rnd() < 0.5 ? -1 : 1) * (1.2 + rnd() * 2.8), c = i % 10 === 0 ? 'verm' : (i % 3 === 0 ? 'haze' : 'bone');
+    const fh = 1.45 + rnd() * 0.3;   // kept off |x| < 1.2: the engine's girl runs down the centre lane
+    figs.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(c), h: H(0, fh, fh) });
   }
   for (let i = 0; i < 24; i++) {   // continues the engine's queue north along the temple's road face
     const qx = G.x + 4.8 + (i % 3) * 0.35, qz = G.z - 11.5 - i * 1.15 + (i % 2) * 0.25;
-    figs.push({ x: qx, z: qz, w: 0.55, d: 0.45, r: 0, c: C(i % 6 === 0 ? 'verm' : 'bone'), h: H(0, 0, 1.55 + (i % 3) * 0.1) });
+    figs.push({ x: qx, z: qz, w: 0.55, d: 0.45, r: 0, c: C(i % 6 === 0 ? 'verm' : 'bone'), h: H(0, 1.55 + (i % 3) * 0.1, 1.55 + (i % 3) * 0.1) });
   }
   goods.push({ x: G.x - 2.2, z: YZ + 2, w: 0.8, d: 0.8, r: 0.3, c: C('haze'), h: H(0, 0.7, 0) });   // tea table, dadao
   [[-0.9, 0], [0.7, -0.5], [0.4, 0.8]].forEach(o => figs.push({ x: G.x - 2.2 + o[0], z: YZ + 2 + o[1], w: 0.55, d: 0.45, r: rnd() * 6, c: C('bone'), h: H(0, 1.25, 0) }));
@@ -159,42 +162,46 @@
   junk(-26.6, PZ + 11, 0.12, 'lamp');     // moored along the pier's river side
   junk(-27.2, PZ - 3, -0.1, 'bone');
   junk(-26.5, PZ - 15, 0.06, 'lamp');
-  part(-21.5, 0, PZ + 8, 3, 80, only(T, 0.1, 'bone'));                               // riverside path, tower
-  part(-23.1, 0, PZ + 8, 0.08, 80, only(T, 0.9, 'haze'));                            // its railing
-  for (let i = 0; i < 8; i++) veh.push({ x: -21.6 + (rnd() - 0.5) * 0.8, z: PZ + 40 - i * 9.5, w: 0.18, d: 1.5, r: 0.35 + rnd() * 0.3, c: C('haze'), h: H(0, 0, 0.85) });
+  part(-21.5, 0, PZ + 8, 3, 80, only(DT, 0.1, 'bone'));                              // riverside path (runs on past the pier both ways)
+  part(-23.1, 0, PZ + 8, 0.08, 80, only(DT, 0.9, 'haze'));                           // its railing, doubling as the pier rail
+  for (let i = 0; i < 8; i++) veh.push({ x: -21.6 + (rnd() - 0.5) * 0.8, y: 0.4, z: PZ + 40 - i * 9.5, w: 0.18, d: 1.5, r: 0.35 + rnd() * 0.3, c: C('haze'), h: H(0, 0.85, 0.85) });   // bicycles leant on the rail, on the deck
 
   // ── parked at the kerb: bicycles and tricycles, then rows of scooters ──
   const kerbs = [{ x: 6.25, z0: -168, z1: -244 }, { x: -6.3, z0: -156, z1: -175 }, { x: -6.3, z0: -186, z1: -205 }, { x: -6.3, z0: -215, z1: -234 }, { x: -6.3, z0: -246, z1: -274 }];
+  const trikes = [[6.35, -192], [6.35, -250], [-6.4, -161], [-6.4, -209], [-6.4, -228]];
   kerbs.forEach((k, ki) => {
-    for (let z = k.z0; z > k.z1; z -= 3.4) if (rnd() < 0.7)
-      veh.push({ x: k.x, y: WALK, z, w: 0.18, d: 1.6, r: (rnd() - 0.5) * 0.3, c: C(rnd() < 0.8 ? 'haze' : 'ink'), h: H(0, 0.9, 0) });
-    if (ki < 4) for (let z = k.z0 - 0.5; z > k.z1; z -= 0.74)   // scooter rows, not where the queue stands
-      veh.push({ x: k.x, y: WALK, z, w: 0.5, d: 1.7, r: (rnd() - 0.5) * 0.2, c: C(rnd() < 0.85 ? 'haze' : 'bone'), h: H(0, 0, 0.85) });
+    // one slot every 1.8 along the kerb: a bicycle, a scooter, or nothing — never two on one spot
+    for (let z = k.z0; z > k.z1; z -= 1.8) {
+      if (trikes.some(t => Math.abs(t[1] - z) < 1.4)) continue;
+      const r = rnd();
+      if (r < 0.35) veh.push({ x: k.x, y: WALK, z, w: 0.18, d: 1.6, r: (rnd() - 0.5) * 0.3, c: C(rnd() < 0.8 ? 'haze' : 'ink'), h: H(0, 0.9, 0.9) });
+      else if (r < 0.7 && ki < 4) veh.push({ x: k.x, y: WALK, z, w: 0.5, d: 1.7, r: (rnd() - 0.5) * 0.2, c: C(rnd() < 0.85 ? 'haze' : 'bone'), h: H(0, 0.85, 0.85) });   // no scooters where the queue stands
+    }
   });
-  [[6.35, -192], [6.35, -250], [-6.4, -161], [-6.4, -209], [-6.4, -228]].forEach(t => {     // tricycles, dadao
-    veh.push({ x: t[0], y: WALK, z: t[1], w: 0.8, d: 1.9, r: 0, c: C('haze'), h: H(0, 0.75, 0) });
-    veh.push({ x: t[0], y: WALK + 1.35, z: t[1], w: 0.8, d: 1.2, r: 0, c: C('bone'), h: H(0, 0.1, 0) });
-    veh.push({ x: t[0], y: WALK + 0.75, z: t[1] - 0.5, w: 0.05, d: 0.05, r: 0, c: C('ink'), h: H(0, 0.6, 0) });
+  trikes.forEach(t => {     // tricycles
+    veh.push({ x: t[0], y: WALK, z: t[1], w: 0.8, d: 1.9, r: 0, c: C('haze'), h: H(0, 0.75, 0.75) });
+    veh.push({ x: t[0], y: WALK + 1.35, z: t[1], w: 0.8, d: 1.2, r: 0, c: C('bone'), h: H(0, 0.1, 0.1) });
+    veh.push({ x: t[0], y: WALK + 0.75, z: t[1] - 0.5, w: 0.05, d: 0.05, r: 0, c: C('ink'), h: H(0, 0.6, 0.6) });
   });
 
-  // ── 年貨大街, tower era only: lantern strings over the road, banners, stalls, the crowd ──
+  // ── 年貨大街 (dadao and tower): lantern strings over the road, banners, stalls, the crowd ──
   const fest = [];
   for (let k = 0; k < 8; k++) {
     const z = -198 - k * 12;
-    fest.push({ x: 0, y: 7.4, z, w: 12.9, d: 0.04, r: 0, c: C('ink'), h: H(0, 0, 0.04) });
-    for (let i = 0; i <= 10; i++) lant.push({ x: -5 + i, y: 6.9, z, w: 0.5, d: 0.5, r: 0, c: C('verm'), h: H(0, 0, 0.5) });
+    fest.push({ x: 0, y: 7.4, z, w: 12.9, d: 0.04, r: 0, c: C('ink'), h: H(0, 0.04, 0.04) });
+    for (let i = 0; i <= 10; i++) lant.push({ x: -5 + i, y: 6.9, z, w: 0.5, d: 0.5, r: 0, c: C('verm'), h: H(0, 0.5, 0.5) });
   }
   [-1, 1].forEach(side => { for (let k = 0; k < 15; k++) {
     const z = -199 - k * 6 + (rnd() - 0.5) * 1.5, x = side * 5.0;
-    fest.push({ x, z, w: 1.6, d: 3.0, r: 0, c: C('haze'), h: H(0, 0, 0.9) });                              // table
-    fest.push({ x, y: 0.9, z, w: 1.2, d: 2.4, r: 0, c: C(k % 2 ? 'lamp' : 'bone'), h: H(0, 0, 0.35) });     // the goods
-    fest.push({ x, y: 2.25, z, w: 2.2, d: 3.6, r: 0, c: C(k % 3 === 0 ? 'verm' : 'bone'), h: H(0, 0, 0.12) }); // canopy
-    fest.push({ x: x - side * 0.9, z: z - 1.6, w: 0.07, d: 0.07, r: 0, c: C('ink'), h: H(0, 0, 2.25) });
-    fest.push({ x: x - side * 0.9, z: z + 1.6, w: 0.07, d: 0.07, r: 0, c: C('ink'), h: H(0, 0, 2.25) });
+    fest.push({ x, z, w: 1.6, d: 3.0, r: 0, c: C('haze'), h: H(0, 0.9, 0.9) });                            // table
+    fest.push({ x, y: 0.9, z, w: 1.2, d: 2.4, r: 0, c: C(k % 2 ? 'lamp' : 'bone'), h: H(0, 0.35, 0.35) });   // the goods
+    fest.push({ x, y: 2.25, z, w: 2.2, d: 3.6, r: 0, c: C(k % 3 === 0 ? 'verm' : 'bone'), h: H(0, 0.12, 0.12) }); // canopy
+    fest.push({ x: x - side * 0.9, z: z - 1.6, w: 0.07, d: 0.07, r: 0, c: C('ink'), h: H(0, 2.25, 2.25) });
+    fest.push({ x: x - side * 0.9, z: z + 1.6, w: 0.07, d: 0.07, r: 0, c: C('ink'), h: H(0, 2.25, 2.25) });
   } });
-  shops.forEach(s => { const side = Math.sign(s.fx); fest.push({ x: s.fx - side * 0.05, y: 1.9, z: s.z, w: 0.06, d: s.span * 0.6, r: 0, c: C('verm'), h: H(0, 0, 0.9) }); });
-  signPart('年貨大街', 'verm', 'bone', false, 'z', 0, 8.1, -193, 1.5, T);
-  signPart('恭喜發財', 'verm', 'bone', false, 'z', 0, 8.1, -252, 1.5, T);
+  shops.forEach(s => { const side = Math.sign(s.fx); fest.push({ x: s.fx - side * 0.05, y: 1.9, z: s.z, w: 0.06, d: s.span * 0.6, r: 0, c: C('verm'), h: H(0, 0.9, 0.9) }); });
+  signPart('年貨大街', 'verm', 'bone', false, 'z', 0, 8.1, -193, 1.5, DT);
+  signPart('恭喜發財', 'verm', 'bone', false, 'z', 0, 8.1, -252, 1.5, DT);
 
   // ── presence drivers ──
   // instSet collapses an absent item to 0.0001 tall but keeps its footprint, so a canopy or a

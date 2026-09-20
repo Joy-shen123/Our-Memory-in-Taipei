@@ -25,7 +25,7 @@
   // ── THE THREE CHAPTERS ────────────────────────────────────────────────────────
   // A chapter's road marking is painted at zRange[0]; the world flips as the camera crosses it.
   const ERAS = [
-    { key: 'red',   start: 1985, end: 2000, years: '1985–1999', label: 'Childhood', zh: '西門町 · Ximending',
+    { key: 'red',   start: 1985, end: 2000, years: '1985–1999', label: 'When We Were Young', zh: '西門町 · Ximending',
       zRange: [60, -140],   uPrint: 0.0,  traffic: 6,
       palette: { ground: 'ink', roof: 'haze', accent: 'verm' } },
     { key: 'dadao', start: 2000, end: 2020, years: '2000–2019', label: 'Spring Festival', zh: '大稻埕 · Dadaocheng',
@@ -38,7 +38,7 @@
 
   // ── THE WORDS — big lines that surface as you scroll. at = scroll progress 0..1
   const WORDS = [
-    { at: 0.03, big: 'Memory in Us',                  sub: 'Three generations. One street.' },
+    { at: 0.03, big: 'Our Memory in Taipei',          sub: 'Three generations. One street.' },
     { at: 0.10, big: 'We were children.',             sub: 'We felt happiness.' },
     { at: 0.17, big: 'Nostalgia.',                    sub: 'Toys, candy, playful things.' },
     { at: 0.25, big: 'We remember the small things.', sub: '' },
