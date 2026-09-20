@@ -2,7 +2,7 @@
 // the 月下老人 queue beat, and the uPrint post pass (woodblock → night photograph).
 
 (function () {
-  const { PALETTE, GRID, ERAS, TILES, CAM } = window.DATA;
+  const { PALETTE, GRID, ERAS, TILES, CAM, CLOSING } = window.DATA;
   const C = k => new THREE.Color(PALETTE[k]);
 
   // ── tunables ──────────────────────────────────────────────────────────────────
@@ -13,8 +13,8 @@
   const ERA_MS = 500;         // the world re-renders into the next era over this long
   const LABEL_NEAR = 70;      // anchor labels fade in inside this distance
   // per-era mix of the five colours: sky/fog darkens, lamp light grows, print fades
-  const ERA_MIX = { flee: { night: 0.0, lamp: 0.55, hemi: 0.7 }, tea: { night: 0.25, lamp: 0.8, hemi: 0.55 },
-                    modern: { night: 0.5, lamp: 1.0, hemi: 0.45 }, now: { night: 0.75, lamp: 1.25, hemi: 0.35 } };
+  const ERA_MIX = { red: { night: 0.0, lamp: 0.55, hemi: 0.7 }, dadao: { night: 0.4, lamp: 0.95, hemi: 0.5 },
+                    tower: { night: 0.75, lamp: 1.25, hemi: 0.35 } };
 
   // ── fog: directional, permanent, and cheap ───────────────────────────────────
   // three.js fog is distance-from-camera. The brief's fog is "the part of the century you
@@ -116,8 +116,8 @@
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
   boxGeo.translate(0, 0.5, 0); // origin at the base so scale.y is height
   const parts = [];
-  function part(x, y, z, w, d, look, rotY) {
-    const mesh = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') })));
+  function part(x, y, z, w, d, look, rotY, geo) {
+    const mesh = new THREE.Mesh(geo || boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') })));
     mesh.position.set(x, y, z);
     mesh.scale.set(w, 1, d);
     if (rotY) mesh.rotation.y = rotY;
@@ -128,7 +128,6 @@
     parts.push(p);
     return p;
   }
-  const same = (h, col) => ({ flee: { h, col }, tea: { h, col }, modern: { h, col }, now: { h, col } });
   const only = (eras, h, col) => { const o = {}; eras.forEach(k => o[k] = { h, col }); return o; };
 
   const tileX = tile => tile.grid[0] * GRID.laneX + tile.grid[0] * (tile.size[0] / 2 - 4);
@@ -142,72 +141,90 @@
   TILES.filter(t => t.hero).forEach(t => { anchors[t.id] = { tile: t, x: tileX(t), z: tileZ(t), top: 8 }; });
   const built = (t, k) => t.byEra[k].built;
 
-  // 霞海城隍廟 — base, swallowtail-ish roof, two lamp posts, and the queue outside it in `now`
+  const ALL = ERAS.map(e => e.key);
+
+  // Ximen Red House — the 1908 octagon: eight-sided red brick drum, a low roof, a lantern on top
   (() => {
-    const A = anchors.chenghuang, t = A.tile, x = A.x, z = A.z;
-    const on = ERAS.map(e => e.key).filter(k => built(t, k));
-    part(x, 0, z, 8, 8, only(on, 4.5, 'verm'));                    // hall
-    part(x, 4.5, z, 9.6, 9.6, only(on, 1.1, 'ink'));               // roof slab
-    part(x, 5.4, z, 1.6, 10.2, only(on, 1.6, 'ink'), Math.PI / 4); // ridge, a box on its edge
-    part(x - 3.3, 0, z - 5.6, 0.5, 0.5, only(on, 3.2, 'lamp'));    // lamp posts by the door
-    part(x + 3.3, 0, z - 5.6, 0.5, 0.5, only(on, 3.2, 'lamp'));
-    part(x - 4, 0, z + 5.2, 0.6, 0.6, only(on, 2.4, 'lamp'));
-    part(x + 4, 0, z + 5.2, 0.6, 0.6, only(on, 2.4, 'lamp'));
-    // the queue: small figures in a line from the door, along the street, `now` only
-    for (let i = 0; i < 14; i++) {
-      const qx = x - 4.6 - (i < 4 ? 0 : (i - 4) * 0.02), qz = z + 4.6 - i * 1.15 + (i % 2) * 0.25;
-      part(qx - (i % 3) * 0.35, 0, qz, 0.55, 0.45, only(['now'], 1.6 + (i % 3) * 0.1, i % 5 === 0 ? 'verm' : 'bone'));
-    }
-    A.top = 7.5;
+    const A = anchors.redhouse, x = A.x, z = A.z;
+    const oct = new THREE.CylinderGeometry(1, 1, 1, 8); oct.translate(0, 0.5, 0);
+    part(x, 0, z, 5.2, 5.2, only(ALL, 5, 'verm'), Math.PI / 8, oct);              // the drum
+    part(x, 5, z, 5.8, 5.8, only(ALL, 0.6, 'ink'), Math.PI / 8, oct);             // eave slab
+    const cone = new THREE.CylinderGeometry(0.15, 1, 1, 8); cone.translate(0, 0.5, 0);
+    part(x, 5.6, z, 5.4, 5.4, only(ALL, 2.6, 'ink'), Math.PI / 8, cone);          // roof
+    part(x, 8.2, z, 1, 1, only(ALL, 1.2, 'bone'), Math.PI / 8, oct);              // lantern
+    part(x + 6.5, 0, z, 6, 9, { red: { h: 3.6, col: 'bone' }, dadao: { h: 3.6, col: 'bone' }, tower: { h: 3.6, col: 'bone' } }); // the cross-shaped market wing
+    part(x - 3.6, 0, z - 5.4, 0.5, 0.5, only(ALL, 3, 'lamp'));                    // lamps at the door
+    part(x + 3.6, 0, z - 5.4, 0.5, 0.5, only(ALL, 3, 'lamp'));
+    A.top = 9.4;
   })();
 
-  // 迪化街 — five shophouses in a row: arcade at street level, upper floor set back, parapet later
+  // Dihua Street — five shophouses: arcade at street level, upper floor set back, Baroque crests from 1930
   (() => {
-    const A = anchors.dihua, t = A.tile, x = A.x, z0 = A.z + 20;
+    const A = anchors.dihua, x = A.x, z0 = A.z + 20;
     for (let i = 0; i < 5; i++) {
       const z = z0 - i * 10, v = (i % 2) * 0.4;
-      part(x, 0, z, 9, 9, { flee: { h: 3.2, col: 'bone' }, tea: { h: 3.4, col: 'haze' }, modern: { h: 3.6, col: 'bone' }, now: { h: 3.6, col: 'bone' } });
-      part(x + 1.2, 3.2, z, 6.6, 9, { flee: { h: 0.4 + v, col: 'haze' }, tea: { h: 2 + v, col: 'haze' }, modern: { h: 4.4 + v, col: 'bone' }, now: { h: 4.4 + v, col: 'bone' } });
-      part(x - 2.6, 3.4, z, 1.2, 9, only(['modern', 'now'], 5.2 + v, 'bone'));    // pilasters at the street face
-      part(x - 2.6, 8.6 + v, z, 1.4, 4, only(['modern', 'now'], 1.4, 'bone'));    // baroque parapet crest
-      part(x - 3.2, 2.2, z, 0.3, 7, only(['now'], 0.6, 'verm'));                  // 年貨 shop sign band
+      part(x, 0, z, 9, 9, { red: { h: 3.2, col: 'bone' }, dadao: { h: 3.6, col: 'bone' }, tower: { h: 3.6, col: 'bone' } });
+      part(x + 1.2, 3.2, z, 6.6, 9, { red: { h: 1.6 + v, col: 'haze' }, dadao: { h: 4.4 + v, col: 'bone' }, tower: { h: 4.4 + v, col: 'bone' } });
+      part(x - 2.6, 3.4, z, 1.2, 9, only(['dadao', 'tower'], 5.2 + v, 'bone'));   // pilasters
+      part(x - 2.6, 8.6 + v, z, 1.4, 4, only(['dadao', 'tower'], 1.4, 'bone'));   // parapet crest
+      part(x - 3.2, 2.2, z, 0.3, 7, only(['tower'], 0.6, 'verm'));                // shop sign band
     }
     A.top = 10;
   })();
 
-  // 大稻埕碼頭 — a platform on the river, junks in `tea`, one left in `modern`, a park in `now`
+  // Xiahai City God Temple — hall, roof, lamp posts, and the queue outside it today
   (() => {
-    const A = anchors.wharf, x = A.x, z = A.z;
-    part(x, 0, z, 14, 40, { flee: { h: 0.3, col: 'haze' }, tea: { h: 0.8, col: 'haze' }, modern: { h: 0.8, col: 'haze' }, now: { h: 0.8, col: 'haze' } });
-    for (let i = 0; i < 4; i++) {
-      const jz = z + 15 - i * 10, jx = x - 11, eras = i === 1 ? ['tea', 'modern'] : ['tea'];
-      part(jx, -0.3, jz, 2.4, 7, only(eras, 1.4, 'ink'));           // hull
-      part(jx, 1.1, jz + 0.6, 0.3, 0.3, only(eras, 7, 'bone'));     // mast
-      part(jx, 2.6, jz + 0.9, 0.15, 3.4, only(eras, 4.6, 'bone'));  // sail
+    const A = anchors.chenghuang, x = A.x, z = A.z;
+    part(x, 0, z, 8, 8, only(ALL, 4.5, 'verm'));
+    part(x, 4.5, z, 9.6, 9.6, only(ALL, 1.1, 'ink'));
+    part(x, 5.4, z, 1.6, 10.2, only(ALL, 1.6, 'ink'), Math.PI / 4);
+    part(x - 3.3, 0, z - 5.6, 0.5, 0.5, only(ALL, 3.2, 'lamp'));
+    part(x + 3.3, 0, z - 5.6, 0.5, 0.5, only(ALL, 3.2, 'lamp'));
+    part(x + 4, 0, z + 5.2, 0.6, 0.6, only(ALL, 2.4, 'lamp'));
+    part(x - 4, 0, z + 5.2, 0.6, 0.6, only(ALL, 2.4, 'lamp'));
+    for (let i = 0; i < 14; i++) { // the queue, today only, along the street side (east face)
+      const qx = x + 4.8 + (i % 3) * 0.35, qz = z + 4.6 - i * 1.15 + (i % 2) * 0.25;
+      part(qx, 0, qz, 0.55, 0.45, only(['tower'], 1.6 + (i % 3) * 0.1, i % 5 === 0 ? 'verm' : 'bone'));
     }
-    for (let i = 0; i < 6; i++) {                                    // tea chests on the wharf, `tea` only
-      part(x + 3 + (i % 2) * 1.6, 0.8, z + 12 - i * 3.2, 1.2, 1.2, only(['tea'], 1.1, 'ink'));
-    }
-    for (let i = 0; i < 5; i++) {                                    // park trees, `now` only
-      part(x + 4, 0.8, z + 16 - i * 8, 0.4, 0.4, only(['now'], 2.6, 'ink'));
-      part(x + 4, 3.2, z + 16 - i * 8, 2.6, 2.6, only(['now'], 2.4, 'haze'));
-    }
-    A.top = 4;
+    A.top = 7.5;
   })();
 
-  // 太平町 — tea factories, then the 1930s block: the theatre volume with a sign, cafés beside it
+  // Taipei 101 — podium, eight stacked flared segments, spire. Empty field before 2004.
+  const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 0 };
   (() => {
-    const A = anchors.taiping, x = A.x, z0 = A.z + 15;
-    part(x, 0, z0, 9, 10, { tea: { h: 4, col: 'haze' }, modern: { h: 12, col: 'bone' }, now: { h: 11, col: 'haze' } });   // 永樂座 volume
-    part(x - 4.6, 7, z0, 0.4, 6, only(['modern'], 3, 'verm'));                                                          // its vertical sign
-    part(x - 4.6, 3, z0, 0.4, 5, only(['now'], 1.2, 'lamp'));
-    part(x, 0, z0 - 10, 9, 10, { tea: { h: 3.5, col: 'haze' }, modern: { h: 7, col: 'bone' }, now: { h: 10, col: 'haze' } });
-    part(x, 0, z0 - 20, 9, 10, { tea: { h: 4, col: 'haze' }, modern: { h: 6, col: 'bone' }, now: { h: 12, col: 'haze' } });
-    part(x, 0, z0 - 30, 9, 10, { tea: { h: 3, col: 'haze' }, modern: { h: 8, col: 'bone' }, now: { h: 9, col: 'haze' } });
-    part(x - 2.6, 6.2, z0 - 10, 1.4, 5, only(['modern'], 1.4, 'bone'));                                                 // parapet crests
-    part(x - 2.6, 5.2, z0 - 20, 1.4, 5, only(['modern'], 1.4, 'bone'));
-    A.top = 13;
+    const A = anchors.tower101, x = A.x, z = A.z;
+    part(x, 0, z, 26, 26, only(['tower'], 6, 'haze'));                          // podium
+    part(x, 6, z, 15, 15, only(['tower'], 14, 'haze'));                         // base shaft
+    let y = 20;
+    for (let i = 0; i < 8; i++) {                                               // the eight segments
+      const w = 12 + (i % 2) * 0.6;
+      part(x, y, z, w - 2.5, w - 2.5, only(['tower'], 9, 'haze'));
+      part(x, y + 5.5, z, w, w, only(['tower'], 3.5, 'haze'));                  // the flared top of each segment
+      y += 9;
+    }
+    part(x, y, z, 6, 6, only(['tower'], 5, 'haze'));                            // crown
+    part(x, y + 5, z, 1.2, 1.2, only(['tower'], 14, 'bone'));                   // spire
+    TOWER.h = y + 5;
+    A.top = y + 19;
   })();
+
+  // the man climbing the west face: a small figure whose height follows the scroll in the last chapter
+  const man = new THREE.Group();
+  const manMat = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
+  const manBody = new THREE.Mesh(boxGeo, manMat); manBody.scale.set(0.7, 1.4, 0.5); man.add(manBody);
+  const manHead = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') }))); manHead.scale.set(0.5, 0.5, 0.5); manHead.position.y = 1.45; man.add(manHead);
+  const armL = new THREE.Mesh(boxGeo, manMat); armL.scale.set(0.25, 1.1, 0.25); armL.position.set(-0.55, 1.0, 0); man.add(armL);
+  const armR = new THREE.Mesh(boxGeo, manMat); armR.scale.set(0.25, 1.1, 0.25); armR.position.set(0.55, 0.7, 0); man.add(armR);
+  man.scale.setScalar(1.6);
+  scene.add(man);
+  function updateMan(u) {
+    const i = ERAS.length - 1, f = Math.min(1, Math.max(0, (u - BOUNDS[i]) / (BOUNDS[i + 1] - BOUNDS[i])));
+    man.visible = ERAS[eraIdx].key === 'tower';
+    const climb = Math.pow(f, 1.4) * TOWER.h * 0.93 + 6;
+    man.position.set(TOWER.x - 6.1, climb, TOWER.z + 1.5);
+    const t = performance.now() / 1000;
+    armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
+  }
 
   // ── era state and the 500ms re-render ────────────────────────────────────────
   let eraIdx = 0, eraT0 = -1e9, eraFrom = 0, eraE = 1;
@@ -351,12 +368,14 @@
   const eraYearsEl = document.getElementById('eraYears');
   let swapTimer = 0;
   function swapEraLabel(era, instant) {
-    const apply = () => { eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + ' · ' + era.en; };
+    const apply = () => { eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + ' · ' + era.zh; };
     clearTimeout(swapTimer);
     if (instant) { eraBox.classList.remove('swap'); apply(); return; }
     eraBox.classList.add('swap');
     swapTimer = setTimeout(() => { apply(); eraBox.classList.remove('swap'); }, 240);
   }
+  const closingEl = document.getElementById('closing');
+  closingEl.textContent = CLOSING.line;
   const labelHost = document.getElementById('labels');
   const labels = Object.values(anchors).map(A => {
     const el = document.createElement('div');
@@ -377,8 +396,8 @@
       const vis = s.built && inFront ? near * eraE : 0;
       if (L.shownKey !== key) { // reveal the caption word by word (per character, this is 中文)
         L.shownKey = key;
-        L.name.textContent = L.A.tile.name.zh;
-        L.en.textContent = L.A.tile.name.en;
+        L.name.textContent = L.A.tile.name.en;
+        L.en.textContent = L.A.tile.name.zh;
         L.cap.innerHTML = (s.caption || '').split('').map((ch, i) => `<span style="transition-delay:${i * 18}ms">${ch}</span>`).join('');
       }
       el = L.el;
@@ -421,7 +440,9 @@
 
     setEra(eraAtU(progress), false);
     updateWorld(now);
+    updateMan(progress);
     updateLabels();
+    closingEl.style.opacity = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6)).toFixed(2);
 
     const y = Math.round(yearAtU(progress));
     if (y !== shownYear) { shownYear = y; yearEl.textContent = String(y); }

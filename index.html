@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>時代迷霧 · 大稻埕</title>
+<title>Memory in Us</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,22 +12,22 @@
   <!-- Scroll spacer. The canvas never scrolls; this page does, over it. -->
   <div class="scroll" aria-hidden="true">
     <section data-era="open"></section>
-    <section data-era="flee"></section>
-    <section data-era="tea"></section>
-    <section data-era="modern"></section>
-    <section data-era="now"></section>
+    <section data-era="red"></section>
+    <section data-era="dadao"></section>
+    <section data-era="tower"></section>
     <section data-era="close"></section>
   </div>
 
   <div id="labels" aria-hidden="true"></div>
 
   <div class="hud">
-    <div class="hud-title">時代迷霧 <span>大稻埕</span></div>
+    <div class="hud-title">Memory in Us <span>Taipei</span></div>
     <div class="hud-era">
       <div class="hud-era-label" id="eraLabel"></div>
       <div class="hud-era-years" id="eraYears"></div>
     </div>
-    <div class="hud-year"><span class="hud-year-k">年</span><span id="year">1853</span></div>
+    <div class="hud-closing" id="closing"></div>
+    <div class="hud-year"><span class="hud-year-k">YEAR</span><span id="year">1853</span></div>
   </div>
 
   <script src="three.min.js"></script>
