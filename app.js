@@ -423,20 +423,42 @@
   window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
 
 
-  // ── the girl running down the middle of the street, always a little ahead of the camera ──
+  // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
+  // Issue #1 Part 2 (CJ, 2026-09-21: 「go 開始 Part 2」). Suggested, not copied: bowl-cut black
+  // hair with a straight fringe, white shirt, dark skirt on two straps, red cheeks, a bowl of
+  // noodles carried in both hands in front of her. She is the viewer's memory, so she runs the
+  // whole street, not only the 2000s. Primitives and the palette only.
   const girl = new THREE.Group();
-  const gMat = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
   const gSkin = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
+  const gShirt = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
   const gInk = withFog(new THREE.MeshLambertMaterial({ color: C('ink') }));
-  const skirtGeo = new THREE.ConeGeometry(0.55, 1, 10); skirtGeo.translate(0, 0.5, 0);
-  const skirt = new THREE.Mesh(skirtGeo, gMat); skirt.scale.set(1, 0.9, 1); skirt.position.y = 0.75; girl.add(skirt);
-  const torso = new THREE.Mesh(boxGeo, gMat); torso.scale.set(0.5, 0.55, 0.3); torso.position.y = 1.6; girl.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), gSkin); head.position.y = 2.42; girl.add(head);
-  const hair = new THREE.Mesh(boxGeo, gInk); hair.scale.set(0.16, 0.5, 0.16); hair.position.set(0, 2.05, 0.3); hair.rotation.x = -0.9; girl.add(hair);
+  const gVerm = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
+  const gLamp = withFog(new THREE.MeshLambertMaterial({ color: C('lamp') }));
+  const skirtGeo = new THREE.ConeGeometry(0.5, 1, 10); skirtGeo.translate(0, 0.5, 0);
+  const skirt = new THREE.Mesh(skirtGeo, gInk); skirt.scale.set(1, 0.85, 1); skirt.position.y = 0.8; girl.add(skirt);        // dark skirt
+  const torso = new THREE.Mesh(boxGeo, gShirt); torso.scale.set(0.52, 0.6, 0.32); torso.position.y = 1.62; girl.add(torso);   // white shirt
+  [-0.13, 0.13].forEach(x => { const st = new THREE.Mesh(boxGeo, gInk); st.scale.set(0.09, 0.6, 0.34); st.position.set(x, 1.62, 0); girl.add(st); }); // straps
+  const bib = new THREE.Mesh(boxGeo, gInk); bib.scale.set(0.36, 0.22, 0.35); bib.position.y = 1.62; girl.add(bib);          // the skirt's bib
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), gSkin); head.position.y = 2.46; girl.add(head);
+  // bowl cut: a cap of hair over the top and back, a straight fringe across the forehead
+  const capGeo = new THREE.SphereGeometry(0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.58);
+  const hairCap = new THREE.Mesh(capGeo, gInk); hairCap.position.y = 2.47; girl.add(hairCap);
+  const fringe = new THREE.Mesh(boxGeo, gInk); fringe.scale.set(0.5, 0.16, 0.14); fringe.position.set(0, 2.42, 0.2); girl.add(fringe);
+  const hair = new THREE.Mesh(boxGeo, gInk); hair.scale.set(0.56, 0.3, 0.16); hair.position.set(0, 2.28, -0.2); girl.add(hair);  // the back of the bowl
+  [-0.17, 0.17].forEach(x => { const ch = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), gVerm); ch.position.set(x, 2.38, 0.22); girl.add(ch); }); // red cheeks
   const legL = new THREE.Mesh(boxGeo, gSkin); legL.scale.set(0.16, 0.8, 0.16); legL.position.set(-0.15, 0.8, 0); legL.rotation.x = Math.PI; girl.add(legL);
   const legR = new THREE.Mesh(boxGeo, gSkin); legR.scale.set(0.16, 0.8, 0.16); legR.position.set(0.15, 0.8, 0); legR.rotation.x = Math.PI; girl.add(legR);
-  const gArmL = new THREE.Mesh(boxGeo, gSkin); gArmL.scale.set(0.13, 0.6, 0.13); gArmL.position.set(-0.36, 2.1, 0); gArmL.rotation.x = Math.PI; girl.add(gArmL);
-  const gArmR = new THREE.Mesh(boxGeo, gSkin); gArmR.scale.set(0.13, 0.6, 0.13); gArmR.position.set(0.36, 2.1, 0); gArmR.rotation.x = Math.PI; girl.add(gArmR);
+  [legL, legR].forEach(l => { const shoe = new THREE.Mesh(boxGeo, gInk); shoe.scale.set(1.2, 0.12, 1.6); shoe.position.set(0, 0.95, -0.25); l.add(shoe); }); // shoes at the foot end of the leg
+  // arms held forward, both hands on the bowl
+  const gArmL = new THREE.Mesh(boxGeo, gSkin); gArmL.scale.set(0.13, 0.55, 0.13); gArmL.position.set(-0.3, 1.95, 0.06); gArmL.rotation.x = -Math.PI / 2 + 0.25; girl.add(gArmL);
+  const gArmR = new THREE.Mesh(boxGeo, gSkin); gArmR.scale.set(0.13, 0.55, 0.13); gArmR.position.set(0.3, 1.95, 0.06); gArmR.rotation.x = -Math.PI / 2 + 0.25; girl.add(gArmR);
+  const bowl = new THREE.Group();
+  const bowlGeo = new THREE.CylinderGeometry(0.3, 0.2, 0.22, 12); bowlGeo.translate(0, 0.11, 0);
+  bowl.add(new THREE.Mesh(bowlGeo, gShirt));
+  const noodles = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), gLamp); noodles.position.y = 0.18; bowl.add(noodles);
+  const egg = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), gVerm); egg.position.set(0.08, 0.36, 0.05); bowl.add(egg);
+  [-0.05, 0.03].forEach((x, i) => { const cs = new THREE.Mesh(boxGeo, gInk); cs.scale.set(0.025, 0.5, 0.025); cs.position.set(x, 0.2, -0.02 + i * 0.03); cs.rotation.z = 0.35 + i * 0.1; cs.rotation.x = -0.4; bowl.add(cs); });
+  bowl.position.set(0, 1.78, 0.5); girl.add(bowl);
   girl.scale.setScalar(1.15);
   scene.add(girl);
   let stride = 0, lastProg = 0, run = 0;
@@ -448,8 +470,9 @@
     girl.position.set(Math.sin(stride * 0.15) * 0.6, Math.abs(Math.sin(stride)) * 0.12 * run, z);
     const sw = Math.sin(stride) * (0.25 + run * 0.9);
     legL.rotation.x = Math.PI + sw; legR.rotation.x = Math.PI - sw;
-    gArmL.rotation.x = Math.PI - sw * 0.8; gArmR.rotation.x = Math.PI + sw * 0.8;
-    hair.rotation.x = -0.9 - run * 0.5;
+    const carry = Math.sin(stride * 2) * 0.04 * run;                                 // the bowl bobs a little as she runs; the arms stay on it
+    bowl.position.y = 1.78 + carry; gArmL.position.y = gArmR.position.y = 1.95 + carry;
+    hair.position.z = -0.2 - run * 0.06; fringe.position.y = 2.42 + Math.sin(stride * 2) * 0.01 * run;
     girl.rotation.y = 0;
   }
 

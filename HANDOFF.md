@@ -4,7 +4,7 @@ Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/
 
 ## What it is
 
-One page, one verb: scroll. A street runs away from the camera. Scrolling moves the camera down the street and forward in time through three chapters. A girl in a red dress runs down the middle of the road ahead of the camera. Big words surface as you scroll. It ends on a man climbing Taipei 101 with the line "Where we go, we don't know. We only know we need to climb higher."
+One page, one verb: scroll. A street runs away from the camera. Scrolling moves the camera down the street and forward in time through three chapters. 張君雅小妹妹 (bowl cut, white shirt, dark skirt, a bowl of noodles in both hands) runs down the middle of the road ahead of the camera; she is the viewer's memory, so she runs every chapter. Big words surface as you scroll. It ends on a man climbing Taipei 101 with the line "Where we go, we don't know. We only know we need to climb higher."
 
 | Chapter | key | years | z range | what is there |
 |---|---|---|---|---|
@@ -86,7 +86,7 @@ Every item below is procedural (primitives, canvas text, the palette) or from th
 
 ## Open items
 
-1. Issue #1 Part 2: replace the girl (`girl`, `updateGirl` in `app.js`) with 張君雅小妹妹 — bowl cut, white shirt, dark skirt or overalls, a noodle bowl held in front, the same scroll-driven run. Suggest the character, do not copy the artwork.
+1. Issue #1 Part 2 done 2026-09-21: the runner is 張君雅小妹妹 (`girl`, `updateGirl` in `app.js`, names kept). Suggested with primitives, not the trademark artwork.
 2. Issue #1 Part 3: write `RUBRIC.md`, score each chapter once, post the scores and the three lowest items to the issue thread.
 3. The base-shot keyframe (CAM[4] in `data.js`, camera y 3 at z -372 looking at y 50) puts the frame bottom at ~13° elevation, so the 101 podium is below the frame in that shot. Lower the target (y 40) or move the camera back (z -380) if the podium should show.
 4. The wharf is only seen peripherally (the target curve looks east through Dadaocheng). A keyframe that glances west at z ≈ -200 would show it.
