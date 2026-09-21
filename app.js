@@ -594,10 +594,11 @@
   const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
   const post = new THREE.ShaderMaterial({
     uniforms: { tDiffuse: { value: rt.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uPrint: { value: 1 },
-                uTime: { value: 0 }, uInk: { value: C('ink') }, uHaze: { value: C('haze') }, uBone: { value: C('bone') } },
+                uTime: { value: 0 }, uInk: { value: C('ink') }, uHaze: { value: C('haze') }, uBone: { value: C('bone') },
+                uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 1, 1) } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
     fragmentShader: `
-      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime; uniform vec3 uInk, uHaze, uBone;
+      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime, uFlash; uniform vec3 uInk, uHaze, uBone, uFlashCol;
       varying vec2 vUv;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -628,6 +629,9 @@
         // VIGNETTE — restrained
         float d = distance(vUv, vec2(0.5));
         c *= 1.0 - smoothstep(0.45, 1.0, d) * 0.3;
+        // CHAPTER CUT — a flash from the centre of the frame as the camera crosses a year marking
+        float fm = 1.0 - smoothstep(0.12, 0.72, length(vec2(vUv.x - 0.5, (vUv.y - 0.5) * 0.6)));
+        c = mix(c, uFlashCol, uFlash * fm);
         gl_FragColor = vec4(c, 1.0);
       }`,
     depthTest: false, depthWrite: false
@@ -635,6 +639,27 @@
   const postScene = new THREE.Scene();
   postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  // ── chapter cut: a flash as the camera crosses each year marking ─────────────
+  // Keyed on progress (so it scrubs both ways), white at the 2000 marking and warm gold at 2020;
+  // it holds briefly and fades so stopping on a marking does not leave the frame lit. Borrowed
+  // from IVRESS's section cuts (research/ivress/README.md).
+  const FLASH_W = 0.012, FLASH_HOLD = 500, FLASH_FADE = 1200;
+  const FLASH_COL = [null, new THREE.Color(1, 1, 1), C('lamp').lerp(new THREE.Color(1, 1, 1), 0.45)];
+  let flashIn = false, flashT0 = 0;
+  function updateFlash(now) {
+    let a = 0, col = null;
+    for (let i = 1; i < ERAS.length; i++) {
+      const k = 1 - Math.min(1, Math.abs(progress - BOUNDS[i]) / FLASH_W);
+      if (k > a) { a = k; col = FLASH_COL[i]; }
+    }
+    if (a > 0 && !flashIn) { flashIn = true; flashT0 = now; }
+    if (a === 0) flashIn = false;
+    const t = now - flashT0;
+    const fade = t < FLASH_HOLD ? 1 : Math.max(0, 1 - (t - FLASH_HOLD) / FLASH_FADE);
+    post.uniforms.uFlash.value = a * a * (3 - 2 * a) * fade;
+    if (col) post.uniforms.uFlashCol.value.copy(col);
+  }
 
   // ── HUD: era label, year, anchor labels ──────────────────────────────────────
   const yearEl = document.getElementById('year');
@@ -726,6 +751,7 @@
     if (y !== shownYear) { shownYear = y; yearEl.textContent = String(y); }
 
     post.uniforms.uTime.value = now / 1000;
+    updateFlash(now);
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
     renderer.setRenderTarget(null);
