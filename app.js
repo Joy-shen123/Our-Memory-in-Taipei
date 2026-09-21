@@ -834,9 +834,29 @@
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });
   resize();
 
+  // ── render warm-up (IVRESS borrow h) ─────────────────────────────────────────
+  // three.js compiles a material's program and uploads its textures the first time the object is
+  // drawn, so the first crossing into each era used to hitch on the buildings that only exist
+  // there. Era differences are visibility and uniforms only, so one pass with everything visible
+  // covers all three: compile every program, draw one frame into the offscreen target so the
+  // textures upload, then restore. Runs on the first frame, after the scene files have built.
+  // ?nowarm=1 skips it, for measuring.
+  let warm = null;
+  function warmUp() {
+    const t0 = performance.now(), vis = [];
+    scene.traverse(o => { vis.push([o, o.visible]); o.visible = true; });
+    renderer.compile(scene, camera);
+    renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null);
+    vis.forEach(([o, v]) => { o.visible = v; });
+    warm = { ms: Math.round(performance.now() - t0), programs: renderer.info.programs.length, textures: renderer.info.memory.textures };
+  }
+  const NOWARM = new URLSearchParams(location.search).get('nowarm') === '1';
+  const hitch = { max: 0, at: 0 };                                 // the longest frame gap since load, for measuring
   function frame(now) {
     const dt = Math.min(0.1, (now - lastT) / 1000);
+    if (now - lastT > hitch.max && lastT > 0) { hitch.max = Math.round(now - lastT); hitch.at = +progress.toFixed(3); }
     lastT = now;
+    if (!warm && !NOWARM) { warmUp(); hitch.max = 0; }
     const target = Math.min(1, Math.max(0, window.scrollY / maxScroll()));
     progress += (target - progress) * (1 - Math.exp(-DAMP * dt));
     if (Math.abs(target - progress) < 0.00005) progress = target;
@@ -884,7 +904,7 @@
 
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; },
-                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
+                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
 
   requestAnimationFrame(frame);
 })();
