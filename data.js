@@ -120,8 +120,9 @@
     { p: [2, 5, -300],     t: [0, 40, -420],   fov: 55 },
     // 4 · the base — looking straight up the west face
     { p: [-3, 3, -372],    t: [-4, 50, -420],  fov: 62 },
-    // 5 · closing — high beside the tower, the man near the top
-    { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 50 },
+    // 5 · closing — high beside the tower, the man near the top. The fov opens from 62 to 82
+    //     over the climb so the world widens as he nears the crown (IVRESS borrow e).
+    { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 82 },
   ];
 
   const root = document.documentElement;
