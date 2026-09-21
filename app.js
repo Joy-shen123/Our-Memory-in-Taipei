@@ -65,7 +65,10 @@
   // ── renderer, scene, camera ──────────────────────────────────────────────────
   const canvas = document.getElementById('scene');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // pixel ratio cap: 2 on a desktop, 1.5 on a phone (coarse pointer or a narrow screen), so a
+  // 3x phone does not render 9x the pixels of a laptop
+  const IS_PHONE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_PHONE ? 1.5 : 2));
   renderer.outputEncoding = THREE.LinearEncoding; // gamma is applied at the end of the post pass
 
   const scene = new THREE.Scene();
@@ -801,7 +804,7 @@
       const dist = Math.hypot(L.A.x - camera.position.x, L.A.z - camera.position.z);
       const inFront = wp.z < 1 && Math.abs(wp.x) < 1.1;
       const near = Math.min(1, Math.max(0, (LABEL_NEAR - dist) / 30));
-      const vis = s.built && inFront ? near * eraE : 0;
+      const vis = s.built && inFront ? near * eraE * (1 - closingA) : 0;   // labels step aside for the closing line
       if (L.shownKey !== key) { // reveal the caption word by word (per character, this is 中文)
         L.shownKey = key;
         L.name.textContent = L.A.tile.name.en;
@@ -820,7 +823,7 @@
 
   // ── scroll → progress, damped ────────────────────────────────────────────────
   const maxScroll = () => Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-  let progress = 0, frontier = Infinity, lastT = performance.now(), shownYear = -1;
+  let progress = 0, frontier = Infinity, lastT = performance.now(), shownYear = -1, closingA = 0;
 
   function resize() {
     const w = window.innerWidth, h = window.innerHeight, pr = renderer.getPixelRatio();
@@ -833,6 +836,34 @@
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });
   resize();
+
+  // ── robustness: tab switches, keyboards, touch ───────────────────────────────
+  // Coming back from another tab, the first frame's dt would be the whole absence; dt is clamped
+  // to 50 ms and the clocks are reset so neither the camera damping nor the runner's scroll-speed
+  // estimate sees a jump.
+  const resetClocks = () => { lastT = performance.now(); lastProg = progress; };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resetClocks(); });
+  window.addEventListener('pageshow', resetClocks);
+  window.addEventListener('focus', resetClocks);
+  // keyboard: arrows, page keys, space, home, end scroll the page even when the browser gave the
+  // canvas focus and stopped scrolling the document itself
+  window.addEventListener('keydown', ev => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    const page = window.innerHeight * 0.8, step = 120;
+    const by = { ArrowDown: step, ArrowUp: -step, PageDown: page, PageUp: -page, ' ': ev.shiftKey ? -page : page }[ev.key];
+    if (by !== undefined) { ev.preventDefault(); window.scrollBy({ top: by, behavior: 'smooth' }); }
+    else if (ev.key === 'Home') { ev.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (ev.key === 'End') { ev.preventDefault(); window.scrollTo({ top: maxScroll(), behavior: 'smooth' }); }
+  });
+  // touch: the document scrolls natively (touch-action: pan-y on the canvas). If an in-app browser
+  // swallows the gesture and scrollY does not move, drag the page by hand for the rest of the swipe.
+  let touchY = 0, touchScroll0 = 0, touchMoves = 0, touchManual = false;
+  window.addEventListener('touchstart', ev => { touchY = ev.touches[0].clientY; touchScroll0 = window.scrollY; touchMoves = 0; touchManual = false; }, { passive: true });
+  window.addEventListener('touchmove', ev => {
+    const y = ev.touches[0].clientY, dy = touchY - y; touchY = y; touchMoves++;
+    if (!touchManual && touchMoves >= 3 && Math.abs(dy) > 4 && window.scrollY === touchScroll0) touchManual = true;
+    if (touchManual) window.scrollBy(0, dy);
+  }, { passive: true });
 
   // ── render warm-up (IVRESS borrow h) ─────────────────────────────────────────
   // three.js compiles a material's program and uploads its textures the first time the object is
@@ -853,7 +884,7 @@
   const NOWARM = new URLSearchParams(location.search).get('nowarm') === '1';
   const hitch = { max: 0, at: 0 };                                 // the longest frame gap since load, for measuring
   function frame(now) {
-    const dt = Math.min(0.1, (now - lastT) / 1000);
+    const dt = Math.min(0.05, (now - lastT) / 1000);
     if (now - lastT > hitch.max && lastT > 0) { hitch.max = Math.round(now - lastT); hitch.at = +progress.toFixed(3); }
     lastT = now;
     if (!warm && !NOWARM) { warmUp(); hitch.max = 0; }
@@ -875,7 +906,8 @@
     updateGirl(progress, camZ, dt);
     updateWords(progress);
     updateLabels();
-    closingEl.style.opacity = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6)).toFixed(2);
+    closingA = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6));
+    closingEl.style.opacity = closingA.toFixed(2);
 
     const y = Math.round(yearAtU(progress));
     if (y !== shownYear) { shownYear = y; yearEl.textContent = String(y); }

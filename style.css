@@ -20,6 +20,7 @@ html, body {
   height: 100vh;
   display: block;
   z-index: 0;
+  touch-action: pan-y;   /* a swipe on the canvas scrolls the page */
 }
 
 /* the scroll runway. 6 sections = opening, four eras, closing. */
@@ -85,7 +86,7 @@ html, body {
 }
 
 @media (max-width: 480px) {
-  .hud-title { font-size: 10px; letter-spacing: 0.24em; }
+  .hud-title { font-size: 10px; letter-spacing: 0.24em; top: auto; bottom: 28px; }   /* bottom-right on a phone: the chapter column owns the top */
   .hud-chapter { gap: 12px; }
   .chap-col { min-width: 0; gap: 6px; }
   .chap-n { font-size: 20px; }
