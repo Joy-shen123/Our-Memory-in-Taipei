@@ -476,6 +476,77 @@
     girl.rotation.y = 0;
   }
 
+  // ── curve particles (IVRESS borrow g): lantern sparks in Dadaocheng, a light stream up 101 ──
+  // Two THREE.Points, CPU-updated each frame, each riding a CatmullRomCurve3 sampled once into a
+  // table: the sparks drift along a curve threaded through the eight lantern strings and rise off
+  // it; the stream spirals up the tower on a curve that follows TOWER.faceX. A tiny shader gives
+  // each point a soft round sprite and its own alpha. Capped at 500 + 900 points.
+  const SPARK_N = 500, STREAM_N = 900;
+  const pointsMat = (size) => new THREE.ShaderMaterial({
+    uniforms: { uSize: { value: size }, uPR: { value: renderer.getPixelRatio() } },
+    vertexShader: `attribute float aAlpha; attribute vec3 aColor; uniform float uSize, uPR; varying float vA; varying vec3 vC;
+      void main(){ vC = aColor; vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = min(28.0, uSize * uPR * 240.0 / max(1.0, -mv.z)); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vA; varying vec3 vC;
+      void main(){ vec2 d = gl_PointCoord - 0.5; float r = dot(d, d); if (r > 0.25) discard;
+        gl_FragColor = vec4(vC, vA * smoothstep(0.25, 0.06, r)); }`,
+    transparent: true, depthWrite: false, fog: false
+  });
+  function pointsSet(n, size) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), alp = new Float32Array(n);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(alp, 1));
+    const mesh = new THREE.Points(geo, pointsMat(size)); mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
+    return { mesh, pos, col, alp, n, p: [] };
+  }
+  const sampleCurve = (pts, n) => new THREE.CatmullRomCurve3(pts, false, 'centripetal').getSpacedPoints(n);
+  const curveAt = (tab, t) => { const f = Math.min(tab.length - 1.001, Math.max(0, t) * (tab.length - 1)), i = Math.floor(f), k = f - i; return P3.copy(tab[i]).lerp(tab[i + 1], k); };
+  const sparks = pointsSet(SPARK_N, 0.55), stream = pointsSet(STREAM_N, 0.7);
+  const sparkCurve = sampleCurve([[0, 7.2, -186], [1.5, 7.0, -204], [-1.5, 7.4, -228], [1.0, 7.0, -252], [-1.0, 7.3, -276], [0, 7.5, -290]].map(a => new THREE.Vector3(a[0], a[1], a[2])), 256);
+  const lampC = C('lamp'), vermC = C('verm'), boneC = C('bone'), glassC = C('glass');
+  for (let i = 0; i < SPARK_N; i++) sparks.p.push({ t: rnd(), x: (rnd() - 0.5) * 11, life: rnd(), rate: 0.25 + rnd() * 0.3, sway: rnd() * 6.28, warm: rnd() });
+  let streamCurve = null;
+  function buildStreamCurve() {                                    // needs TOWER.faceX from scene-tower.js
+    const pts = [];
+    for (let k = 0; k <= 14; k++) {
+      const y = 2 + (TOWER.h + 18 - 2) * k / 14, r = TOWER.x - TOWER.faceX(y) + 1.6, a = k * 1.35;
+      pts.push(new THREE.Vector3(TOWER.x + Math.cos(a) * r, y, TOWER.z + Math.sin(a) * r));
+    }
+    streamCurve = sampleCurve(pts, 512);
+    for (let i = 0; i < STREAM_N; i++) stream.p.push({ t: rnd(), rate: 0.045 + rnd() * 0.05, jx: (rnd() - 0.5) * 1.2, jy: (rnd() - 0.5) * 1.2, jz: (rnd() - 0.5) * 1.2, bright: rnd() });
+  }
+  function updateParticles(dt, now, key) {
+    sparks.mesh.visible = key === 'dadao';
+    stream.mesh.visible = key === 'tower' && !!streamCurve;
+    if (sparks.mesh.visible) {
+      const P = sparks.p, t = now / 1000;
+      for (let i = 0; i < SPARK_N; i++) {
+        const q = P[i]; q.life += q.rate * dt; if (q.life > 1) { q.life = 0; q.t = rnd(); q.x = (rnd() - 0.5) * 11; }
+        curveAt(sparkCurve, q.t);
+        const rise = q.life * 4.5, sw = Math.sin(t * 1.7 + q.sway) * 0.35 * q.life;
+        sparks.pos[i * 3] = P3.x + q.x + sw; sparks.pos[i * 3 + 1] = P3.y + rise; sparks.pos[i * 3 + 2] = P3.z + Math.cos(t * 1.3 + q.sway) * 0.3;
+        tmpC.copy(lampC).lerp(vermC, q.warm * 0.6);
+        sparks.col[i * 3] = tmpC.r; sparks.col[i * 3 + 1] = tmpC.g; sparks.col[i * 3 + 2] = tmpC.b;
+        sparks.alp[i] = Math.sin(q.life * Math.PI) * 0.9;
+      }
+      sparks.mesh.geometry.attributes.position.needsUpdate = true; sparks.mesh.geometry.attributes.aColor.needsUpdate = true; sparks.mesh.geometry.attributes.aAlpha.needsUpdate = true;
+    }
+    if (stream.mesh.visible) {
+      const P = stream.p;
+      for (let i = 0; i < STREAM_N; i++) {
+        const q = P[i]; q.t += q.rate * dt; if (q.t > 1) q.t -= 1;
+        curveAt(streamCurve, q.t);
+        stream.pos[i * 3] = P3.x + q.jx; stream.pos[i * 3 + 1] = P3.y + q.jy; stream.pos[i * 3 + 2] = P3.z + q.jz;
+        tmpC.copy(glassC).lerp(boneC, 0.5 + q.bright * 0.5).lerp(lampC, q.t * 0.5);   // cool at the base, warm and pale near the crown
+        stream.col[i * 3] = tmpC.r; stream.col[i * 3 + 1] = tmpC.g; stream.col[i * 3 + 2] = tmpC.b;
+        stream.alp[i] = (0.35 + 0.65 * q.bright) * Math.min(1, q.t * 8) * Math.min(1, (1 - q.t) * 6);
+      }
+      stream.mesh.geometry.attributes.position.needsUpdate = true; stream.mesh.geometry.attributes.aColor.needsUpdate = true; stream.mesh.geometry.attributes.aAlpha.needsUpdate = true;
+    }
+  }
+
   // ── the words ──────────────────────────────────────────────────────────────
   // Each word is split into glyph spans with a per-glyph transition-delay; toggling .show on the
   // block reveals them letter by letter with no JS per frame (IVRESS borrow b). The block's own
@@ -778,6 +849,8 @@
 
     setEra(eraAtU(progress), false);
     updateWorld(now);
+    if (!streamCurve && TOWER.faceX) buildStreamCurve();
+    updateParticles(dt, now, ERAS[eraIdx].key);
     updateMan(progress);
     updateGirl(progress, camZ, dt);
     updateWords(progress);
