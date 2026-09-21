@@ -137,6 +137,8 @@
   // street level, two floors of small windows and balconies above, flat roofs carrying the
   // big steel-framed signs (國際牌, 黑松 …) that lit the road at night. West side of the street,
   // 1985–1991 in scroll time; demolished in 1992, so the childhood chapter only.
+  // CJ, 2026-09-21: 「盡量矮點才能比較後來的建設跟慢慢長大的感覺」— drawn at two storeys (arcade +
+  // one floor) so the childhood street stays low and the later chapters grow above it.
   (() => {
     const NAMES = ['忠', '孝', '仁', '愛', '信', '義', '和', '平'];
     const NEON = [['國際牌', 'verm'], ['黑松汽水', 'lamp'], ['三洋', 'verm'], ['聲寶', 'lamp'], ['歌林', 'verm'], ['大同', 'lamp'], ['味全', 'verm'], ['SONY', 'lamp']];
@@ -153,22 +155,22 @@
         F(XF - 1.6 + 1.5 - 0.02, z - L / 2 + 1.7 + k * 3.3, 0, 0.06, 2.0, 2.2, 'ink');            // the open shop doorway, dark
       }
       // upper two storeys, over the arcade, with balcony windows (instanced, one shared texture)
-      upper.push({ x: x0, z, y: FLOOR, w: DEPTH, d: L, h: hOf(FLOOR * 2), c: C('bone') });
-      part(x0, FLOOR * 3, z, DEPTH + 0.3, L + 0.3, only(RED, 0.5, 'haze'));      // parapet / roof slab
+      upper.push({ x: x0, z, y: FLOOR, w: DEPTH, d: L, h: hOf(FLOOR), c: C('bone') });
+      part(x0, FLOOR * 2, z, DEPTH + 0.3, L + 0.3, only(RED, 0.5, 'haze'));      // parapet / roof slab
       // block name: a pale plate on the road-facing corner
       const v = vertTex(nm + '棟', 'bone', 'ink', 'verm');
-      board(XF + 0.02, FLOOR + 0.8, z + L / 2 - 1.2, 4.6 * v.aspect, 4.6, v.t, RED, 'x');
+      board(XF + 0.02, FLOOR + 0.3, z + L / 2 - 1.2, 3.0 * v.aspect, 3.0, v.t, RED, 'x');
       // rooftop neon: a steel lattice frame and the sign, angled toward the road
-      const y = FLOOR * 3 + 0.5, sx = x0 + 1.5, sz = z;
-      [-1.9, 1.9].forEach(dz => F(sx, sz + dz, y, 0.18, 0.18, 4.4, 'ink'));
-      F(sx, sz, y + 4.4, 0.18, 4.2, 0.18, 'ink');
-      F(sx, sz, y + 2.2, 0.18, 4.2, 0.14, 'ink');
+      const y = FLOOR * 2 + 0.5, sx = x0 + 1.5, sz = z;
+      [-1.9, 1.9].forEach(dz => F(sx, sz + dz, y, 0.18, 0.18, 3.4, 'ink'));
+      F(sx, sz, y + 3.4, 0.18, 4.2, 0.18, 'ink');
+      F(sx, sz, y + 1.7, 0.18, 4.2, 0.14, 'ink');
       const [txt, colr] = NEON[i];
       const t = boardTex(768, 320, 'ink', [{ text: txt, size: 190, y: 160, col: colr }], colr);
-      const p = board(sx + 0.15, y + 0.6, sz, 4.8, 3.2, t, RED, 'x', 0.7); p.mesh.rotation.y = -0.35; // faces the road, turned toward the camera
+      const p = board(sx + 0.15, y + 0.5, sz, 4.4, 2.5, t, RED, 'x', 0.7); p.mesh.rotation.y = -0.35; // faces the road, turned toward the camera
       plates.push(p);
     });
-    instSet(boxGeo, lam('bone', { map: upperTex }), upper, { colors: true }).mesh.material.map.repeat.set(6, 2);
+    instSet(boxGeo, lam('bone', { map: upperTex }), upper, { colors: true }).mesh.material.map.repeat.set(6, 1);
   })();
 
   // ═══ 3. 樂聲戲院 — the cinema on 武昌街 with hand-painted billboards ═══════════════════
@@ -177,7 +179,7 @@
   // a marquee canopy over the doors and poster cases at the pavement. West side, opposite the
   // Red House, so it is in frame with the octagon from the second keyframe.
   (() => {
-    const z = -66, W = 15, D = 12, Hh = 16.5, XF = -9.3;
+    const z = -66, W = 15, D = 12, Hh = 10, XF = -9.3;                              // three storeys: the childhood street stays low
     part(XF - D / 2, 0, z, D, W, only(ALL, Hh, 'bone'));
     part(XF - D / 2, Hh, z, D + 0.4, W + 0.4, only(ALL, 0.5, 'haze'));
     part(XF - 0.6, 4.2, z, 3.2, W - 2, only(ALL, 0.35, 'ink'));                   // marquee canopy over the entrance
@@ -194,12 +196,12 @@
       fitText(g, '樂聲戲院 · 今日上映', 58, 500); g.fillStyle = PALETTE.verm; g.fillText('樂聲戲院 · 今日上映', 50, 580);
       return tex(cv);
     }
-    board(XF + 0.08, 5.2, z + 3.7, 6.8, 5.1, poster('英雄本色', 'A BETTER TOMORROW · 1986', 'haze', 'verm'), ALL, 'x');
-    board(XF + 0.08, 5.2, z - 3.7, 6.8, 5.1, poster('倩女幽魂', 'A CHINESE GHOST STORY · 1987', 'bone', 'lamp'), ALL, 'x');
-    board(XF + 0.08, 10.8, z, 13.8, 4.6, boardTex(2048, 680, 'bone', [{ text: '楚留香 · 成龍 · 周潤發 · 林青霞', size: 150, y: 250, col: 'ink' }, { text: '武昌街電影街', size: 110, y: 500, col: 'verm' }], 'verm'), ALL, 'x');
+    board(XF + 0.08, 4.6, z + 3.7, 6.8, 3.9, poster('英雄本色', 'A BETTER TOMORROW · 1986', 'haze', 'verm'), ALL, 'x');
+    board(XF + 0.08, 4.6, z - 3.7, 6.8, 3.9, poster('倩女幽魂', 'A CHINESE GHOST STORY · 1987', 'bone', 'lamp'), ALL, 'x');
+    board(XF + 0.08, 8.55, z, 13.8, 1.4, boardTex(2048, 680, 'bone', [{ text: '楚留香 · 成龍 · 周潤發 · 林青霞', size: 150, y: 250, col: 'ink' }, { text: '武昌街電影街', size: 110, y: 500, col: 'verm' }], 'verm'), ALL, 'x');
     const v = vertTex('樂聲戲院', 'verm', 'bone', 'bone');
-    board(XF + 0.9, 6, z + W / 2 + 0.36, 7 * v.aspect, 7, v.t, ALL, 'z', 0.6);      // corner neon, read from the street
-    F(XF + 0.6, z + W / 2 + 0.12, 5.8, 2.2, 0.3, 7.4, 'ink', ALL);                    // its dark backing, behind the board
+    board(XF + 0.9, 3.6, z + W / 2 + 0.36, 6 * v.aspect, 6, v.t, ALL, 'z', 0.6);      // corner neon, read from the street
+    F(XF + 0.6, z + W / 2 + 0.12, 3.4, 2.2, 0.3, 6.4, 'ink', ALL);                    // its dark backing, behind the board
     for (let k = 0; k < 6; k++) F(XF + 0.06, z - 5 + k * 2, 0.9, 0.06, 1.2, 1.6, k % 2 ? 'lamp' : 'haze', ALL);  // poster cases
   })();
 
@@ -244,7 +246,7 @@
 
   // ═══ the shopfronts between: the teammate's Ximending library, with building bodies behind ═
   const lib = libGroup(['red']);
-  const bodyTex = facadeTex(4, 3, 'bone');
+  const bodyTex = facadeTex(4, 3, 'bone'); bodyTex.needsUpdate = true;
   // place a library storefront with its front on the sidewalk's outer edge (|x| = 9.2)
   function front(id, side, z, scale) {
     const a = findAsset(id); if (!a) return null;
@@ -255,33 +257,96 @@
   // a plain building body, x 9.4 outward, with a window texture on the road face
   const body = (side, z, len, h, col) => bodies.push({ x: side * (9.4 + 4.6), z, w: 9.2, d: len, h: hOf(h), c: C(col) });
   // east side, from the street start: the 1980s row, then the Red House, then the 1990s
-  front('movie-billboard-wall', 1, 38); body(1, 38, 10, 14, 'bone');
-  front('record-shop', 1, 27); body(1, 27, 10, 12, 'haze');
-  front('comic-rental-shop', 1, 17); body(1, 17, 9, 13, 'bone');
+  // CJ, 2026-09-21: 「我希望一開始的兩邊不要太多大建築」— the opening stays open: two-storey
+  // bodies only until the Red House plaza; the tall blocks start further down the street.
+  front('movie-billboard-wall', 1, 38); body(1, 38, 10, 3.8, 'bone');
+  front('record-shop', 1, 27); body(1, 27, 8, 4, 'haze');
+  front('comic-rental-shop', 1, 17); body(1, 17, 7, 6.4, 'bone');
   front('public-phone-booth', 1, 10);
   front('yeh-lang-125', 1, 7.5); front('yeh-lang-125', 1, 6.3);
-  front('internet-cafe', 1, 2); body(1, 2, 10, 15, 'walk');
-  front('phone-shop-window', 1, -8); body(1, -8, 9, 12, 'bone');
+  front('internet-cafe', 1, 2); body(1, 2, 8, 4.2, 'walk');
+  front('phone-shop-window', 1, -8); body(1, -8, 8, 6.4, 'bone');
   front('arcade-cabinet', 1, -14.5); front('gashapon-machine', 1, -16);
-  front('manga-rental', 1, -22); body(1, -22, 10, 13, 'haze');
+  front('manga-rental', 1, -22); body(1, -22, 8, 4, 'haze');
   front('photo-sticker-booth', 1, -30);
-  front('tower-records', 1, -38); body(1, -38, 12, 16, 'lamp');                  // 淘兒 1992: the yellow front on the corner before the Red House plaza
+  front('tower-records', 1, -38); body(1, -38, 12, 6.6, 'lamp');                 // 淘兒 1992: the yellow front on the corner before the Red House plaza, two storeys
   front('bbcall-ad-standee', 1, -46);
   // west side after 中華商場 and 樂聲: the 1990s–2000s
-  front('f4-poster-wall', -1, -82); body(-1, -82, 8, 12, 'bone');
+  front('f4-poster-wall', -1, -82); body(-1, -82, 8, 6.6, 'bone');
   front('zhangjunya-snack-shelf', -1, -88.5);
-  front('kamatiam-cooler-storefront', -1, -95); body(-1, -95, 8, 11, 'haze');
-  front('concert-stage', -1, -106, 0.9); body(-1, -106, 10, 12, 'bone');          // the 簽唱會 stage at the pedestrian-zone corner
+  front('kamatiam-cooler-storefront', -1, -95); body(-1, -95, 8, 6.6, 'haze');
+  front('concert-stage', -1, -106, 0.9); body(-1, -106, 10, 8, 'bone');          // the 簽唱會 stage at the pedestrian-zone corner
   // east side after the Red House: 2000s items toward the chapter's end
   front('zhangjunya-snack-shelf', 1, -90);
-  front('creative-cafe-storefront', 1, -96); body(1, -96, 8, 12, 'walk');
-  front('f4-poster-wall', 1, -104); body(1, -104, 8, 13, 'haze');
+  front('creative-cafe-storefront', 1, -96); body(1, -96, 8, 8, 'walk');
+  front('f4-poster-wall', 1, -104); body(1, -104, 8, 9, 'haze');
   front('bbcall-ad-standee', 1, -110);
-  front('internet-cafe', 1, -117); body(1, -117, 10, 15, 'bone');
+  front('internet-cafe', 1, -117); body(1, -117, 10, 10, 'bone');
   front('photo-sticker-booth', 1, -125); front('gashapon-machine', 1, -127); front('arcade-cabinet', 1, -128.5);
-  front('phone-shop-window', 1, -134); body(1, -134, 9, 12, 'haze');
+  front('phone-shop-window', 1, -134); body(1, -134, 9, 11, 'haze');
   // a body behind the Red House plaza edge and beyond 萬年 so the row does not end in a field
-  body(-1, -140, 8, 10, 'bone'); body(1, -142, 8, 11, 'walk');
+  body(-1, -140, 8, 9, 'bone'); body(1, -142, 8, 10, 'walk');
+
+  // ═══ the signs — CJ, 2026-09-21: 「希望有很多標語像asset裡面的文本那樣有大量回憶」 ═══════════════
+  // Every name below comes from asset/ximen-1980s.md, ximen-1990s.md and ximen-2000s.md. One
+  // library textPlane (canvas text on a coloured ground) per sign = one draw call; the brackets,
+  // poles and banner ropes are instanced. Dense and small: the first 60 units carry most of them.
+  const Core = window.NostalgiaCore;
+  const COL = { verm: 'bone', lamp: 'ink', bone: 'ink', ink: 'lamp', haze: 'ink', sky: 'ink', walk: 'verm', leaf: 'bone' };
+  let nSigns = 0;
+  function sign(text, w, x, y, z, rotY, bg, vertical, size) {
+    if (!Core) return null;
+    const m = Core.textPlane(text, w, { bg: PALETTE[bg || 'bone'], color: PALETTE[COL[bg || 'bone']], vertical: !!vertical, fontSize: size || 96, padding: 26 });
+    m.material.fog = false; m.material.side = THREE.DoubleSide;
+    m.position.set(x, y, z); m.rotation.y = rotY || 0;
+    lib.add(m); nSigns++;
+    return m;
+  }
+  const BG = ['verm', 'lamp', 'bone', 'ink', 'haze', 'sky', 'walk', 'leaf'];
+  const bgOf = i => BG[i % BG.length];
+  // hanging signs: perpendicular to the facade, read walking down the street. side +1 east.
+  function hang(text, side, z, y, i, big) {
+    const w = big ? 0.75 : 0.55, ax = side * (side > 0 ? 9.2 : 6.2);                // the facade line
+    const m = sign(text, w, side * (Math.abs(ax) - 0.55 - w / 2), y, z, 0, bgOf(i), true, 96);
+    if (m) { const h = m.geometry.parameters.height; F(side * (Math.abs(ax) - 0.5), z, y + h / 2 - 0.03, 1.1, 0.05, 0.05, 'ink'); }
+  }
+  // wall boards: flat on the facade, facing the road
+  const wall = (text, side, z, y, w, i, size) => sign(text, w, side * (side > 0 ? 9.12 : 6.12), y, z, side > 0 ? -Math.PI / 2 : Math.PI / 2, bgOf(i), false, size || 96);
+  // posters at eye level
+  const poster2 = (text, side, z, i) => sign(text, 0.7, side * (side > 0 ? 9.1 : 6.1), 1.5, z, side > 0 ? -Math.PI / 2 : Math.PI / 2, bgOf(i + 2), true, 88);
+  // banners across the street on two poles (y clear of the camera: 6.6 at z 40, 5.3 at z 0, 3.7 at z -60)
+  function banner(text, z, y, bg) {
+    [-5.9, 5.9].forEach(x => F(x, z, 0, 0.14, 0.14, y + 0.8, 'haze'));
+    F(0, z, y + 0.72, 11.8, 0.04, 0.04, 'ink');
+    sign(text, 10.5, 0, y, z, 0, bg || 'verm', false, 110);
+  }
+  // price cards on the kerb stalls, small, facing the road
+  const card = (text, x, z, r) => sign(text, 0.9, x, 1.35, z, r, 'bone', false, 72);
+
+  // 中華商場 (west, z 46 … -46): the shops under the arcade and the brands on the walls
+  ['電子零件', '訂做制服', '點心世界', '郵票錢幣', '收音機', '軍用品', '皮鞋', '眼鏡', '鐘錶', '唱片', '文具', '玩具', '西裝', '鑰匙', '刻印', '布莊'].forEach((t, i) => hang(t, -1, 44 - i * 5.6, 2.9, i));
+  [['國際牌 National', 'verm'], ['黑松汽水', 'lamp'], ['三洋電視', 'sky'], ['聲寶', 'verm'], ['大同電鍋', 'bone'], ['歌林', 'lamp'], ['味全', 'verm'], ['統一', 'bone'], ['點心世界 酸辣湯', 'lamp'], ['中華商場 歲末大特價', 'verm'], ['電子零件 批發零售', 'sky'], ['訂做制服 一日交件', 'bone']].forEach(([t, bg], i) => sign(t, 2.6, -6.12, 5.5 - (i % 2) * 1.1, 42 - i * 7.4, Math.PI / 2, bg, false, 96));
+  // east side, the 1980s: shop names hanging, stars and cartoons on the walls, posters at eye level
+  ['唱片行', '租書店', '冰果室', '電動間', '錄影帶', '卡帶黑膠', '漫畫', '麵線', '冰宮', 'MTV', '書局', '模型', '理髮', '相館', '茶行', '雜貨', '西藥房', '委託行', '小吃', '皮件'].forEach((t, i) => hang(t, 1, 44 - i * 4.4, 2.6 + (i % 3) * 0.7, i + 3));
+  [['鄧麗君 新歌上市', 2.4], ['鳳飛飛', 1.6], ['羅大佑 鹿港小鎮', 2.4], ['蘇芮', 1.4], ['齊秦 王傑', 1.8], ['李宗盛', 1.6], ['小虎隊 1988', 2.2], ['小叮噹', 1.6], ['七龍珠', 1.6], ['怪博士與機器娃娃', 2.6], ['小甜甜', 1.4], ['科學小飛俠', 2.0], ['無敵鐵金剛', 2.0], ['楚留香', 1.6], ['林青霞 王祖賢', 2.2], ['張國榮', 1.6], ['周潤發 成龍', 2.2], ['米老鼠 Hello Kitty', 2.4]].forEach(([t, w], i) => wall(t, 1, 45 - i * 5.1, 3.9 + (i % 2) * 1.3, w, i + 1, 96));
+  ['楚留香', '英雄本色', '小叮噹', '七龍珠', '小甜甜', '港片', '林青霞', '成龍', '周潤發', '鳳飛飛', '羅大佑', '小虎隊', '米老鼠', 'Hello Kitty', '尪仔標', '彈珠汽水'].forEach((t, i) => poster2(t, 1, 46.5 - i * 5.4 + (i % 2) * 1.3, i));
+  ['冰果室', '電動間', '租書店', '紅豆牛奶冰', '小蜜蜂', '瑪利歐', '卡帶', '黑膠'].forEach((t, i) => poster2(t, -1, 20 - i * 6.6, i + 5));
+  // banners across the road
+  banner('中華商場 歲末大特價', 38, 8.2, 'verm');
+  banner('電影街 本週上映 楚留香', 10, 7.6, 'lamp');   // far enough that it sits under the opening title
+  banner('小虎隊 新專輯 全面上市', 0, 7.0, 'verm');
+  banner('西門町 電影街 · 樂聲 豪華 今日上映', -52, 6.2, 'ink');
+  // price cards on the kerb stalls (east stalls face the road, -x)
+  [['紅豆牛奶冰 15元', 32], ['彈珠汽水 8元', 21.5], ['尪仔標 一張5元', -19.5], ['錄影帶 一夜30元', -33]].forEach(([t, z]) => card(t, 6.75, z + 0.2, -Math.PI / 2));
+  [['卡帶 120元', -52], ['刨冰 一盤15元', -76], ['電動 一枚5元', -114]].forEach(([t, z]) => card(t, -6.75, z + 0.2, Math.PI / 2));
+  // lamp-post and pole signs down the first stretch
+  for (let i = 0; i < 8; i++) { const z = 41 - i * 8.2, side = i % 2 ? -1 : 1; F(side * 5.6, z, 0, 0.12, 0.12, 4.2, 'haze'); sign(['禁止停車', '西門町', '中華路', '武昌街', '成都路', '漢中街', '公車站', '電影街'][i], 0.9, side * 5.6, 3.6, z + 0.08, 0, i % 2 ? 'sky' : 'bone', false, 80); }
+  // the 1990s stretch (z -45 … -96): the next decade's names, thinner
+  ['淘兒音樂城', '佳佳唱片', 'KTV', 'VCD', '拍貼', 'BB Call', '大哥大', '電子雞', '快打旋風', '格鬥天王', 'SEGA', 'PlayStation', 'Game Boy', '皮卡丘'].forEach((t, i) => hang(t, i % 2 ? -1 : 1, -50 - i * 3.3, 2.7 + (i % 3) * 0.6, i + 2, true));
+  [['四大天王 劉德華 張學友 郭富城 黎明', 3.2], ['張惠妹 姊妹 1996', 2.4], ['伍佰', 1.4], ['任賢齊 心太軟', 2.2], ['王菲 徐若瑄 范曉萱', 2.8], ['灌籃高手', 1.8], ['美少女戰士', 2.0], ['名偵探柯南', 2.0], ['櫻桃小丸子 蠟筆小新', 2.6], ['哆啦A夢 1997', 2.0], ['神奇寶貝 1998', 2.0]].forEach(([t, w], i) => wall(t, i % 2 ? -1 : 1, -80 - i * 4.6, 3.6 + (i % 2), w, i + 4, 96));
+  // the pedestrian zone (z -96 … -140): the 2000s
+  [['周杰倫 Jay 簽唱會', 2.6], ['蔡依林 S.H.E 5566', 2.8], ['孫燕姿 王力宏', 2.4], ['F4 流星花園', 2.2], ['火影忍者 海賊王', 2.4], ['張君雅小妹妹 維力手打麵', 3.0], ['網咖 天堂 RO 楓之谷', 2.8], ['Nokia Sony Ericsson', 2.6], ['阿宗麵線', 1.6], ['MP3 MSN 大頭貼', 2.4]].forEach(([t, w], i) => wall(t, i % 2 ? -1 : 1, -100 - i * 4, 3.4 + (i % 2) * 1.2, w, i + 1, 96));
+  window.__ximenSigns = () => nSigns;
 
   // ── one street stall: post-and-awning, counter, goods, crates, basket, seller and shoppers ──
   const stallEra = { red: 1, dadao: 0 };
@@ -310,7 +375,7 @@
   // the plaza in front of the Red House: two rows of stalls facing the camera
   [-50, -56].forEach(z => [9.6, 12.6, 15.6, 18.6, 21.6].forEach((x, i) => stall(x, z, 0, 1, i + (z < -52 ? 1 : 0))));
   // kerb stalls under the arcades, facing the road, clear of the library props and the camera
-  [[1, -19.5], [1, -33], [-1, -52], [-1, -76], [-1, -114], [1, -74], [1, -86], [1, -100]].forEach(([s, z], i) => stall(s * 7.9, z, -s, 0, i + 5, [1.3, 2.0]));
+  [[1, 32], [1, 21.5], [1, -19.5], [1, -33], [-1, -52], [-1, -76], [-1, -114], [1, -74], [1, -86], [1, -100]].forEach(([s, z], i) => stall(s * 7.9, z, -s, 0, i + 5, [1.3, 2.0]));
 
   // ── the street crowd along both kerbs, thick at the pedestrian zone ──
   (() => {
@@ -345,7 +410,10 @@
   instSet(boxGeo, lam('bone'), furn, { colors: true });
   instSet(boxGeo, lam('walk'), columns, { colors: true });
   instSet(boxGeo, lam('ink'), winBoxes);
-  instSet(boxGeo, lam('bone', { map: bodyTex }), bodies, { colors: true }).mesh.material.map.repeat.set(3, 3);
+  // window rows scale with height: three rows on the low bodies, six on the tall ones
+  instSet(boxGeo, lam('bone', { map: bodyTex }), bodies.filter(b => b.h.red <= 4.5), { colors: true }).mesh.material.map.repeat.set(2, 0.34);
+  instSet(boxGeo, lam('bone', { map: bodyTex.clone() }), bodies.filter(b => b.h.red > 4.5 && b.h.red <= 8), { colors: true }).mesh.material.map.repeat.set(2, 0.67);
+  instSet(boxGeo, lam('bone', { map: bodyTex.clone() }), bodies.filter(b => b.h.red > 8), { colors: true }).mesh.material.map.repeat.set(2, 1);
   instSet(basketGeo, lam('bone'), baskets, { colors: true });
   instSet(boxGeo, lam('bone'), crowd, { colors: true });
 })();
