@@ -560,14 +560,29 @@
   const tgtCurve = new THREE.CatmullRomCurve3(CAM.map(k => V(k.t)), false, 'centripetal');
   const fovs = CAM.map(k => k.fov);
   const pTmp = new THREE.Vector3(), tTmp = new THREE.Vector3();
+  // mouse parallax (IVRESS borrow f): a damped offset along the camera's own right and up axes,
+  // applied after lookAt so the frame slides rather than turns; it fades to nothing within
+  // PARALLAX_FADE of each chapter cut and of the end, so the cuts and the closing shot stay fixed.
+  const PARALLAX_FADE = 0.04, PARALLAX_X = 0.6, PARALLAX_Y = 0.3;
   let mouseX = 0, mouseY = 0, driftX = 0, driftY = 0;
+  const camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
+  function parallaxFade(u) {
+    let f = 1;
+    for (let i = 1; i < BOUNDS.length; i++) f = Math.min(f, Math.abs(u - BOUNDS[i]) / PARALLAX_FADE);
+    f = Math.min(1, f);
+    return f * f * (3 - 2 * f);
+  }
   function placeCamera(u) {
     posCurve.getPoint(u, pTmp);
     tgtCurve.getPoint(u, tTmp);
     const s = u * (fovs.length - 1), i = Math.min(fovs.length - 2, Math.floor(s)), f = s - i;
     camera.fov = fovs[i] + (fovs[i + 1] - fovs[i]) * f;
-    camera.position.set(pTmp.x + driftX, pTmp.y + driftY, pTmp.z); // a small parallax drift, never enough to break the frame
+    camera.position.copy(pTmp);
     camera.lookAt(tTmp);
+    const k = parallaxFade(u);
+    camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    camera.position.addScaledVector(camRight, driftX * k).addScaledVector(camUp, driftY * k);
     camera.updateProjectionMatrix();
     return pTmp.z;
   }
@@ -754,8 +769,8 @@
     const target = Math.min(1, Math.max(0, window.scrollY / maxScroll()));
     progress += (target - progress) * (1 - Math.exp(-DAMP * dt));
     if (Math.abs(target - progress) < 0.00005) progress = target;
-    driftX += (mouseX * 0.5 - driftX) * (1 - Math.exp(-2 * dt));
-    driftY += (-mouseY * 0.25 - driftY) * (1 - Math.exp(-2 * dt));
+    driftX += (mouseX * PARALLAX_X - driftX) * (1 - Math.exp(-2 * dt));
+    driftY += (-mouseY * PARALLAX_Y - driftY) * (1 - Math.exp(-2 * dt));
 
     const camZ = placeCamera(progress);
     frontier = Math.min(frontier, camZ - FOG_LEAD);
@@ -796,7 +811,7 @@
 
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; },
-                   get camZ() { return camera.position.z; }, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
+                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
 
   requestAnimationFrame(frame);
 })();
