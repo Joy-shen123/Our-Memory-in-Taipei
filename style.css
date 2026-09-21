@@ -47,31 +47,24 @@ html, body {
 }
 .hud-title span { opacity: 0.6; margin-left: 0.6em; }
 
-.hud-era {
+/* the chapter column, top-left: counter, name in caps, years, and the Chinese name set vertically */
+.hud-chapter {
   position: absolute;
+  top: clamp(20px, 4vw, 56px);
   left: clamp(20px, 4vw, 56px);
-  bottom: clamp(24px, 6vh, 72px);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   transition: opacity 240ms ease;
+  text-shadow: 0 2px 16px var(--ink);
 }
-.hud-era.swap { opacity: 0; }
-.hud-era-label {
-  font-size: clamp(26px, 3.6vw, 56px);
-  font-weight: 700;
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  max-width: 60vw;
-  text-shadow: 0 2px 24px var(--ink);
-}
-.hud-era-years {
-  margin-top: 14px;
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  opacity: 0.8;
-  border-top: 1px solid var(--bone);
-  display: inline-block;
-  padding-top: 8px;
-  min-width: 140px;
-}
+.hud-chapter.swap { opacity: 0; }
+.chap-col { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--bone); padding-top: 8px; min-width: 150px; }
+.chap-n { font-size: 26px; font-weight: 700; letter-spacing: 0.06em; line-height: 1; font-variant-numeric: tabular-nums; }
+.chap-of { font-size: 12px; font-weight: 400; letter-spacing: 0.32em; opacity: 0.6; margin-left: 0.3em; vertical-align: 0.5em; }
+.chap-name { font-size: 12px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; max-width: 240px; line-height: 1.5; }
+.chap-years { font-size: 11px; letter-spacing: 0.3em; opacity: 0.7; }
+.chap-zh { writing-mode: vertical-rl; font-size: 22px; font-weight: 700; letter-spacing: 0.3em; line-height: 1; padding-top: 8px; border-top: 1px solid var(--bone); }
 
 .hud-year {
   position: absolute;
@@ -93,7 +86,11 @@ html, body {
 
 @media (max-width: 480px) {
   .hud-title { font-size: 10px; letter-spacing: 0.24em; }
-  .hud-era { bottom: 84px; }
+  .hud-chapter { gap: 12px; }
+  .chap-col { min-width: 0; gap: 6px; }
+  .chap-n { font-size: 20px; }
+  .chap-name { font-size: 10px; letter-spacing: 0.24em; max-width: 150px; }
+  .chap-zh { font-size: 16px; }
   .hud-year { bottom: 28px; left: 20px; right: auto; text-align: left; }
 }
 

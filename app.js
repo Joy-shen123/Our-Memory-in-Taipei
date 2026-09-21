@@ -676,12 +676,19 @@
 
   // ── HUD: era label, year, anchor labels ──────────────────────────────────────
   const yearEl = document.getElementById('year');
-  const eraBox = document.querySelector('.hud-era');
+  // the chapter column (top-left): "01/03", the name in caps, the years, the Chinese name vertical
+  const eraBox = document.querySelector('.hud-chapter');
   const eraLabelEl = document.getElementById('eraLabel');
   const eraYearsEl = document.getElementById('eraYears');
+  const eraZhEl = document.getElementById('eraZh');
+  const chapNEl = document.getElementById('chapN');
   let swapTimer = 0;
   function swapEraLabel(era, instant) {
-    const apply = () => { eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + ' · ' + era.zh; };
+    const apply = () => {
+      const zh = era.zh.split(' · ');                                  // '西門町 · Ximending' → vertical 西門町, romanised name under the years
+      chapNEl.textContent = String(ERAS.indexOf(era) + 1).padStart(2, '0');
+      eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + (zh[1] ? ' · ' + zh[1] : ''); eraZhEl.textContent = zh[0];
+    };
     clearTimeout(swapTimer);
     if (instant) { eraBox.classList.remove('swap'); apply(); return; }
     eraBox.classList.add('swap');
