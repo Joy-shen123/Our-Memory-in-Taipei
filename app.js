@@ -635,10 +635,12 @@
         c = mix(c, printed, uPrint);
         c = mix(c, uInk, ink);
         c = pow(max(c, 0.0), vec3(1.0 / 2.2));
-        // GRAIN — paper grain at 1 (coarser, static), film grain at 0 (finer, moving)
+        // GRAIN — paper grain at 1 (coarser, static), film grain at 0 (finer, moving).
+        // Luminance-aware: it lives in the shadows and leaves the sky clean; stepped at 30 Hz.
         vec2 cell = floor(gl_FragCoord.xy / mix(1.0, 2.0, uPrint));
-        float g = hash(cell + floor(uTime * mix(60.0, 2.0, uPrint)) * 0.37) - 0.5;
-        c += g * mix(0.025, 0.045, uPrint);
+        float g = hash(cell + floor(uTime * mix(30.0, 2.0, uPrint)) * 0.37) - 0.5;
+        g *= mix(1.0, 1.0 - lum(c), 0.85);
+        c += g * mix(0.06, 0.045, uPrint);
         // VIGNETTE — restrained
         float d = distance(vUv, vec2(0.5));
         c *= 1.0 - smoothstep(0.45, 1.0, d) * 0.3;
