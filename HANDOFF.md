@@ -1,6 +1,6 @@
 # HANDOFF — Our Memory in Taipei
 
-Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/claude_code_build_day (branch `main`). Local clone: `~/Documents/CJ-project-vault/shidaimiwu-proto`. Last updated 2026-09-21 (issue #1 Part 1, branch `issue-1-part-1`).
+Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Local clone: `~/Documents/CJ-project-vault/shidaimiwu-proto`; this branch's worktree is `_worktrees/shidaimiwu-proto/issue-1-part-1`. Last updated 2026-09-21 (issue #1 Part 3 and the IVRESS borrow list, branch `issue-1-part-1`).
 
 ## What it is
 
@@ -23,13 +23,16 @@ Open it: double-click `index.html`. No build step, no server, no network. `index
 - 2026-09-20: "THE BUILDING NEED TO REFERENCE REAL BUILDING" — use the teammate's asset library in `asset/3d/` first; build from primitives only when no asset exists.
 - 2026-09-20: "REMOVE MOVE MOVING OBEJECT ON THE ROAD" — traffic is switched off. Only the girl moves on the road.
 - 2026-09-21: "opneing frame title child hood change to when we were young, Memory in us change to Our Memory IN Taipei" — done.
+- 2026-09-21: 「盡量矮點才能比較後來的建設跟慢慢長大的感覺」— the opening stays low; nothing tall goes into chapter 1.
+- 2026-09-21: 「all」— go on Part 3 (the rubric) and the whole IVRESS borrow list. Done this session; see the borrows table below.
 
 ## Files and load order
 
 `index.html` loads, in this order: `three.min.js` (r149, UMD, global `THREE`) → `asset/3d/assets-core.js` + `assets-ximen-*.js` + `assets-dadaocheng-*.js` (teammate's library, global `NOSTALGIA_ASSETS`) → `data.js` (all content, global `DATA`) → `app.js` (engine) → `scene-red.js`, `scene-dadao.js`, `scene-tower.js` (one chapter each; they build the anchors too).
 
 - `data.js` — palette, eras, anchors with captions (position and label only; the buildings are in the scene files), generic lots (Xinyi stretch only now), camera keyframes (`CAM`, 6 keyframes, z must keep decreasing), `WORDS`, `CLOSING`. Change copy here.
-- `app.js` — renderer, custom fog (currently disabled by setting the frontier to -1e5), camera rig on a Catmull-Rom curve, year/era from scroll progress with boundaries pinned where the camera crosses each road marking, the `part()`/`instSet()` system that tweens every object's height per era over 500 ms, the street furniture (lamps, trees, crowd, hanging signs, distant city), the asset-library placer, the girl, the climbing man, the words, the post pass (grain and vignette only now; `uPrint` is 0 everywhere). No street trees on Dihua Street (z -138 … -292) or near the 101 base shot.
+- `app.js` — renderer, custom fog (currently disabled by setting the frontier to -1e5), camera rig on a Catmull-Rom curve, year/era from scroll progress with boundaries pinned where the camera crosses each road marking, the `part()`/`instSet()` system that tweens every object's height per era over 500 ms, the street furniture (lamps, trees, crowd, hanging signs, distant city), the asset-library placer, the girl, the climbing man, the words (per-glyph reveal), the two particle systems, the render warm-up, the post pass (luminance-aware grain, vignette and the chapter-cut flash; `uPrint` is 0 everywhere), mouse parallax along the camera axes, and the robustness block (pixel-ratio cap, clock reset on tab return, keyboard and touch scroll). No street trees on Dihua Street (z -138 … -292) or near the 101 base shot.
+- `style.css` — the HUD: chapter column top-left (`.hud-chapter`), site title top-right (bottom-right under 480 px), year bottom-right (bottom-left under 480 px), the words with their glyph transitions, anchor labels, the closing line at 24vh.
 - `scene-*.js` — use `window.SCENE` API only: `part(x,y,z,w,d,lookByEra,rotY?,geo?)` (one draw call each), `instSet(geo,mat,items,{colors})`, `only(eras,h,col)`, `C(name)`, `libGroup(eras)` (a group visible only in those eras), `asset(id, group, x, z, rotY, scale?)` (builds one library item into it; front faces +Z before rotation, so `-π/2` on the east side and `+π/2` on the west), `findAsset(id)`, `anchors`, `TOWER`. Items absent in an era have height 0 and are dropped underground by the engine. Each scene file sets `anchors.<id>.top` for its labels; `scene-tower.js` sets `TOWER.h` (crown top) and `TOWER.faceX(y)` (west-face x at height y) so the climbing man stays on the glass.
 - `asset/` — teammate's texts (`*.md`) and 3D library (`asset/3d/`). `asset/3d/preview.html` previews the library. All six era sets are placed: Ximending items along the childhood chapter (`scene-red.js`, visible in the red era), Dadaocheng items along Spring Festival (`scene-dadao.js`, visible in red and dadao so nothing pops in at the flip). The library's own `red-house`, `chunghwa-market` and `xiahai-temple` are not used: the rebuilds below replace them.
 - `README.md` — the original note that this was a throwaway prototype. Out of date: this is now the entry.
@@ -44,7 +47,9 @@ agent-browser eval -b "$(printf 'new Promise(r=>{window.scrollTo(0,%s*(document.
 agent-browser screenshot /tmp/f.png; agent-browser console; agent-browser close
 ```
 
-Chapter fractions: red 0.02–0.33, dadao 0.38–0.56, tower 0.62–1.0. `window.__fog` exposes `progress`, `year`, `era`, `camZ`, `BOUNDS`, `jumpToYear(y)`. Syntax-check any file with `node -e "new Function(require('fs').readFileSync('app.js','utf8'))"`. Last measured 2026-09-21 after Part 1: 101 fps (display cap) at every chapter, 1440x900 pixel ratio 1, 1111 meshes + 57 instanced sets, console empty.
+Chapter fractions: red 0.02–0.347, dadao 0.347–0.582, tower 0.582–1.0 (the exact boundaries are `window.__fog.BOUNDS`; the flash and the parallax fade key on them). `window.__fog` exposes `progress`, `year`, `era`, `camZ`, `BOUNDS`, `jumpToYear(y)`, `drift` (parallax x, y, fade), `warm` (warm-up ms, programs, textures) and `hitch` (longest frame gap since load, for measuring). `index.html?nowarm=1` skips the warm-up. Syntax-check any file with `node -e "new Function(require('fs').readFileSync('app.js','utf8'))"`. Last measured 2026-09-21 after Part 3 and the borrows: 100.8 / 100.9 / 100.8 fps headed at 0.2 / 0.44 / 0.78 (display cap), 96.8 at 0.9 with the light stream on, 1440x900 pixel ratio 1, 1269 meshes + 59 instanced sets + 2 Points, console empty, zero page errors.
+
+Headless notes from this session: wait ~40 frames after `open` before scrolling (the first frames carry the shader compiles); `agent-browser errors --json` accumulates for the life of a session, so judge "console empty" on a fresh session; CSS transitions only advance with the frame clock, so a mid-transition screenshot needs a short frame wait (about 26 frames for the word reveal), not a long one. If `open` returns "Resource temporarily unavailable (os error 35)", that session's daemon is wedged: `agent-browser close` it, remove only that session's files under `~/.agent-browser/`, and use a new session name; never `pkill` the daemon binary, other sessions on this machine share it.
 
 Headed Chrome throttles animation frames when the window is not focused, so a second headed session on the same machine stalls the first one's `requestAnimationFrame` wait. For screenshots drop `--headed` (headless does not throttle); measure fps headed, alone. On stage: click once in the page before scrolling.
 
@@ -84,15 +89,31 @@ Every item below is procedural (primitives, canvas text, the palette) or from th
 | 台北市政府 outline | horizon, (-46, -505) | Taipei City Hall's symmetrical stepped massing at the end of 仁愛路: centre block, two wings, two end pavilions, roof block, unlit haze so it reads as distance. Visible left of the tower in the approach shot; the office ring west of z -360 was lowered so it shows. |
 | Base shot cleanup | fraction ~0.78 | The dark roof in the base shot was the engine's street-tree crown beside the camera; app.js now plants no trees within 45 of z -405. |
 
+## IVRESS borrows (issue #1 Part 3 session, 2026-09-21)
+
+The eight cheap effects from `research/ivress/README.md`, one commit each, screenshots in `~/Desktop/issue1-part1/part3/`. All inside the constraints: r149 UMD, no build, no network, no image or model files, daylight, no fog.
+
+| Item | Where | What it does | Screenshot |
+|---|---|---|---|
+| a. Chapter-cut flash | `app.js` post pass, `updateFlash` | white flash at the 2000 marking, warm gold at 2020, elliptical mask from the centre, keyed on progress within 0.012 of the boundary, 500 ms hold then a 1.2 s fade | `a-chapter-cut-flash-0.347.png`, `-0.582.png` |
+| b. Letter-by-letter words | `updateWords`, `.word-big .w span` | per-glyph spans with a 38 ms transition-delay step; `.show` toggles when the word is near; words kept whole so lines break between words | `b-letter-reveal-0.12-mid.png`, `-0.12.png` |
+| c. Chapter column | `.hud-chapter`, `swapEraLabel` | "01/03 · WHEN WE WERE YOUNG · 1985–1999 · Ximending" top-left, Chinese name vertical; replaced the bottom-left era block | `c-chapter-column-0.05.png` |
+| d. Luminance-aware grain | post pass | `grain *= mix(1, 1 − luma, 0.85)`, stepped at 30 Hz, amplitude 0.06 at black | `d-luminance-grain-0.44.png` |
+| e. FOV ramp | `data.js` CAM[5] | closing keyframe fov 82, so the view opens from 62 to 82 over the climb | `e-fov-ramp-0.97.png` |
+| f. Mouse parallax | `placeCamera`, `parallaxFade` | damped drift along the camera's right and up (0.6 / 0.3), applied after lookAt, fading to 0 within 0.04 of each cut and the end | `f-mouse-parallax-0.44.png` (pointer at 200,150) |
+| g. Curve particles | `sparks`, `stream`, `updateParticles` | 500 lantern sparks rising off a curve through the eight strings (dadao), 900 points spiralling up a curve on `TOWER.faceX` (tower); a 12-line point shader, CPU-updated | `g-curve-particles-sparks-0.5.png`, `-stream-0.9.png` |
+| h. Render warm-up | `warmUp` | first frame: everything visible, `renderer.compile`, one offscreen draw, restore; 50 ms, 16 programs, 165 textures. The crossing hitch was 12 ms with or without it on the M4 Max, so this is insurance for a slower laptop | `h-render-warmup-0.0.png` |
+| Robustness | `IS_PHONE`, `resetClocks`, keydown, touchmove | pixel ratio 2 desktop / 1.5 phone; dt ≤ 50 ms and clocks reset on tab return; arrows, page keys, space, home, end; touch fallback if a swipe does not move `scrollY` | `robust-390x844-0.05.png`, `-0.44.png`, `-0.97.png` |
+
 ## Open items
 
 1. Issue #1 Part 2 done 2026-09-21: the runner is 張君雅小妹妹 (`girl`, `updateGirl` in `app.js`, names kept). Suggested with primitives, not the trademark artwork.
-2. Issue #1 Part 3: write `RUBRIC.md`, score each chapter once, post the scores and the three lowest items to the issue thread.
+2. Issue #1 Part 3 done 2026-09-21: `RUBRIC.md` in the repo root, first scoring posted on the issue. Scores (recognition / period / composition / density / palette / story beat / performance): ch01 4 3 3 3 4 3 5, ch02 4 3 3 3 4 2 5, ch03 4 3 4 2 4 4 5. The flash (borrow a) and the particles (g) address the two lowest; re-score after CJ answers the period question below. Waiting on CJ: gate the 1980s / 1990s / 2000s Ximending sets by scroll year, or keep all three on for density?
 3. The base-shot keyframe (CAM[4] in `data.js`, camera y 3 at z -372 looking at y 50) puts the frame bottom at ~13° elevation, so the 101 podium is below the frame in that shot. Lower the target (y 40) or move the camera back (z -380) if the podium should show.
 4. The wharf is only seen peripherally (the target curve looks east through Dadaocheng). A keyframe that glances west at z ≈ -200 would show it.
-5. The era label (bottom-left) and the anchor label can overlap the top-right title on narrow screens. Labels are clamped to y ≥ 110 px; check 390x844 again after any HUD change.
+5. HUD on narrow screens: the chapter column is top-left, the site title drops to the bottom-right under 480 px, anchor labels are clamped to y ≥ 110 px and fade out while the closing line shows. Checked 390x844 at 0.05, 0.44 and 0.97 on 2026-09-21; check again after any HUD change.
 6. `README.md` still says "throwaway prototype". Rewrite as the project readme.
-7. Mobile: last checked 390x844 before the asset library was added. Re-check.
+7. Mobile: 390x844 re-checked 2026-09-21 with the asset library, the column and the particles (screenshots in `part3/`). Not yet checked on a real phone: the touch fallback and the 1.5 pixel-ratio cap.
 
 ## Not done on purpose
 
