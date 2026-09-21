@@ -477,12 +477,25 @@
   }
 
   // ── the words ──────────────────────────────────────────────────────────────
+  // Each word is split into glyph spans with a per-glyph transition-delay; toggling .show on the
+  // block reveals them letter by letter with no JS per frame (IVRESS borrow b). The block's own
+  // opacity still follows scroll distance so a word also fades as you leave it.
   const wordEl = document.getElementById('word'), wordBig = wordEl.children[0], wordSub = wordEl.children[1];
+  const GLYPH_MS = 38;
+  // words are kept whole (a .w span per word, nowrap) so lines break between words, never inside one
+  const glyphs = (text, from) => { let i = 0; return text.split(' ').map(w => '<span class="w">' + w.split('').map(ch => `<span style="transition-delay:${from + (i++) * GLYPH_MS}ms">${ch}</span>`).join('') + '</span>').join(' '); };
   let wordShown = -1;
   function updateWords(u) {
     let best = -1, bestA = 0;
     WORDS.forEach((w, i) => { const a = Math.max(0, 1 - Math.abs(u - w.at) / 0.045); if (a > bestA) { bestA = a; best = i; } });
-    if (best !== wordShown && best >= 0) { wordShown = best; wordBig.textContent = WORDS[best].big; wordSub.textContent = WORDS[best].sub || ''; }
+    if (best !== wordShown && best >= 0) {
+      wordShown = best;
+      wordEl.classList.remove('show');
+      wordBig.innerHTML = glyphs(WORDS[best].big, 0);
+      wordSub.innerHTML = glyphs(WORDS[best].sub || '', WORDS[best].big.length * GLYPH_MS * 0.6);
+      void wordEl.offsetWidth;                                       // restart the transitions
+    }
+    wordEl.classList.toggle('show', bestA > 0.35);
     const a = Math.min(1, bestA * 1.6);
     wordEl.style.opacity = a.toFixed(2);
     wordEl.style.transform = `translateY(${((1 - a) * 18).toFixed(1)}px)`;

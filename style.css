@@ -152,4 +152,8 @@ html, body {
   opacity: 0.85;
   text-shadow: 0 2px 16px var(--ink);
 }
+/* letter-by-letter reveal: each glyph is a span with its own transition-delay, set in app.js */
+.word-big .w, .word-sub .w { display: inline-block; white-space: nowrap; }
+.word-big .w span, .word-sub .w span { display: inline-block; opacity: 0; transform: translateY(0.35em); transition: opacity 360ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.hud-word.show .word-big span, .hud-word.show .word-sub span { opacity: 1; transform: none; }
 @media (max-width: 480px) { .hud-word { top: 18vh; } .word-big { font-size: 44px; } }
