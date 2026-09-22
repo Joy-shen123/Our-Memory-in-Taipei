@@ -1,1 +1,5 @@
 .DS_Store
+asset/music/gen/*.wav
+asset/music/private/*
+!asset/music/private/README.md
+!asset/music/private/manifest.example.js

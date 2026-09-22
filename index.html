@@ -33,6 +33,23 @@
     <div class="hud-word" id="word"><div class="word-big"></div><div class="word-sub"></div></div>
     <div class="hud-closing" id="closing"></div>
     <div class="hud-year"><span class="hud-year-k">YEAR</span><span id="year">1853</span></div>
+    <!-- the decade music player (music.js): a YouTube MV box per decade, local loops when YouTube cannot play. -->
+    <div class="hud-music" id="music" role="group" aria-label="Music">
+      <div class="mus-body">
+        <div class="mus-k">MUSIC · <span id="musDecade">1980s</span> · <span id="musStatus">connecting to YouTube…</span></div>
+        <div class="mus-track" id="musTrack"></div>
+        <div class="mus-row">
+          <div class="mus-decades">
+            <button type="button" data-decade="1980s" aria-label="Play the 1980s videos">80s</button>
+            <button type="button" data-decade="1990s" aria-label="Play the 1990s videos">90s</button>
+            <button type="button" data-decade="2000s" aria-label="Play the 2000s videos">00s</button>
+            <button type="button" data-decade="2010s" aria-label="Play the 2010s videos">10s</button>
+          </div>
+          <button class="mus-mute" id="musMute" type="button" title="Sound (m)" aria-pressed="false">Click to play</button>
+        </div>
+        <div class="mus-box" id="musBox"><div id="musEmbed"></div></div>
+      </div>
+    </div>
   </div>
 
   <script src="three.min.js"></script>
@@ -48,5 +65,6 @@
   <script src="scene-red.js"></script>
   <script src="scene-dadao.js"></script>
   <script src="scene-tower.js"></script>
+  <script src="music.js"></script>
 </body>
 </html>
