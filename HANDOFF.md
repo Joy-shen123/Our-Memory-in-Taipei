@@ -1,6 +1,6 @@
 # HANDOFF — Our Memory in Taipei
 
-Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Local clone: `~/Documents/CJ-project-vault/shidaimiwu-proto`; this branch's worktree is `_worktrees/shidaimiwu-proto/issue-1-part-1`. Last updated 2026-09-21 (issue #1 Part 3 and the IVRESS borrow list, branch `issue-1-part-1`).
+Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/shidaimiwu-proto`. Worktrees go in `~/Documents/CJ-project-vault/_worktrees/shidaimiwu-proto/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; the `issue-1-part-1` worktree can be removed. Last updated 2026-09-21 (issue #1 Part 3 and the IVRESS borrow list, branch `issue-1-part-1`).
 
 ## What it is
 
@@ -107,13 +107,15 @@ The eight cheap effects from `research/ivress/README.md`, one commit each, scree
 
 ## Open items
 
-1. Issue #1 Part 2 done 2026-09-21: the runner is 張君雅小妹妹 (`girl`, `updateGirl` in `app.js`, names kept). Suggested with primitives, not the trademark artwork.
-2. Issue #1 Part 3 done 2026-09-21: `RUBRIC.md` in the repo root, first scoring posted on the issue. Scores (recognition / period / composition / density / palette / story beat / performance): ch01 4 3 3 3 4 3 5, ch02 4 3 3 3 4 2 5, ch03 4 3 4 2 4 4 5. The flash (borrow a) and the particles (g) address the two lowest; re-score after CJ answers the period question below. Waiting on CJ: gate the 1980s / 1990s / 2000s Ximending sets by scroll year, or keep all three on for density?
-3. The base-shot keyframe (CAM[4] in `data.js`, camera y 3 at z -372 looking at y 50) puts the frame bottom at ~13° elevation, so the 101 podium is below the frame in that shot. Lower the target (y 40) or move the camera back (z -380) if the podium should show.
-4. The wharf is only seen peripherally (the target curve looks east through Dadaocheng). A keyframe that glances west at z ≈ -200 would show it.
-5. HUD on narrow screens: the chapter column is top-left, the site title drops to the bottom-right under 480 px, anchor labels are clamped to y ≥ 110 px and fade out while the closing line shows. Checked 390x844 at 0.05, 0.44 and 0.97 on 2026-09-21; check again after any HUD change.
-6. `README.md` still says "throwaway prototype". Rewrite as the project readme.
-7. Mobile: 390x844 re-checked 2026-09-21 with the asset library, the column and the particles (screenshots in `part3/`). Not yet checked on a real phone: the touch fallback and the 1.5 pixel-ratio cap.
+1. **Issue #3, surface texture pass** (open, not started): tone mapping and environment light → procedural colour and normal maps in `assets-core.js` `C.mat` → one shadow sun following the scroll camera → per-vertex ambient occlusion. Four commits, screenshots at 0.05 / 0.44 / 0.78, then a second rubric scoring on issue #1's thread. Procedural only, daylight stays bright.
+2. **Ship kit** (not filed yet; proposed as #4): README first line carries the Pages link (the current link still points at the old repo name and 404s); a `submission/` folder with a one-paragraph pitch, five screenshots (one per chapter, the 101 base, the climb) and a 60-second scroll recording.
+3. **Waiting on CJ, from the rubric:** gate the 1980s / 1990s / 2000s Ximending sets by scroll year (about an hour in `scene-red.js`, thins the 1985 street) or keep all three on for density. A 1989 frame currently shows a NOKIA sign.
+4. **Waiting on CJ:** Blender. Modelling hero buildings (Red House, temple, 101) in Blender and loading GLB files breaks the no-model-files and double-click rules and needs a served page plus a loader. Everything in #3 carries over if that comes; decided after Build Day unless CJ says otherwise.
+5. Second rubric scoring after #3: ch02 story beat (2) and ch03 density (2) were addressed by the chapter-cut flash and the particles after the first scoring; not re-scored yet.
+6. The base-shot keyframe (CAM[4] in `data.js`, camera y 3 at z -372 looking at y 50) puts the 101 podium below the frame. Lower the target (y 40) or move the camera back (z -380) if the podium should show.
+7. The wharf is only seen peripherally. A keyframe that glances west at z ≈ -200 would show it.
+8. Mobile: 390x844 checked 2026-09-21 in headless Chrome. Not yet checked on a real phone: the touch fallback and the 1.5 pixel-ratio cap.
+9. `research/` (untracked on main as of 2026-09-22): the three.js survey, the IVRESS teardown and the 15 render-style test pages with shots. `research/README.md` indexes it and links the two shareable artifacts. Commit it or leave it local; nothing on the page loads from it.
 
 ## Not done on purpose
 
