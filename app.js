@@ -676,6 +676,18 @@
   bowl.position.set(0, 1.78, 0.5); girl.add(bowl);
   girl.scale.setScalar(1.15);
   scene.add(girl);
+  // Issue #5 step 4: the girl is a glb (asset/blender/girl.py) with two run frames, runA (left
+  // leg forward) and runB (right leg forward), swapped by stride phase. The primitive build above
+  // stays until the glb arrives; the same group carries position, bob and scale.
+  let frameA = null, frameB = null;
+  if (window.MODELS) MODELS.load('girl', gltf => {
+    const root = MODELS.lambertize(gltf.scene);
+    const a = MODELS.node(root, 'runA'), b = MODELS.node(root, 'runB');
+    if (!a || !b) return;
+    girl.children.slice().forEach(c => girl.remove(c));
+    girl.add(a, b);
+    frameA = a; frameB = b;
+  });
   let stride = 0, lastProg = 0, run = 0;
   function updateGirl(u, camZ, dt) {
     const speed = Math.abs(u - lastProg) / Math.max(dt, 1e-3); lastProg = u;      // scroll speed drives the run
@@ -685,6 +697,7 @@
     girl.position.set(Math.sin(stride * 0.15) * 0.6, Math.abs(Math.sin(stride)) * 0.12 * run, z);
     const sw = Math.sin(stride) * (0.25 + run * 0.9);
     legL.rotation.x = Math.PI + sw; legR.rotation.x = Math.PI - sw;
+    if (frameA) { const fwd = Math.sin(stride) >= 0; frameA.visible = fwd; frameB.visible = !fwd; }   // the two-frame run
     const carry = Math.sin(stride * 2) * 0.04 * run;                                 // the bowl bobs a little as she runs; the arms stay on it
     bowl.position.y = 1.78 + carry; gArmL.position.y = gArmR.position.y = 1.95 + carry;
     hair.position.z = -0.2 - run * 0.06; fringe.position.y = 2.42 + Math.sin(stride * 2) * 0.01 * run;
