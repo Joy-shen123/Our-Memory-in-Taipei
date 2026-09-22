@@ -118,8 +118,6 @@ CJ, 2026-09-22: 「work GitHub issue #3 … one commit and screenshots per step,
 
 Cost: fps unchanged at the display cap (100.5–100.6 at 0.2 / 0.44 / 0.78 / 0.9, was 100.8). Load is heavier: warm-up 331 ms for 30 programs (was 50 ms for 16). Not measured on a phone.
 
-## Music (issue #4, branch `issue-music-player`, 2026-09-22)
-
 ## Music (issue #4, branch `issue-music-player`, 2026-09-22/23)
 
 CJ, 2026-09-22: 「i want music for different section can you find 1980s 1990s 2000s 2010s music and make a music player system, i can switch when i am in that decade」. CJ, 2026-09-23: picked the 「YouTube IFrame player」 over the Spotify embed (which replaced an earlier private-folder direction; both closed). One YouTube player sits inside the control bottom-left as a 356 × 200 MV box; the scroll year picks the decade's video list, the four buttons switch decades by hand, the current decade's button steps to the next video, and the synthesised loops are only the fallback.
