@@ -99,12 +99,11 @@
   function B(col, row, type) {
     return { id: type + '_' + (col < 0 ? 'w' : 'e') + row, grid: [col, row], size: [8, 8], hero: false, type, byEra: TYPES[type] };
   }
+  // Only the Xinyi stretch keeps generic lots (rows 28+). The Ximending and Dadaocheng
+  // stretches are laid out building by building in scene-red.js and scene-dadao.js.
   const GENERIC = [
-    B(1, 1, 'shophouse'), B(1, 4, 'shophouse'), B(1, 10, 'market'), B(1, 13, 'market'), B(1, 16, 'baroque'),
     B(1, 29, 'baroque'), B(1, 32, 'block'), B(1, 35, 'highrise'), B(1, 38, 'highrise'),
-    B(-1, 1, 'shophouse'), B(-1, 3, 'shophouse'), B(-1, 6, 'market'), B(-1, 9, 'shophouse'), B(-1, 12, 'market'),
-    B(-1, 15, 'baroque'), B(-1, 18, 'baroque'), B(-1, 21, 'baroque'), B(-1, 28, 'block'), B(-1, 31, 'block'),
-    B(-1, 34, 'highrise'), B(-1, 37, 'highrise'),
+    B(-1, 28, 'block'), B(-1, 31, 'block'), B(-1, 34, 'highrise'), B(-1, 37, 'highrise'),
   ];
   const TILES = ANCHORS.concat(GENERIC);
 
@@ -121,8 +120,9 @@
     { p: [2, 5, -300],     t: [0, 40, -420],   fov: 55 },
     // 4 · the base — looking straight up the west face
     { p: [-3, 3, -372],    t: [-4, 50, -420],  fov: 62 },
-    // 5 · closing — high beside the tower, the man near the top
-    { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 50 },
+    // 5 · closing — high beside the tower, the man near the top. The fov opens from 62 to 82
+    //     over the climb so the world widens as he nears the crown (IVRESS borrow e).
+    { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 82 },
   ];
 
   const root = document.documentElement;

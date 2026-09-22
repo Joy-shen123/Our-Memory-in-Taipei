@@ -65,7 +65,10 @@
   // ── renderer, scene, camera ──────────────────────────────────────────────────
   const canvas = document.getElementById('scene');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // pixel ratio cap: 2 on a desktop, 1.5 on a phone (coarse pointer or a narrow screen), so a
+  // 3x phone does not render 9x the pixels of a laptop
+  const IS_PHONE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_PHONE ? 1.5 : 2));
   renderer.outputEncoding = THREE.LinearEncoding; // gamma is applied at the end of the post pass
 
   const scene = new THREE.Scene();
@@ -143,70 +146,10 @@
 
   const ALL = ERAS.map(e => e.key);
 
-  // Ximen Red House — the 1908 octagon. Replaced by the asset library's model when it is loaded.
-  if (!window.NOSTALGIA_ASSETS) (() => {
-    const A = anchors.redhouse, x = A.x, z = A.z;
-    const oct = new THREE.CylinderGeometry(1, 1, 1, 8); oct.translate(0, 0.5, 0);
-    part(x, 0, z, 5.2, 5.2, only(ALL, 5, 'verm'), Math.PI / 8, oct);              // the drum
-    part(x, 5, z, 5.8, 5.8, only(ALL, 0.6, 'ink'), Math.PI / 8, oct);             // eave slab
-    const cone = new THREE.CylinderGeometry(0.15, 1, 1, 8); cone.translate(0, 0.5, 0);
-    part(x, 5.6, z, 5.4, 5.4, only(ALL, 2.6, 'ink'), Math.PI / 8, cone);          // roof
-    part(x, 8.2, z, 1, 1, only(ALL, 1.2, 'bone'), Math.PI / 8, oct);              // lantern
-    part(x + 6.5, 0, z, 6, 9, { red: { h: 3.6, col: 'bone' }, dadao: { h: 3.6, col: 'bone' }, tower: { h: 3.6, col: 'bone' } }); // the cross-shaped market wing
-    part(x - 3.6, 0, z - 5.4, 0.5, 0.5, only(ALL, 3, 'lamp'));                    // lamps at the door
-    part(x + 3.6, 0, z - 5.4, 0.5, 0.5, only(ALL, 3, 'lamp'));
-    A.top = 9.4;
-  })();
-
-  // Dihua Street — five shophouses: arcade at street level, upper floor set back, Baroque crests from 1930
-  (() => {
-    const A = anchors.dihua, x = A.x, z0 = A.z + 20;
-    for (let i = 0; i < 5; i++) {
-      const z = z0 - i * 10, v = (i % 2) * 0.4;
-      part(x, 0, z, 9, 9, { red: { h: 3.2, col: 'brick' }, dadao: { h: 3.6, col: 'brick' }, tower: { h: 3.6, col: 'brick' } });
-      part(x + 1.2, 3.2, z, 6.6, 9, { red: { h: 1.6 + v, col: 'haze' }, dadao: { h: 4.4 + v, col: 'bone' }, tower: { h: 4.4 + v, col: 'bone' } });
-      part(x - 2.6, 3.4, z, 1.2, 9, only(['dadao', 'tower'], 5.2 + v, 'bone'));   // pilasters
-      part(x - 2.6, 8.6 + v, z, 1.4, 4, only(['dadao', 'tower'], 1.4, 'bone'));   // parapet crest
-      part(x - 3.2, 2.2, z, 0.3, 7, only(['tower'], 0.6, 'verm'));                // shop sign band
-    }
-    A.top = 10;
-  })();
-
-  // Xiahai City God Temple — hall, roof, lamp posts, and the queue outside it today
-  (() => {
-    const A = anchors.chenghuang, x = A.x, z = A.z;
-    part(x, 0, z, 8, 8, only(ALL, 4.5, 'verm'));
-    part(x, 4.5, z, 9.6, 9.6, only(ALL, 1.1, 'ink'));
-    part(x, 5.4, z, 1.6, 10.2, only(ALL, 1.6, 'ink'), Math.PI / 4);
-    part(x - 3.3, 0, z - 5.6, 0.5, 0.5, only(ALL, 3.2, 'lamp'));
-    part(x + 3.3, 0, z - 5.6, 0.5, 0.5, only(ALL, 3.2, 'lamp'));
-    part(x + 4, 0, z + 5.2, 0.6, 0.6, only(ALL, 2.4, 'lamp'));
-    part(x - 4, 0, z + 5.2, 0.6, 0.6, only(ALL, 2.4, 'lamp'));
-    for (let i = 0; i < 14; i++) { // the queue, today only, along the street side (east face)
-      const qx = x + 4.8 + (i % 3) * 0.35, qz = z + 4.6 - i * 1.15 + (i % 2) * 0.25;
-      part(qx, 0, qz, 0.55, 0.45, only(['tower'], 1.6 + (i % 3) * 0.1, i % 5 === 0 ? 'verm' : 'bone'));
-    }
-    A.top = 7.5;
-  })();
-
-  // Taipei 101 — podium, eight stacked flared segments, spire. Empty field before 2004.
-  const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 0 };
-  (() => {
-    const A = anchors.tower101, x = A.x, z = A.z;
-    part(x, 0, z, 26, 26, only(['tower'], 6, 'walk'));                          // podium
-    part(x, 6, z, 15, 15, only(['tower'], 14, 'glass'));                        // base shaft
-    let y = 20;
-    for (let i = 0; i < 8; i++) {                                               // the eight segments
-      const w = 12 + (i % 2) * 0.6;
-      part(x, y, z, w - 2.5, w - 2.5, only(['tower'], 9, 'glass'));
-      part(x, y + 5.5, z, w, w, only(['tower'], 3.5, 'glass'));                  // the flared top of each segment
-      y += 9;
-    }
-    part(x, y, z, 6, 6, only(['tower'], 5, 'glass'));                           // crown
-    part(x, y + 5, z, 1.2, 1.2, only(['tower'], 14, 'bone'));                   // spire
-    TOWER.h = y + 5;
-    A.top = y + 19;
-  })();
+  // The four anchors themselves are built in the scene files (scene-red.js: the Red House;
+  // scene-dadao.js: Dihua Street and the temple; scene-tower.js: Taipei 101), each from a real
+  // reference. They set anchors[id].top for the label and, for the tower, TOWER.h / TOWER.faceX.
+  const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 100, faceX: null };
 
   // the man climbing the west face: a small figure whose height follows the scroll in the last chapter
   const man = new THREE.Group();
@@ -221,7 +164,8 @@
     const i = ERAS.length - 1, f = Math.min(1, Math.max(0, (u - BOUNDS[i]) / (BOUNDS[i + 1] - BOUNDS[i])));
     man.visible = ERAS[eraIdx].key === 'tower';
     const climb = 6 + Math.pow(f, 1.4) * (TOWER.h - 20);
-    man.position.set(TOWER.x - 6.1, climb, TOWER.z + 1.5);
+    const fx = TOWER.faceX ? TOWER.faceX(climb) : TOWER.x - 6.1;
+    man.position.set(fx, climb, TOWER.z + 1.5);
     const t = performance.now() / 1000;
     armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
   }
@@ -293,6 +237,7 @@
     for (let i = 0; i < 320; i++) {
       const side = i % 2 ? 1 : -1, x = side * (30 + rnd() * 90), z = 60 - rnd() * 560;
       const w = 5 + rnd() * 9, d = 5 + rnd() * 9, far = Math.abs(x) / 120;
+      if (x < -28 && z < -186 && z > -244) continue;                              // the river behind the Dadaocheng wharf
       items.push({ x, z, w, d, h: { red: 2 + rnd() * 3, dadao: 3 + rnd() * 6, tower: 6 + rnd() * (10 + 30 * far) } });
     }
     instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items);
@@ -316,7 +261,7 @@
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 62); t.anisotropy = 8;
     return t;
   }
-  const roadMaps = { red: roadTexture('dirt'), dadao: roadTexture('tram'), tower: roadTexture('lines') };
+  const roadMaps = { red: roadTexture('dirt'), dadao: roadTexture('plain'), tower: roadTexture('lines') }; // Dihua Street: plain asphalt, no tram, no centre line
   const roadMesh = scene.children.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.width === GRID.roadWidth);
   roadMesh.material.map = roadMaps.red; roadMesh.material.needsUpdate = true;
 
@@ -370,7 +315,8 @@
   (() => {
     const trunks = [], crowns = [];
     for (let z = 34; z > -460; z -= 15) [-1, 1].forEach(s => {
-      if (Math.abs(z + 420) < 30) return;
+      if (Math.abs(z + 405) < 45) return;                       // the 101 plaza and the base shot
+      if (z < -138 && z > -292) return;                          // Dihua Street has no street trees
       trunks.push({ x: s * (walkX - 0.8), z, w: 0.35, d: 0.35, h: { red: 0, dadao: 2.6, tower: 3.2 } });
       crowns.push({ x: s * (walkX - 0.8), z, w: 2.8 + rnd(), d: 2.8 + rnd(), h: { red: 0, dadao: 2.4, tower: 3 }, yOf: trunks[trunks.length - 1] });
     });
@@ -393,7 +339,8 @@
     for (let i = 0; i < 70; i++) {
       const s = i % 2 ? 1 : -1, z = 20 - rnd() * 440, y = 3 + rnd() * 5;
       const c = i % 3 === 0 ? C('verm') : (i % 3 === 1 ? C('lamp') : C('bone'));
-      items.push({ x: s * (GRID.roadWidth / 2 + 3.2), z, y, w: 1.4, d: 0.25, c, h: { red: i % 6 === 0 ? 0.8 : 0, dadao: i % 2 === 0 ? 1.6 : 0, tower: 2.2 } });
+      const ximen = z > -140;                                                     // Ximending 1985–1999 already wore a wall of signs
+      items.push({ x: s * (GRID.roadWidth / 2 + 3.2), z, y, w: 1.4, d: 0.25, c, h: { red: ximen ? (i % 2 === 0 ? 1.6 : 0) : (i % 6 === 0 ? 0.8 : 0), dadao: i % 2 === 0 ? 1.6 : 0, tower: 2.2 } });
     }
     instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('bone'), emissive: C('lamp'), emissiveIntensity: 0.25 }), items, { colors: true });
   })();
@@ -442,62 +389,79 @@
 
 
 
-  // ── the childhood street: the teammate's Ximending asset library laid along both sides ──
-  // Loaded before app.js from asset/3d/. Each build() returns a Group, origin at its base, front +Z.
-  const nostalgia = new THREE.Group();
-  (() => {
-    const REG = window.NOSTALGIA_ASSETS, Core = window.NostalgiaCore;
-    if (!REG || !Core) return;
-    const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; m.needsUpdate = true; }); } });
-    const box = new THREE.Box3(), size = new THREE.Vector3();
-    const place = (obj, side, zc) => {
-      obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;    // front faces the road
-      obj.updateMatrixWorld(true);
-      box.setFromObject(obj); box.getSize(size);
-      obj.position.set(side * (6.6 + size.x / 2), 0.2, zc);
-      unfog(obj); nostalgia.add(obj);
-      return size.z;
-    };
-    // the Red House itself sits on its anchor lot
-    const A = anchors.redhouse;
-    const rh = (REG['ximen-2000s'] || []).find(a => a.id === 'red-house');
-    if (rh) { const o = rh.build(Core); o.rotation.y = -Math.PI / 2; o.position.set(A.x + 1, 0.2, A.z); o.scale.setScalar(1.6); unfog(o); nostalgia.add(o); }
-    // everything else, alternating sides from the street start
-    const order = [].concat(REG['ximen-1980s'] || [], REG['ximen-1990s'] || [], REG['ximen-2000s'] || []).filter(a => a.id !== 'red-house');
-    let zE = 34, zW = 30;
-    order.forEach((a, i) => {
-      const side = i % 2 ? 1 : -1;
-      if (side > 0 && Math.abs(zE - A.z) < 14) zE = A.z - 14;     // leave the Red House lot free
-      const obj = a.build(Core);
-      obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
-      const depth = size.x;                                        // after the rotation, x becomes depth along z
-      const zc = (side > 0 ? zE : zW) - depth / 2;
-      place(obj, side, zc);
-      if (side > 0) zE -= depth + 3; else zW -= depth + 3;
-    });
-  })();
-  scene.add(nostalgia);
+  // ── the teammate's asset library (asset/3d/), placed by the scene files ──────
+  // Each build() returns a Group, origin at its base, front facing +Z. libGroup(eras) makes a
+  // group that is only visible in those eras; asset() builds one library item into it.
+  // Library materials are unfogged: the mist is off and its shader chunk is not theirs.
+  const libGroups = [];
+  function libGroup(eras) {
+    const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g); return g;
+  }
+  const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; m.needsUpdate = true; }); } });
+  const libBox = new THREE.Box3(), libSize = new THREE.Vector3();
+  function findAsset(id) {
+    const REG = window.NOSTALGIA_ASSETS || {};
+    for (const k in REG) { const a = REG[k].find(a => a.id === id); if (a) return a; }
+    return null;
+  }
+  // asset(id, group, x, z, rotY, scale?) → the placed Group (or null when the library is missing).
+  // The returned group carries userData.size = its world-space bounding box size after rotation.
+  function asset(id, group, x, z, rotY, scale) {
+    const a = findAsset(id), Core = window.NostalgiaCore;
+    if (!a || !Core) return null;
+    const o = a.build(Core);
+    o.rotation.y = rotY || 0;
+    if (scale) o.scale.setScalar(scale);
+    o.position.set(x, 0.2, z);
+    o.updateMatrixWorld(true);
+    libBox.setFromObject(o); libBox.getSize(libSize);
+    o.userData.size = libSize.clone();
+    unfog(o); group.add(o);
+    return o;
+  }
 
   // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
   // part(x, y, z, w, d, lookByEra, rotY?, geo?)  lookByEra: { red:{h,col}, dadao:{h,col}, tower:{h,col} }
   // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX };
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
 
 
-  // ── the girl running down the middle of the street, always a little ahead of the camera ──
+  // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
+  // Issue #1 Part 2 (CJ, 2026-09-21: 「go 開始 Part 2」). Suggested, not copied: bowl-cut black
+  // hair with a straight fringe, white shirt, dark skirt on two straps, red cheeks, a bowl of
+  // noodles carried in both hands in front of her. She is the viewer's memory, so she runs the
+  // whole street, not only the 2000s. Primitives and the palette only.
   const girl = new THREE.Group();
-  const gMat = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
   const gSkin = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
+  const gShirt = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
   const gInk = withFog(new THREE.MeshLambertMaterial({ color: C('ink') }));
-  const skirtGeo = new THREE.ConeGeometry(0.55, 1, 10); skirtGeo.translate(0, 0.5, 0);
-  const skirt = new THREE.Mesh(skirtGeo, gMat); skirt.scale.set(1, 0.9, 1); skirt.position.y = 0.75; girl.add(skirt);
-  const torso = new THREE.Mesh(boxGeo, gMat); torso.scale.set(0.5, 0.55, 0.3); torso.position.y = 1.6; girl.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), gSkin); head.position.y = 2.42; girl.add(head);
-  const hair = new THREE.Mesh(boxGeo, gInk); hair.scale.set(0.16, 0.5, 0.16); hair.position.set(0, 2.05, 0.3); hair.rotation.x = -0.9; girl.add(hair);
+  const gVerm = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
+  const gLamp = withFog(new THREE.MeshLambertMaterial({ color: C('lamp') }));
+  const skirtGeo = new THREE.ConeGeometry(0.5, 1, 10); skirtGeo.translate(0, 0.5, 0);
+  const skirt = new THREE.Mesh(skirtGeo, gInk); skirt.scale.set(1, 0.85, 1); skirt.position.y = 0.8; girl.add(skirt);        // dark skirt
+  const torso = new THREE.Mesh(boxGeo, gShirt); torso.scale.set(0.52, 0.6, 0.32); torso.position.y = 1.62; girl.add(torso);   // white shirt
+  [-0.13, 0.13].forEach(x => { const st = new THREE.Mesh(boxGeo, gInk); st.scale.set(0.09, 0.6, 0.34); st.position.set(x, 1.62, 0); girl.add(st); }); // straps
+  const bib = new THREE.Mesh(boxGeo, gInk); bib.scale.set(0.36, 0.22, 0.35); bib.position.y = 1.62; girl.add(bib);          // the skirt's bib
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), gSkin); head.position.y = 2.46; girl.add(head);
+  // bowl cut: a cap of hair over the top and back, a straight fringe across the forehead
+  const capGeo = new THREE.SphereGeometry(0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.58);
+  const hairCap = new THREE.Mesh(capGeo, gInk); hairCap.position.y = 2.47; girl.add(hairCap);
+  const fringe = new THREE.Mesh(boxGeo, gInk); fringe.scale.set(0.5, 0.16, 0.14); fringe.position.set(0, 2.42, 0.2); girl.add(fringe);
+  const hair = new THREE.Mesh(boxGeo, gInk); hair.scale.set(0.56, 0.3, 0.16); hair.position.set(0, 2.28, -0.2); girl.add(hair);  // the back of the bowl
+  [-0.17, 0.17].forEach(x => { const ch = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), gVerm); ch.position.set(x, 2.38, 0.22); girl.add(ch); }); // red cheeks
   const legL = new THREE.Mesh(boxGeo, gSkin); legL.scale.set(0.16, 0.8, 0.16); legL.position.set(-0.15, 0.8, 0); legL.rotation.x = Math.PI; girl.add(legL);
   const legR = new THREE.Mesh(boxGeo, gSkin); legR.scale.set(0.16, 0.8, 0.16); legR.position.set(0.15, 0.8, 0); legR.rotation.x = Math.PI; girl.add(legR);
-  const gArmL = new THREE.Mesh(boxGeo, gSkin); gArmL.scale.set(0.13, 0.6, 0.13); gArmL.position.set(-0.36, 2.1, 0); gArmL.rotation.x = Math.PI; girl.add(gArmL);
-  const gArmR = new THREE.Mesh(boxGeo, gSkin); gArmR.scale.set(0.13, 0.6, 0.13); gArmR.position.set(0.36, 2.1, 0); gArmR.rotation.x = Math.PI; girl.add(gArmR);
+  [legL, legR].forEach(l => { const shoe = new THREE.Mesh(boxGeo, gInk); shoe.scale.set(1.2, 0.12, 1.6); shoe.position.set(0, 0.95, -0.25); l.add(shoe); }); // shoes at the foot end of the leg
+  // arms held forward, both hands on the bowl
+  const gArmL = new THREE.Mesh(boxGeo, gSkin); gArmL.scale.set(0.13, 0.55, 0.13); gArmL.position.set(-0.3, 1.95, 0.06); gArmL.rotation.x = -Math.PI / 2 + 0.25; girl.add(gArmL);
+  const gArmR = new THREE.Mesh(boxGeo, gSkin); gArmR.scale.set(0.13, 0.55, 0.13); gArmR.position.set(0.3, 1.95, 0.06); gArmR.rotation.x = -Math.PI / 2 + 0.25; girl.add(gArmR);
+  const bowl = new THREE.Group();
+  const bowlGeo = new THREE.CylinderGeometry(0.3, 0.2, 0.22, 12); bowlGeo.translate(0, 0.11, 0);
+  bowl.add(new THREE.Mesh(bowlGeo, gShirt));
+  const noodles = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), gLamp); noodles.position.y = 0.18; bowl.add(noodles);
+  const egg = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), gVerm); egg.position.set(0.08, 0.36, 0.05); bowl.add(egg);
+  [-0.05, 0.03].forEach((x, i) => { const cs = new THREE.Mesh(boxGeo, gInk); cs.scale.set(0.025, 0.5, 0.025); cs.position.set(x, 0.2, -0.02 + i * 0.03); cs.rotation.z = 0.35 + i * 0.1; cs.rotation.x = -0.4; bowl.add(cs); });
+  bowl.position.set(0, 1.78, 0.5); girl.add(bowl);
   girl.scale.setScalar(1.15);
   scene.add(girl);
   let stride = 0, lastProg = 0, run = 0;
@@ -509,18 +473,103 @@
     girl.position.set(Math.sin(stride * 0.15) * 0.6, Math.abs(Math.sin(stride)) * 0.12 * run, z);
     const sw = Math.sin(stride) * (0.25 + run * 0.9);
     legL.rotation.x = Math.PI + sw; legR.rotation.x = Math.PI - sw;
-    gArmL.rotation.x = Math.PI - sw * 0.8; gArmR.rotation.x = Math.PI + sw * 0.8;
-    hair.rotation.x = -0.9 - run * 0.5;
+    const carry = Math.sin(stride * 2) * 0.04 * run;                                 // the bowl bobs a little as she runs; the arms stay on it
+    bowl.position.y = 1.78 + carry; gArmL.position.y = gArmR.position.y = 1.95 + carry;
+    hair.position.z = -0.2 - run * 0.06; fringe.position.y = 2.42 + Math.sin(stride * 2) * 0.01 * run;
     girl.rotation.y = 0;
   }
 
+  // ── curve particles (IVRESS borrow g): lantern sparks in Dadaocheng, a light stream up 101 ──
+  // Two THREE.Points, CPU-updated each frame, each riding a CatmullRomCurve3 sampled once into a
+  // table: the sparks drift along a curve threaded through the eight lantern strings and rise off
+  // it; the stream spirals up the tower on a curve that follows TOWER.faceX. A tiny shader gives
+  // each point a soft round sprite and its own alpha. Capped at 500 + 900 points.
+  const SPARK_N = 500, STREAM_N = 900;
+  const pointsMat = (size) => new THREE.ShaderMaterial({
+    uniforms: { uSize: { value: size }, uPR: { value: renderer.getPixelRatio() } },
+    vertexShader: `attribute float aAlpha; attribute vec3 aColor; uniform float uSize, uPR; varying float vA; varying vec3 vC;
+      void main(){ vC = aColor; vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = min(28.0, uSize * uPR * 240.0 / max(1.0, -mv.z)); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vA; varying vec3 vC;
+      void main(){ vec2 d = gl_PointCoord - 0.5; float r = dot(d, d); if (r > 0.25) discard;
+        gl_FragColor = vec4(vC, vA * smoothstep(0.25, 0.06, r)); }`,
+    transparent: true, depthWrite: false, fog: false
+  });
+  function pointsSet(n, size) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), alp = new Float32Array(n);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(alp, 1));
+    const mesh = new THREE.Points(geo, pointsMat(size)); mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
+    return { mesh, pos, col, alp, n, p: [] };
+  }
+  const sampleCurve = (pts, n) => new THREE.CatmullRomCurve3(pts, false, 'centripetal').getSpacedPoints(n);
+  const curveAt = (tab, t) => { const f = Math.min(tab.length - 1.001, Math.max(0, t) * (tab.length - 1)), i = Math.floor(f), k = f - i; return P3.copy(tab[i]).lerp(tab[i + 1], k); };
+  const sparks = pointsSet(SPARK_N, 0.55), stream = pointsSet(STREAM_N, 0.7);
+  const sparkCurve = sampleCurve([[0, 7.2, -186], [1.5, 7.0, -204], [-1.5, 7.4, -228], [1.0, 7.0, -252], [-1.0, 7.3, -276], [0, 7.5, -290]].map(a => new THREE.Vector3(a[0], a[1], a[2])), 256);
+  const lampC = C('lamp'), vermC = C('verm'), boneC = C('bone'), glassC = C('glass');
+  for (let i = 0; i < SPARK_N; i++) sparks.p.push({ t: rnd(), x: (rnd() - 0.5) * 11, life: rnd(), rate: 0.25 + rnd() * 0.3, sway: rnd() * 6.28, warm: rnd() });
+  let streamCurve = null;
+  function buildStreamCurve() {                                    // needs TOWER.faceX from scene-tower.js
+    const pts = [];
+    for (let k = 0; k <= 14; k++) {
+      const y = 2 + (TOWER.h + 18 - 2) * k / 14, r = TOWER.x - TOWER.faceX(y) + 1.6, a = k * 1.35;
+      pts.push(new THREE.Vector3(TOWER.x + Math.cos(a) * r, y, TOWER.z + Math.sin(a) * r));
+    }
+    streamCurve = sampleCurve(pts, 512);
+    for (let i = 0; i < STREAM_N; i++) stream.p.push({ t: rnd(), rate: 0.045 + rnd() * 0.05, jx: (rnd() - 0.5) * 1.2, jy: (rnd() - 0.5) * 1.2, jz: (rnd() - 0.5) * 1.2, bright: rnd() });
+  }
+  function updateParticles(dt, now, key) {
+    sparks.mesh.visible = key === 'dadao';
+    stream.mesh.visible = key === 'tower' && !!streamCurve;
+    if (sparks.mesh.visible) {
+      const P = sparks.p, t = now / 1000;
+      for (let i = 0; i < SPARK_N; i++) {
+        const q = P[i]; q.life += q.rate * dt; if (q.life > 1) { q.life = 0; q.t = rnd(); q.x = (rnd() - 0.5) * 11; }
+        curveAt(sparkCurve, q.t);
+        const rise = q.life * 4.5, sw = Math.sin(t * 1.7 + q.sway) * 0.35 * q.life;
+        sparks.pos[i * 3] = P3.x + q.x + sw; sparks.pos[i * 3 + 1] = P3.y + rise; sparks.pos[i * 3 + 2] = P3.z + Math.cos(t * 1.3 + q.sway) * 0.3;
+        tmpC.copy(lampC).lerp(vermC, q.warm * 0.6);
+        sparks.col[i * 3] = tmpC.r; sparks.col[i * 3 + 1] = tmpC.g; sparks.col[i * 3 + 2] = tmpC.b;
+        sparks.alp[i] = Math.sin(q.life * Math.PI) * 0.9;
+      }
+      sparks.mesh.geometry.attributes.position.needsUpdate = true; sparks.mesh.geometry.attributes.aColor.needsUpdate = true; sparks.mesh.geometry.attributes.aAlpha.needsUpdate = true;
+    }
+    if (stream.mesh.visible) {
+      const P = stream.p;
+      for (let i = 0; i < STREAM_N; i++) {
+        const q = P[i]; q.t += q.rate * dt; if (q.t > 1) q.t -= 1;
+        curveAt(streamCurve, q.t);
+        stream.pos[i * 3] = P3.x + q.jx; stream.pos[i * 3 + 1] = P3.y + q.jy; stream.pos[i * 3 + 2] = P3.z + q.jz;
+        tmpC.copy(glassC).lerp(boneC, 0.5 + q.bright * 0.5).lerp(lampC, q.t * 0.5);   // cool at the base, warm and pale near the crown
+        stream.col[i * 3] = tmpC.r; stream.col[i * 3 + 1] = tmpC.g; stream.col[i * 3 + 2] = tmpC.b;
+        stream.alp[i] = (0.35 + 0.65 * q.bright) * Math.min(1, q.t * 8) * Math.min(1, (1 - q.t) * 6);
+      }
+      stream.mesh.geometry.attributes.position.needsUpdate = true; stream.mesh.geometry.attributes.aColor.needsUpdate = true; stream.mesh.geometry.attributes.aAlpha.needsUpdate = true;
+    }
+  }
+
   // ── the words ──────────────────────────────────────────────────────────────
+  // Each word is split into glyph spans with a per-glyph transition-delay; toggling .show on the
+  // block reveals them letter by letter with no JS per frame (IVRESS borrow b). The block's own
+  // opacity still follows scroll distance so a word also fades as you leave it.
   const wordEl = document.getElementById('word'), wordBig = wordEl.children[0], wordSub = wordEl.children[1];
+  const GLYPH_MS = 38;
+  // words are kept whole (a .w span per word, nowrap) so lines break between words, never inside one
+  const glyphs = (text, from) => { let i = 0; return text.split(' ').map(w => '<span class="w">' + w.split('').map(ch => `<span style="transition-delay:${from + (i++) * GLYPH_MS}ms">${ch}</span>`).join('') + '</span>').join(' '); };
   let wordShown = -1;
   function updateWords(u) {
     let best = -1, bestA = 0;
     WORDS.forEach((w, i) => { const a = Math.max(0, 1 - Math.abs(u - w.at) / 0.045); if (a > bestA) { bestA = a; best = i; } });
-    if (best !== wordShown && best >= 0) { wordShown = best; wordBig.textContent = WORDS[best].big; wordSub.textContent = WORDS[best].sub || ''; }
+    if (best !== wordShown && best >= 0) {
+      wordShown = best;
+      wordEl.classList.remove('show');
+      wordBig.innerHTML = glyphs(WORDS[best].big, 0);
+      wordSub.innerHTML = glyphs(WORDS[best].sub || '', WORDS[best].big.length * GLYPH_MS * 0.6);
+      void wordEl.offsetWidth;                                       // restart the transitions
+    }
+    wordEl.classList.toggle('show', bestA > 0.35);
     const a = Math.min(1, bestA * 1.6);
     wordEl.style.opacity = a.toFixed(2);
     wordEl.style.transform = `translateY(${((1 - a) * 18).toFixed(1)}px)`;
@@ -536,7 +585,7 @@
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
     mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, print: mixCur.print };
     eraFrom = eraIdx; eraIdx = i;
-    nostalgia.visible = ERAS[i].key === 'red';
+    libGroups.forEach(g => { g.visible = g.userData.eras.indexOf(ERAS[i].key) >= 0; });
     eraT0 = instant ? now - ERA_MS : now;
     swapEraLabel(ERAS[i], instant);
   }
@@ -585,14 +634,29 @@
   const tgtCurve = new THREE.CatmullRomCurve3(CAM.map(k => V(k.t)), false, 'centripetal');
   const fovs = CAM.map(k => k.fov);
   const pTmp = new THREE.Vector3(), tTmp = new THREE.Vector3();
+  // mouse parallax (IVRESS borrow f): a damped offset along the camera's own right and up axes,
+  // applied after lookAt so the frame slides rather than turns; it fades to nothing within
+  // PARALLAX_FADE of each chapter cut and of the end, so the cuts and the closing shot stay fixed.
+  const PARALLAX_FADE = 0.04, PARALLAX_X = 0.6, PARALLAX_Y = 0.3;
   let mouseX = 0, mouseY = 0, driftX = 0, driftY = 0;
+  const camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
+  function parallaxFade(u) {
+    let f = 1;
+    for (let i = 1; i < BOUNDS.length; i++) f = Math.min(f, Math.abs(u - BOUNDS[i]) / PARALLAX_FADE);
+    f = Math.min(1, f);
+    return f * f * (3 - 2 * f);
+  }
   function placeCamera(u) {
     posCurve.getPoint(u, pTmp);
     tgtCurve.getPoint(u, tTmp);
     const s = u * (fovs.length - 1), i = Math.min(fovs.length - 2, Math.floor(s)), f = s - i;
     camera.fov = fovs[i] + (fovs[i + 1] - fovs[i]) * f;
-    camera.position.set(pTmp.x + driftX, pTmp.y + driftY, pTmp.z); // a small parallax drift, never enough to break the frame
+    camera.position.copy(pTmp);
     camera.lookAt(tTmp);
+    const k = parallaxFade(u);
+    camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    camera.position.addScaledVector(camRight, driftX * k).addScaledVector(camUp, driftY * k);
     camera.updateProjectionMatrix();
     return pTmp.z;
   }
@@ -632,10 +696,11 @@
   const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
   const post = new THREE.ShaderMaterial({
     uniforms: { tDiffuse: { value: rt.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uPrint: { value: 1 },
-                uTime: { value: 0 }, uInk: { value: C('ink') }, uHaze: { value: C('haze') }, uBone: { value: C('bone') } },
+                uTime: { value: 0 }, uInk: { value: C('ink') }, uHaze: { value: C('haze') }, uBone: { value: C('bone') },
+                uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 1, 1) } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
     fragmentShader: `
-      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime; uniform vec3 uInk, uHaze, uBone;
+      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime, uFlash; uniform vec3 uInk, uHaze, uBone, uFlashCol;
       varying vec2 vUv;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -659,13 +724,18 @@
         c = mix(c, printed, uPrint);
         c = mix(c, uInk, ink);
         c = pow(max(c, 0.0), vec3(1.0 / 2.2));
-        // GRAIN — paper grain at 1 (coarser, static), film grain at 0 (finer, moving)
+        // GRAIN — paper grain at 1 (coarser, static), film grain at 0 (finer, moving).
+        // Luminance-aware: it lives in the shadows and leaves the sky clean; stepped at 30 Hz.
         vec2 cell = floor(gl_FragCoord.xy / mix(1.0, 2.0, uPrint));
-        float g = hash(cell + floor(uTime * mix(60.0, 2.0, uPrint)) * 0.37) - 0.5;
-        c += g * mix(0.025, 0.045, uPrint);
+        float g = hash(cell + floor(uTime * mix(30.0, 2.0, uPrint)) * 0.37) - 0.5;
+        g *= mix(1.0, 1.0 - lum(c), 0.85);
+        c += g * mix(0.06, 0.045, uPrint);
         // VIGNETTE — restrained
         float d = distance(vUv, vec2(0.5));
         c *= 1.0 - smoothstep(0.45, 1.0, d) * 0.3;
+        // CHAPTER CUT — a flash from the centre of the frame as the camera crosses a year marking
+        float fm = 1.0 - smoothstep(0.12, 0.72, length(vec2(vUv.x - 0.5, (vUv.y - 0.5) * 0.6)));
+        c = mix(c, uFlashCol, uFlash * fm);
         gl_FragColor = vec4(c, 1.0);
       }`,
     depthTest: false, depthWrite: false
@@ -674,14 +744,42 @@
   postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
+  // ── chapter cut: a flash as the camera crosses each year marking ─────────────
+  // Keyed on progress (so it scrubs both ways), white at the 2000 marking and warm gold at 2020;
+  // it holds briefly and fades so stopping on a marking does not leave the frame lit. Borrowed
+  // from IVRESS's section cuts (research/ivress/README.md).
+  const FLASH_W = 0.012, FLASH_HOLD = 500, FLASH_FADE = 1200;
+  const FLASH_COL = [null, new THREE.Color(1, 1, 1), C('lamp').lerp(new THREE.Color(1, 1, 1), 0.45)];
+  let flashIn = false, flashT0 = 0;
+  function updateFlash(now) {
+    let a = 0, col = null;
+    for (let i = 1; i < ERAS.length; i++) {
+      const k = 1 - Math.min(1, Math.abs(progress - BOUNDS[i]) / FLASH_W);
+      if (k > a) { a = k; col = FLASH_COL[i]; }
+    }
+    if (a > 0 && !flashIn) { flashIn = true; flashT0 = now; }
+    if (a === 0) flashIn = false;
+    const t = now - flashT0;
+    const fade = t < FLASH_HOLD ? 1 : Math.max(0, 1 - (t - FLASH_HOLD) / FLASH_FADE);
+    post.uniforms.uFlash.value = a * a * (3 - 2 * a) * fade;
+    if (col) post.uniforms.uFlashCol.value.copy(col);
+  }
+
   // ── HUD: era label, year, anchor labels ──────────────────────────────────────
   const yearEl = document.getElementById('year');
-  const eraBox = document.querySelector('.hud-era');
+  // the chapter column (top-left): "01/03", the name in caps, the years, the Chinese name vertical
+  const eraBox = document.querySelector('.hud-chapter');
   const eraLabelEl = document.getElementById('eraLabel');
   const eraYearsEl = document.getElementById('eraYears');
+  const eraZhEl = document.getElementById('eraZh');
+  const chapNEl = document.getElementById('chapN');
   let swapTimer = 0;
   function swapEraLabel(era, instant) {
-    const apply = () => { eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + ' · ' + era.zh; };
+    const apply = () => {
+      const zh = era.zh.split(' · ');                                  // '西門町 · Ximending' → vertical 西門町, romanised name under the years
+      chapNEl.textContent = String(ERAS.indexOf(era) + 1).padStart(2, '0');
+      eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + (zh[1] ? ' · ' + zh[1] : ''); eraZhEl.textContent = zh[0];
+    };
     clearTimeout(swapTimer);
     if (instant) { eraBox.classList.remove('swap'); apply(); return; }
     eraBox.classList.add('swap');
@@ -706,7 +804,7 @@
       const dist = Math.hypot(L.A.x - camera.position.x, L.A.z - camera.position.z);
       const inFront = wp.z < 1 && Math.abs(wp.x) < 1.1;
       const near = Math.min(1, Math.max(0, (LABEL_NEAR - dist) / 30));
-      const vis = s.built && inFront ? near * eraE : 0;
+      const vis = s.built && inFront ? near * eraE * (1 - closingA) : 0;   // labels step aside for the closing line
       if (L.shownKey !== key) { // reveal the caption word by word (per character, this is 中文)
         L.shownKey = key;
         L.name.textContent = L.A.tile.name.en;
@@ -725,7 +823,7 @@
 
   // ── scroll → progress, damped ────────────────────────────────────────────────
   const maxScroll = () => Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-  let progress = 0, frontier = Infinity, lastT = performance.now(), shownYear = -1;
+  let progress = 0, frontier = Infinity, lastT = performance.now(), shownYear = -1, closingA = 0;
 
   function resize() {
     const w = window.innerWidth, h = window.innerHeight, pr = renderer.getPixelRatio();
@@ -739,14 +837,62 @@
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });
   resize();
 
+  // ── robustness: tab switches, keyboards, touch ───────────────────────────────
+  // Coming back from another tab, the first frame's dt would be the whole absence; dt is clamped
+  // to 50 ms and the clocks are reset so neither the camera damping nor the runner's scroll-speed
+  // estimate sees a jump.
+  const resetClocks = () => { lastT = performance.now(); lastProg = progress; };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resetClocks(); });
+  window.addEventListener('pageshow', resetClocks);
+  window.addEventListener('focus', resetClocks);
+  // keyboard: arrows, page keys, space, home, end scroll the page even when the browser gave the
+  // canvas focus and stopped scrolling the document itself
+  window.addEventListener('keydown', ev => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    const page = window.innerHeight * 0.8, step = 120;
+    const by = { ArrowDown: step, ArrowUp: -step, PageDown: page, PageUp: -page, ' ': ev.shiftKey ? -page : page }[ev.key];
+    if (by !== undefined) { ev.preventDefault(); window.scrollBy({ top: by, behavior: 'smooth' }); }
+    else if (ev.key === 'Home') { ev.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else if (ev.key === 'End') { ev.preventDefault(); window.scrollTo({ top: maxScroll(), behavior: 'smooth' }); }
+  });
+  // touch: the document scrolls natively (touch-action: pan-y on the canvas). If an in-app browser
+  // swallows the gesture and scrollY does not move, drag the page by hand for the rest of the swipe.
+  let touchY = 0, touchScroll0 = 0, touchMoves = 0, touchManual = false;
+  window.addEventListener('touchstart', ev => { touchY = ev.touches[0].clientY; touchScroll0 = window.scrollY; touchMoves = 0; touchManual = false; }, { passive: true });
+  window.addEventListener('touchmove', ev => {
+    const y = ev.touches[0].clientY, dy = touchY - y; touchY = y; touchMoves++;
+    if (!touchManual && touchMoves >= 3 && Math.abs(dy) > 4 && window.scrollY === touchScroll0) touchManual = true;
+    if (touchManual) window.scrollBy(0, dy);
+  }, { passive: true });
+
+  // ── render warm-up (IVRESS borrow h) ─────────────────────────────────────────
+  // three.js compiles a material's program and uploads its textures the first time the object is
+  // drawn, so the first crossing into each era used to hitch on the buildings that only exist
+  // there. Era differences are visibility and uniforms only, so one pass with everything visible
+  // covers all three: compile every program, draw one frame into the offscreen target so the
+  // textures upload, then restore. Runs on the first frame, after the scene files have built.
+  // ?nowarm=1 skips it, for measuring.
+  let warm = null;
+  function warmUp() {
+    const t0 = performance.now(), vis = [];
+    scene.traverse(o => { vis.push([o, o.visible]); o.visible = true; });
+    renderer.compile(scene, camera);
+    renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null);
+    vis.forEach(([o, v]) => { o.visible = v; });
+    warm = { ms: Math.round(performance.now() - t0), programs: renderer.info.programs.length, textures: renderer.info.memory.textures };
+  }
+  const NOWARM = new URLSearchParams(location.search).get('nowarm') === '1';
+  const hitch = { max: 0, at: 0 };                                 // the longest frame gap since load, for measuring
   function frame(now) {
-    const dt = Math.min(0.1, (now - lastT) / 1000);
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    if (now - lastT > hitch.max && lastT > 0) { hitch.max = Math.round(now - lastT); hitch.at = +progress.toFixed(3); }
     lastT = now;
+    if (!warm && !NOWARM) { warmUp(); hitch.max = 0; }
     const target = Math.min(1, Math.max(0, window.scrollY / maxScroll()));
     progress += (target - progress) * (1 - Math.exp(-DAMP * dt));
     if (Math.abs(target - progress) < 0.00005) progress = target;
-    driftX += (mouseX * 0.5 - driftX) * (1 - Math.exp(-2 * dt));
-    driftY += (-mouseY * 0.25 - driftY) * (1 - Math.exp(-2 * dt));
+    driftX += (mouseX * PARALLAX_X - driftX) * (1 - Math.exp(-2 * dt));
+    driftY += (-mouseY * PARALLAX_Y - driftY) * (1 - Math.exp(-2 * dt));
 
     const camZ = placeCamera(progress);
     frontier = Math.min(frontier, camZ - FOG_LEAD);
@@ -754,16 +900,20 @@
 
     setEra(eraAtU(progress), false);
     updateWorld(now);
+    if (!streamCurve && TOWER.faceX) buildStreamCurve();
+    updateParticles(dt, now, ERAS[eraIdx].key);
     updateMan(progress);
     updateGirl(progress, camZ, dt);
     updateWords(progress);
     updateLabels();
-    closingEl.style.opacity = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6)).toFixed(2);
+    closingA = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6));
+    closingEl.style.opacity = closingA.toFixed(2);
 
     const y = Math.round(yearAtU(progress));
     if (y !== shownYear) { shownYear = y; yearEl.textContent = String(y); }
 
     post.uniforms.uTime.value = now / 1000;
+    updateFlash(now);
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
     renderer.setRenderTarget(null);
@@ -786,7 +936,7 @@
 
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; },
-                   get camZ() { return camera.position.z; }, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
+                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
 
   requestAnimationFrame(frame);
 })();

@@ -20,6 +20,7 @@ html, body {
   height: 100vh;
   display: block;
   z-index: 0;
+  touch-action: pan-y;   /* a swipe on the canvas scrolls the page */
 }
 
 /* the scroll runway. 6 sections = opening, four eras, closing. */
@@ -47,31 +48,24 @@ html, body {
 }
 .hud-title span { opacity: 0.6; margin-left: 0.6em; }
 
-.hud-era {
+/* the chapter column, top-left: counter, name in caps, years, and the Chinese name set vertically */
+.hud-chapter {
   position: absolute;
+  top: clamp(20px, 4vw, 56px);
   left: clamp(20px, 4vw, 56px);
-  bottom: clamp(24px, 6vh, 72px);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   transition: opacity 240ms ease;
+  text-shadow: 0 2px 16px var(--ink);
 }
-.hud-era.swap { opacity: 0; }
-.hud-era-label {
-  font-size: clamp(26px, 3.6vw, 56px);
-  font-weight: 700;
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  max-width: 60vw;
-  text-shadow: 0 2px 24px var(--ink);
-}
-.hud-era-years {
-  margin-top: 14px;
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  opacity: 0.8;
-  border-top: 1px solid var(--bone);
-  display: inline-block;
-  padding-top: 8px;
-  min-width: 140px;
-}
+.hud-chapter.swap { opacity: 0; }
+.chap-col { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--bone); padding-top: 8px; min-width: 150px; }
+.chap-n { font-size: 26px; font-weight: 700; letter-spacing: 0.06em; line-height: 1; font-variant-numeric: tabular-nums; }
+.chap-of { font-size: 12px; font-weight: 400; letter-spacing: 0.32em; opacity: 0.6; margin-left: 0.3em; vertical-align: 0.5em; }
+.chap-name { font-size: 12px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; max-width: 240px; line-height: 1.5; }
+.chap-years { font-size: 11px; letter-spacing: 0.3em; opacity: 0.7; }
+.chap-zh { writing-mode: vertical-rl; font-size: 22px; font-weight: 700; letter-spacing: 0.3em; line-height: 1; padding-top: 8px; border-top: 1px solid var(--bone); }
 
 .hud-year {
   position: absolute;
@@ -92,8 +86,12 @@ html, body {
 }
 
 @media (max-width: 480px) {
-  .hud-title { font-size: 10px; letter-spacing: 0.24em; }
-  .hud-era { bottom: 84px; }
+  .hud-title { font-size: 10px; letter-spacing: 0.24em; top: auto; bottom: 28px; }   /* bottom-right on a phone: the chapter column owns the top */
+  .hud-chapter { gap: 12px; }
+  .chap-col { min-width: 0; gap: 6px; }
+  .chap-n { font-size: 20px; }
+  .chap-name { font-size: 10px; letter-spacing: 0.24em; max-width: 150px; }
+  .chap-zh { font-size: 16px; }
   .hud-year { bottom: 28px; left: 20px; right: auto; text-align: left; }
 }
 
@@ -113,10 +111,10 @@ html, body {
 .label-cap span { opacity: 0; transition: opacity 260ms ease; }
 .label.on .label-cap span { opacity: 1; }
 
-/* the closing line, fading in beside the climbing man */
+/* the closing line, fading in beside the climbing man, below the chapter column */
 .hud-closing {
   position: absolute;
-  top: clamp(72px, 12vh, 140px);
+  top: clamp(170px, 24vh, 260px);
   left: clamp(20px, 4vw, 56px);
   max-width: min(560px, 80vw);
   font-size: clamp(22px, 2.6vw, 40px);
@@ -152,4 +150,8 @@ html, body {
   opacity: 0.85;
   text-shadow: 0 2px 16px var(--ink);
 }
+/* letter-by-letter reveal: each glyph is a span with its own transition-delay, set in app.js */
+.word-big .w, .word-sub .w { display: inline-block; white-space: nowrap; }
+.word-big .w span, .word-sub .w span { display: inline-block; opacity: 0; transform: translateY(0.35em); transition: opacity 360ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.hud-word.show .word-big span, .hud-word.show .word-sub span { opacity: 1; transform: none; }
 @media (max-width: 480px) { .hud-word { top: 18vh; } .word-big { font-size: 44px; } }

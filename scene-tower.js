@@ -3,20 +3,26 @@
 // carries rice paddies and farmhouses in the two earlier eras, so scrolling back reads
 // "fields, then the tallest building on earth". Primitives only, five colours only.
 //
-// Instancing rule learned the hard way: app.js collapses an instanced item to a plate at its
-// own y in the eras where its height is 0 (it never hides it). So no instanced item here is
-// raised off the ground. Anything that used to be a raised box (tree crown, flag, traffic-light
-// head, taxi cabin, planter plant) is now one compound geometry with its base at y = 0, coloured
-// per vertex, and lifted a hair so the collapsed plate sits just under the ground plane.
+// The tower itself, 新光三越 A11, the 空橋 skywalks and the City Hall silhouette are built here
+// from real references (see HANDOFF.md). This file sets TOWER.h, TOWER.faceX and the label top.
+//
+// The compound geometries below (base at y = 0, height normalised to 1, coloured per vertex)
+// predate the engine hiding absent instances; they still give one draw call per set.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors } = window.SCENE;
 
   const tw = h => ({ red: 0, dadao: 0, tower: h });      // instSet heights: tower era only
   const old = h => ({ red: h, dadao: h, tower: 0 });     // instSet heights: fields era only
   const TW = (h, col) => only(['tower'], h, col);        // part look: tower era only
   const OLD = (h, col) => only(['red', 'dadao'], h, col);
-  const TZ = TOWER.z, TH = TOWER.h;
+  const TZ = TOWER.z, TX = TOWER.x;
+  const SQ2 = Math.SQRT2;
+  // a square frustum, base at y = 0, unit height: half-width hb at the bottom, ht at the top
+  function frustum(hb, ht) {
+    const g = new THREE.CylinderGeometry(ht * SQ2, hb * SQ2, 1, 4, 1); g.rotateY(Math.PI / 4); g.translate(0, 0.5, 0); return g;
+  }
+  const cjk = px => `700 ${px}px -apple-system, "PingFang TC", "Heiti TC", "Noto Sans CJK TC", "Helvetica Neue", sans-serif`;
 
   // ── compound geometry: several boxes merged, base at y = 0, height normalised to 1 ──
   // pieces: { x, y, z, w, h, d, col } in world units (y = base of that box). H = total height.
@@ -73,6 +79,84 @@
     color: C('haze'), map: winTex(cols, rows, false, seed),
     emissive: C('lamp'), emissiveMap: winTex(cols, rows, true, seed), emissiveIntensity: 0.5 });
 
+  // ── 台北101 ─────────────────────────────────────────────────────────────────
+  // Real profile: a 6-storey mall podium; a tapering pedestal (floors 1–25, a truncated pyramid
+  // wider at the ground); four 古錢 coin ornaments on the faces at the 26th floor; eight 斗-shaped
+  // segments of eight floors, each flaring 7° outward as it rises so its top overhangs the next
+  // one's base (the bamboo joints); a 如意 at every segment's four bottom corners; a tapering
+  // crown (floors 91–101); the spire. Glass is the palette's glass with a lit-window grid.
+  const PODIUM_H = 7, PED_Y0 = PODIUM_H, PED_Y1 = 30, PED_HB = 8.5, PED_HT = 6.0;
+  const SEG_H = 8.5, SEG_N = 8, SEG_HB = 5.2, SEG_HT = 6.6, SEG_Y0 = PED_Y1;
+  const CROWN_Y0 = SEG_Y0 + SEG_N * SEG_H, CROWN_H = 8, CROWN_HB = 5.5, CROWN_HT = 3.2;
+  const CROWN_Y1 = CROWN_Y0 + CROWN_H, MECH_H = 3, MAST_H = 2, SPIRE_H = 18;
+  const SPIRE_TOP = CROWN_Y1 + MECH_H + MAST_H + SPIRE_H;
+  function glassTex(cols, rows, lit) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+    const g = cv.getContext('2d');
+    g.fillStyle = lit ? '#000' : '#fff'; g.fillRect(0, 0, 256, 256);
+    const cw = 256 / cols, ch = 256 / rows;
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+      const on = ((i * 7 + j * 13) % 4) !== 0;
+      g.fillStyle = lit ? (on ? PALETTE.lamp : '#000') : 'rgba(20,40,50,0.5)';
+      g.fillRect(i * cw + cw * 0.22, j * ch + ch * 0.2, cw * 0.56, ch * 0.55);
+    }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+  }
+  // a 4-segment cylinder's side UV wraps once around, so u repeats cols·4 for cols windows a face
+  function glassify(mat, cols, rows) {
+    mat.map = glassTex(cols, rows, false); mat.map.repeat.set(cols * 4, rows);
+    mat.emissiveMap = glassTex(cols, rows, true); mat.emissiveMap.repeat.set(cols * 4, rows);
+    mat.emissive = C('lamp'); mat.emissiveIntensity = 0.45; mat.needsUpdate = true;
+    return mat;
+  }
+  // podium: the mall block at the road side, with the steps in front of it
+  part(TX, 0, TZ + 2, 30, 22, TW(PODIUM_H, 'walk'));
+  // pedestal
+  glassify(part(TX, PED_Y0, TZ, 1, 1, TW(PED_Y1 - PED_Y0, 'glass'), 0, frustum(PED_HB, PED_HT)).mesh.material, 5, 25);
+  // 古錢: a bone disc with an ink square hole, centred on each face just below the pedestal top
+  (() => {
+    const y = PED_Y1 - 2.6, hw = PED_HT + (PED_HB - PED_HT) * (PED_Y1 - y) / (PED_Y1 - PED_Y0) + 0.05;
+    const discX = new THREE.CylinderGeometry(0.5, 0.5, 1, 18); discX.rotateZ(Math.PI / 2); discX.translate(0, 0.5, 0); // axis along x
+    const discZ = new THREE.CylinderGeometry(0.5, 0.5, 1, 18); discZ.rotateX(Math.PI / 2); discZ.translate(0, 0.5, 0); // axis along z
+    [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([sx, sz]) => {
+      const x = TX + sx * hw, z = TZ + sz * hw, geo = sx ? discX : discZ;
+      part(x, y, z, sx ? 0.4 : 3.2, sx ? 3.2 : 0.4, TW(3.2, 'bone'), 0, geo);       // the coin
+      part(x + sx * 0.12, y + 1.1, z + sz * 0.12, sx ? 0.3 : 1.0, sx ? 1.0 : 0.3, TW(1.0, 'ink')); // the square hole
+    });
+  })();
+  // the eight flared segments, one instanced frustum
+  (() => {
+    const items = [];
+    for (let i = 0; i < SEG_N; i++) items.push({ x: TX, z: TZ, y: SEG_Y0 + i * SEG_H, w: 1, d: 1, h: tw(SEG_H) });
+    instSet(frustum(SEG_HB, SEG_HT), glassify(new THREE.MeshLambertMaterial({ color: C('glass') }), 4, 8), items);
+  })();
+  // 如意 at the four bottom corners of every segment: bone, a squashed sphere on a little foot
+  (() => {
+    const g = new THREE.SphereGeometry(0.5, 8, 6); g.scale(1, 0.75, 1); g.translate(0, 0.42, 0);
+    const items = [];
+    for (let i = 0; i < SEG_N; i++) [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) =>
+      items.push({ x: TX + sx * (SEG_HB + 0.25), z: TZ + sz * (SEG_HB + 0.25), y: SEG_Y0 + i * SEG_H + 0.15, w: 1.4, d: 1.4, h: tw(1.1) }));
+    instSet(g, new THREE.MeshLambertMaterial({ color: C('bone') }), items);
+  })();
+  // crown, mechanical box, mast, spire
+  glassify(part(TX, CROWN_Y0, TZ, 1, 1, TW(CROWN_H, 'glass'), 0, frustum(CROWN_HB, CROWN_HT)).mesh.material, 3, 10);
+  part(TX, CROWN_Y1, TZ, 4.2, 4.2, TW(MECH_H, 'haze'));
+  part(TX, CROWN_Y1 + MECH_H, TZ, 1.4, 1.4, TW(MAST_H, 'bone'));
+  const spireGeo = new THREE.CylinderGeometry(0.12, 0.6, 1, 8); spireGeo.translate(0, 0.5, 0);
+  part(TX, CROWN_Y1 + MECH_H + MAST_H, TZ, 1, 1, TW(SPIRE_H, 'bone'), 0, spireGeo);
+  // what the engine needs: the crown top for the climb, the west-face x at any height, the label top
+  TOWER.h = CROWN_Y1;
+  TOWER.faceX = y => {
+    let hw;
+    if (y < PED_Y0) hw = 15;
+    else if (y < PED_Y1) hw = PED_HB + (PED_HT - PED_HB) * (y - PED_Y0) / (PED_Y1 - PED_Y0);
+    else if (y < CROWN_Y0) { const t = ((y - SEG_Y0) % SEG_H) / SEG_H; hw = SEG_HB + (SEG_HT - SEG_HB) * t; }
+    else if (y < CROWN_Y1) hw = CROWN_HB + (CROWN_HT - CROWN_HB) * (y - CROWN_Y0) / CROWN_H;
+    else hw = 2.1;
+    return TX - hw - 0.62;
+  };
+  anchors.tower101.top = SPIRE_TOP + 2;
+
   // ── the ring of office towers and malls ─────────────────────────────────────
   // ground-based boxes: their collapsed plates lie inside the paddy slab in the earlier eras
   const bld = [];
@@ -81,16 +165,17 @@
   for (let z = -300; z >= -470; z -= 16) [-1, 1].forEach(s => {
     const i = Math.round(-z / 16);
     let x = i % 2 ? 22 : 31, w = 8 + rnd() * 5, d = 8 + rnd() * 5;
-    const h = 20 + rnd() * 40;
+    let h = 20 + rnd() * 40;
+    if (s < 0 && z <= -360) h = 12 + rnd() * 5;                        // low on the west beyond the skywalk: the City Hall silhouette shows over them
     if (z < -386 && z > -446) x = 36;
     if (s < 0 && Math.abs(z + 386) < 14) { x = 40; w = 8; d = 8; } // clear of the closing camera
     addB(s * x, z, w, d, h, false);
   });
   // behind the tower, beyond z = -440; kept lower right behind the tower so its silhouette stands
   [[-454, [-36, -24, -12, 0, 12, 24, 36]], [-470, [-30, -18, -6, 6, 18, 30]]].forEach(([z, xs]) =>
-    xs.forEach(x => addB(x, z, 8 + rnd() * 5, 8 + rnd() * 5, Math.abs(x) < 14 ? 20 + rnd() * 18 : 24 + rnd() * 36, false)));
+    xs.forEach(x => addB(x, z, 8 + rnd() * 5, 8 + rnd() * 5, x < -10 ? 10 + rnd() * 5 : (Math.abs(x) < 14 ? 20 + rnd() * 18 : 24 + rnd() * 36), false)));
   // three malls a side, low and wide, facing the plaza; tall enough to carry a wall screen at 13.2–15.6
-  [-1, 1].forEach(s => [-394, -416, -438].forEach((z, i) => addB(s * 22, z, 10, 14, 17 + i * 2 + rnd() * 3, true)));
+  [-1, 1].forEach(s => [-394, -416, -438].forEach((z, i) => { if (s > 0 && i === 0) return; addB(s * 22, z, 10, 14, 17 + i * 2 + rnd() * 3, true); }));
 
   const fGeo = facadeGeo();
   instSet(fGeo, facadeMat(5, 7, 1), bld.filter(b => b.top < 30));
@@ -102,6 +187,70 @@
   // a glass-walk link from each front mall toward the plaza edge
   [-1, 1].forEach(s => part(s * 17.8, 8, -394, 2.4, 2, TW(0.5, 'bone')));
 
+  // ── 新光三越 A11 ────────────────────────────────────────────────────────────
+  // The department store across from the 101 podium: a 12-storey block with the big rounded
+  // corner toward the road, an LED wall on the road face, the red square logo near the top.
+  const A11 = { x0: 14, x1: 30, z0: -403, z1: -385, h: 34, r: 6 };
+  (() => {
+    const cx = A11.x0 + A11.r, cz = A11.z1 - A11.r;                      // the rounded corner's axis
+    const fm = () => { const m = new THREE.MeshLambertMaterial({ color: C('haze') }); return m; };
+    const body = part((A11.x0 + A11.r + A11.x1) / 2, 0, (A11.z0 + A11.z1) / 2, A11.x1 - A11.x0 - A11.r, A11.z1 - A11.z0, TW(A11.h, 'bone'));
+    const wing = part((A11.x0 + cx) / 2, 0, (A11.z0 + cz) / 2, cx - A11.x0, cz - A11.z0, TW(A11.h, 'bone'));
+    const cyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 24); cyl.translate(0, 0.5, 0);
+    const corner = part(cx, 0, cz, A11.r * 2, A11.r * 2, TW(A11.h, 'bone'), 0, cyl);
+    [[body, 4, 12], [wing, 2, 12], [corner, 10, 12]].forEach(([p, cols, rows]) => {
+      const m = p.mesh.material;
+      m.map = winTex(cols, rows, false, 4); m.map.wrapS = m.map.wrapT = THREE.RepeatWrapping; m.map.repeat.set(1, 1);
+      m.emissive = C('lamp'); m.emissiveMap = winTex(cols, rows, true, 4); m.emissiveIntensity = 0.5; m.needsUpdate = true;
+    });
+    part(cx + 1, A11.h, cz - 5, 16, 8, TW(1.2, 'haze'));                   // roof plant
+    // the red square logo, road face, near the top
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+    const g = cv.getContext('2d');
+    g.fillStyle = PALETTE.verm; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = PALETTE.bone; g.font = cjk(92); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('新光', 128, 78); g.fillText('三越', 128, 178);
+    const logo = part(A11.x0 - 0.2, A11.h - 6.5, A11.z0 + 4.5, 0.4, 4.4, TW(4.4, 'verm'));
+    logo.mesh.material.map = new THREE.CanvasTexture(cv); logo.mesh.material.emissive = C('verm'); logo.mesh.material.emissiveMap = logo.mesh.material.map; logo.mesh.material.emissiveIntensity = 0.35; logo.mesh.material.needsUpdate = true;
+    // the entrance canopy under the rounded corner, toward the road
+    part(A11.x0 - 1.4, 4.2, (A11.z0 + cz) / 2, 3, cz - A11.z0 - 1, TW(0.3, 'haze'));
+  })();
+
+  // ── 信義空橋: the elevated skywalks ──────────────────────────────────────────
+  // One bridge crosses the road at z -392 (deck y 6.5, clear of the camera which is
+  // at y 5 → 3 here), with railings, a light canopy on slender posts, and a stair ramp down to
+  // each sidewalk; one more segment runs along the mall fronts from A11 to the next mall.
+  const rampGeo = (() => { const g = new THREE.BoxGeometry(1.6, 0.25, 7.6); g.rotateX(Math.atan2(6.35, 7)); g.translate(0, 3.3, -3.5); return g; })();
+  const pale = p => { p.mesh.material = withFog(new THREE.MeshBasicMaterial({ color: C('haze') })); return p; }; // unlit haze: the underside stays soft when the camera passes below
+  function skywalk(z) {
+    const W = 18, D = 3.6, Y = 6.5;
+    pale(part(0, Y, z, W, D, TW(0.2, 'haze')));                                               // deck
+    [-1, 1].forEach(s => part(0, Y + 0.25, z + s * (D / 2 - 0.05), W, 0.06, TW(1.1, 'haze'))); // glass railings
+    [-1, 1].forEach(s => part(0, Y + 1.3, z + s * (D / 2 - 0.05), W, 0.1, TW(0.08, 'bone')));  // handrails
+    [-1, 1].forEach(s => { [-1, 1].forEach(sz => part(s * 8, 0, z + sz * 1.2, 0.6, 0.6, TW(Y, 'haze'))); }); // pillars on the sidewalks
+    [-1, 1].forEach(s => pale(part(s * 8.2, 0.2, z + D / 2, 1, 1, TW(1, 'bone'), 0, rampGeo)));  // stair ramps down toward the camera
+  }
+  skywalk(-392);   // one crossing: at -352 the deck filled the top of the frame as the camera passed under it
+  (() => {  // along the mall fronts, A11 → the next mall (z -409), plaza side
+    const x = A11.x0 + 1.6, z0 = A11.z0, z1 = -409, Y = 6.5;
+    pale(part(x, Y, (z0 + z1) / 2, 3, z0 - z1, TW(0.2, 'haze')));
+    part(x - 1.45, Y + 0.25, (z0 + z1) / 2, 0.06, z0 - z1, TW(1.1, 'haze'));
+    [z0 - 0.5, z1 + 0.5].forEach(z => part(x - 1.2, 0, z, 0.5, 0.5, TW(Y, 'haze')));
+  })();
+
+  // ── 台北市政府 on the horizon: a wide symmetrical stepped silhouette, unlit, in haze ──
+  (() => {
+    // Drawn at 1.7× so the outline clears the office ring from the approach camera; it is a horizon
+    // silhouette, so presence matters more than metric scale. Centre block, two wings, two end pavilions.
+    const x = -46, z = -505, d = 50, k = 1.7;
+    const basic = () => withFog(new THREE.MeshBasicMaterial({ color: C('haze') }));
+    [[0, 24, 30], [-22, 20, 22], [22, 20, 22], [-38, 12, 14], [38, 12, 14]].forEach(([dx, w, h]) => {
+      const p = part(x + dx * k, 0, z, w * k, d, TW(h * k, 'haze'));
+      p.mesh.material = basic();
+    });
+    const p = part(x, 30 * k, z, 10 * k, 10 * k, TW(4 * k, 'haze')); p.mesh.material = basic();   // the roof-top block
+  })();
+
   // ── LED billboards: canvas text, lamp on ink, unlit material so it reads as a screen ──
   function ledTex(text) {
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
@@ -109,7 +258,7 @@
     g.fillStyle = PALETTE.ink; g.fillRect(0, 0, 512, 128);
     g.strokeStyle = PALETTE.bone; g.lineWidth = 4; g.strokeRect(14, 14, 484, 100);
     g.fillStyle = PALETTE.lamp;
-    g.font = '700 86px -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif';
+    g.font = cjk(86);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(text, 256, 68);
     const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
@@ -128,8 +277,14 @@
   // r = -π/2 faces -x (east mall wall, seen from the road); r = π/2 faces +x; r = 0 faces the camera coming down -z
   const SH = 2.4;
   instSet(screenGeo(13.2, SH), new THREE.MeshBasicMaterial({ map: ledTex('TAIPEI 101') }), [
-    { x: 16.7, z: -394, y: -LIFT, w: 9, d: 0.3, r: -Math.PI / 2, h: tw(SH) },   // east mall wall
     { x: 10, z: -350, y: -LIFT, w: 7, d: 0.3, r: 0, h: tw(SH) },                // on a 13-unit street roof
+  ]);
+  // A11's LED wall on the road face: the store name, and the block name above it
+  instSet(screenGeo(11, 3.2), new THREE.MeshBasicMaterial({ map: ledTex('新光三越') }), [
+    { x: A11.x0 - 0.3, z: -397, y: -LIFT, w: 9.5, d: 0.3, r: -Math.PI / 2, h: tw(3.2) },
+  ]);
+  instSet(screenGeo(18, 2.4), new THREE.MeshBasicMaterial({ map: ledTex('A11') }), [
+    { x: A11.x0 - 0.3, z: -397, y: -LIFT, w: 6, d: 0.3, r: -Math.PI / 2, h: tw(2.4) },
   ]);
   // XINYI: wall screen on the west mall, and a rooftop screen raised on two posts so it clears the
   // nearer 13-unit roofs seen from the approach camera
@@ -221,8 +376,8 @@
   instSet(liftGeo, new THREE.MeshLambertMaterial({ color: C('bone') }), crowd, { colors: true });
 
   // ── aircraft-warning lights on the spire top and crown corners: tiny verm cubes, no glow ──
-  [-0.35, 0.35].forEach(x => part(x, TH + 14, TZ, 0.35, 0.35, TW(0.35, 'verm')));
-  [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]].forEach(([dx, dz]) => part(dx, TH, TZ + dz, 0.4, 0.4, TW(0.4, 'verm')));
+  part(TX, SPIRE_TOP, TZ, 0.4, 0.4, TW(0.5, 'verm'));
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(TX + sx * (CROWN_HT - 0.3), CROWN_Y1, TZ + sz * (CROWN_HT - 0.3), 0.4, 0.4, TW(0.4, 'verm')));
 
   // ── the same ground before 2004: rice paddies, farmhouses, banyans and betel palms ──
   [-1, 1].forEach(s => part(s * 26, 0, -390, 36, 190, OLD(0.08, 'bone'))); // water: paper-white paddies, x 8..44, z -295..-485
