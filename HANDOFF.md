@@ -28,7 +28,7 @@ Open it: double-click `index.html`. No build step, no server, no network. `index
 
 ## Files and load order
 
-`index.html` loads, in this order: `three.min.js` (r149, UMD, global `THREE`) → `asset/3d/assets-core.js` + `assets-ximen-*.js` + `assets-dadaocheng-*.js` (teammate's library, global `NOSTALGIA_ASSETS`) → `data.js` (all content, global `DATA`) → `app.js` (engine) → `scene-red.js`, `scene-dadao.js`, `scene-tower.js` (one chapter each; they build the anchors too).
+`index.html` loads, in this order: `three.min.js` (r149, UMD, global `THREE`) → `asset/3d/assets-core.js` + `assets-ximen-*.js` + `assets-dadaocheng-*.js` (teammate's library, global `NOSTALGIA_ASSETS`) → `data.js` (all content, global `DATA`) → `app.js` (engine) → `scene-red.js`, `scene-dadao.js`, `scene-tower.js` (one chapter each; they build the anchors too) → `music.js` (the decade music player, issue #4).
 
 - `data.js` — palette, eras, anchors with captions (position and label only; the buildings are in the scene files), generic lots (Xinyi stretch only now), camera keyframes (`CAM`, 6 keyframes, z must keep decreasing), `WORDS`, `CLOSING`. Change copy here.
 - `app.js` — renderer (ACES on luminance as a CustomToneMapping, the canvas-sky environment map, the shadow-casting sun that follows the scroll, `lit()` / `lam()` / `aoBake()`, see the surface texture pass below), custom fog (currently disabled by setting the frontier to -1e5), camera rig on a Catmull-Rom curve, year/era from scroll progress with boundaries pinned where the camera crosses each road marking, the `part()`/`instSet()` system that tweens every object's height per era over 500 ms, the street furniture (lamps, trees, crowd, hanging signs, distant city), the asset-library placer, the girl, the climbing man, the words (per-glyph reveal), the two particle systems, the render warm-up, the post pass (luminance-aware grain, vignette and the chapter-cut flash; `uPrint` is 0 everywhere), mouse parallax along the camera axes, and the robustness block (pixel-ratio cap, clock reset on tab return, keyboard and touch scroll). No street trees on Dihua Street (z -138 … -292) or near the 101 base shot.
@@ -118,6 +118,23 @@ CJ, 2026-09-22: 「work GitHub issue #3 … one commit and screenshots per step,
 
 Cost: fps unchanged at the display cap (100.5–100.6 at 0.2 / 0.44 / 0.78 / 0.9, was 100.8). Load is heavier: warm-up 331 ms for 30 programs (was 50 ms for 16). Not measured on a phone.
 
+## Music (issue #4, branch `issue-music-player`, 2026-09-22)
+
+CJ, 2026-09-22: 「i want music for different section can you find 1980s 1990s 2000s 2010s music and make a music player system, i can switch when i am in that decade」. One loop per decade plays under the street and crossfades when the scroll year crosses a decade line; a control bottom-left shows the decade and track and switches decades without moving the camera.
+
+| Decade | Scroll years | File | Title | Style |
+|---|---|---|---|---|
+| 1980s | up to 1989 | `asset/music/1980s.mp3` | Neon Arcade | city pop: gated-reverb drum machine, pulse bass, DX7-style e-piano, FM bells |
+| 1990s | 1990–1999 | `asset/music/1990s.mp3` | Letters Home | piano ballad with a shaker groove and strings |
+| 2000s | 2000–2009 | `asset/music/2000s.mp3` | Night Market Slow Jam | R&B: swung hats, boom-bap, pluck riff, Rhodes |
+| 2010s | 2010 onward, including the tower chapter | `asset/music/2010s.mp3` | Skyline Pulse | EDM pop: four-on-the-floor, supersaws under a side-chain |
+
+- **Files.** `music.js` (the player, loaded last), the control markup in `index.html` (`#music`) and its styles in `style.css` (`.hud-music`), the four MP3s (112 kbps, 4.1 MB total) and `asset/music/CREDITS.md`. All four tracks are synthesised in the repo by `asset/music/gen/make-tracks.js` (seeded, no samples, CC0); rebuild with `node asset/music/gen/make-tracks.js --mp3` (needs ffmpeg). `app.js`, `data.js` and the scenes are untouched: the player polls `window.__fog.year` once per frame.
+- **Gesture gate.** Browsers block audio until a click, tap or key press, so the player is silent and the toggle reads "Click for sound" until the first `pointerdown`, `keydown` or `touchstart`. The first click on the toggle turns sound on; after that it mutes and unmutes, as does the `m` key. Mute and a manual decade choice persist in `localStorage` (`omit.music.*`). A manual choice holds until the scroll enters a decade other than the chosen one, then the scroll takes over again. The crossfade is 1.5 s, equal-power, between two alternating `<audio loop>` elements. On a phone (≤ 480 px) only the toggle shows, above the year.
+- **Swap a track.** Drop the new file in `asset/music/`, point the decade's `src` and `title` in the `DECADES` table at the top of `music.js` at it, and add its licence and attribution to `CREDITS.md` (CC0, CC BY with credit, or generated here; nothing "free for personal use"). Keep each file under 2 MB and the folder under 8 MB. The on-page credit line is the `CREDIT` constant next to the table.
+- **Real songs.** `research/music/README.md` lists five recognisable hits per decade with rights holders and what a sync plus master licence would take. A decision for CJ; nothing copyrighted is in the repo. The cheapest option is text only: show the real title under the synthesised loop.
+- **Testing.** `window.__music` exposes `decade`, `track`, `playing`, `muted`, `unlocked`, `manual`, `fading`, `volumes`, `setDecade(key)`, `toggleMute()`. Headless Chrome will not let you hear anything, but `playing` goes true after a real `agent-browser click "canvas"`. Do not use `agent-browser press` or `reload` on this page: both wedged the session daemon three times running (os error 35); dispatch a `KeyboardEvent` from `eval` and re-`open` the URL instead. Measured 2026-09-22: 100.4 / 100.3 / 100.3 fps headed at 0.2 / 0.44 / 0.78 with music playing, against 100.4 / 100.4 / 100.3 on main.
+
 ## Open items
 
 1. ~~Issue #3, surface texture pass~~ — done above, on `issue-3-texture`, not pushed; CJ decides the push.
@@ -132,6 +149,6 @@ Cost: fps unchanged at the display cap (100.5–100.6 at 0.2 / 0.44 / 0.78 / 0.9
 
 ## Not done on purpose
 
-- No sound, no free camera, no menu, no save state, no framework, no CDN.
+- No free camera, no menu, no save state, no framework, no CDN. Sound arrived with issue #4 (below); no sound effects, no volume tied to the camera.
 - No bloom. No fog. No traffic.
 - 二二八 (1947, 天馬茶房) deliberately left out of the story, per the original brief.
