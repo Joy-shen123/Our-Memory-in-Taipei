@@ -5,10 +5,9 @@
 // Primitives, canvas textures and the palette only. References are listed in HANDOFF.md.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam } = window.SCENE;
   const RED = ['red'], ALL = ['red', 'dadao', 'tower'];
   const RH = anchors.redhouse;                                                  // { x: 11, z: -70 }
-  const lam = (col, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: C(col) }, extra || {}));
   const hOf = (h, eras) => { const o = {}; (eras || RED).forEach(k => o[k] = h); return o; };
   const CJK = '-apple-system, "PingFang TC", "Heiti TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif';
 
