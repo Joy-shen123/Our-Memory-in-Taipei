@@ -224,26 +224,16 @@
   // ── 永樂市場 — the 1982 concrete market: a big pale block, upper floors stepped back, cloth
   //    market on the upper floors, wet market open at the ground floor, red vertical sign. ──
   (() => {
-    const z0 = -263, z1 = -285, zc = (z0 + z1) / 2, d = z0 - z1, xf = -9.3;
-    const winTex = (() => {                                    // horizontal window bands
-      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
-      const g = cv.getContext('2d');
-      g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
-      g.fillStyle = 'rgba(0,0,0,0.5)'; for (let i = 0; i < 4; i++) g.fillRect(i * 16 + 3, 20, 10, 24);
-      const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
-    })();
-    const block = (x, y, w, dd, h, rep) => {
-      const p = part(x, y, zc, w, dd, only(ALL, h, 'walk'));
-      p.mesh.material.map = winTex.clone(); p.mesh.material.map.repeat.set(rep, h / 3.4); p.mesh.material.map.needsUpdate = true; p.mesh.material.needsUpdate = true;
-      return p;
-    };
-    block(xf - 8, 4.0, 16, d, 13.6, 6);                        // floors 2–5 over the open ground floor
-    block(xf - 10, 17.6, 12, d - 6, 6.8, 4);                   // floors 6–7 stepped back
-    part(xf - 8, 17.6, zc, 16.2, d + 0.2, only(ALL, 0.25, 'ink'));   // roof lines
-    part(xf - 10, 24.4, zc, 12.2, d - 5.8, only(ALL, 0.25, 'ink'));
-    part(xf - 8.5, 0, zc, 15, d - 0.4, only(ALL, 4.0, 'haze'));      // the ground-floor hall, in shade
-    for (let z = z0 - 0.4; z > z1; z -= 3.6) goods.push({ x: xf + 0.3, z, w: 0.6, d: 0.6, h: HA(4.0), c: C('walk') });   // columns
-    goods.push({ x: xf - 8, y: 3.7, z: zc, w: 16, d: d, h: HA(0.3), c: C('walk') });                                       // ceiling edge
+    const z0 = -263, z1 = -285, zc = (z0 + z1) / 2, xf = -9.3;
+    // Issue #5 step 2: the open hall on its columns, floors 2–5 with cut window bands, the
+    // stepped floors 6–7, roof slabs, sign frame, plant room, tank and stair tower are the glb
+    // from asset/blender/yongle.py (9.1k triangles); the three text signs stay canvas boards.
+    const market = libGroup(ALL);
+    MODELS.load('yongle', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(xf, 0, zc); root.rotation.y = Math.PI / 2;
+      market.add(root);
+    });
     signPart('永樂市場', 'verm', 'bone', true, 'z', xf + 0.6, 6.0, z0 - 1.6, 7.0, ALL);
     signPart('永樂布業商場', 'bone', 'verm', false, 'x', xf + 0.15, 4.5, zc, 1.3, ALL);
     signPart('永樂市場', 'verm', 'bone', false, 'x', xf - 4.0, 24.6, zc, 1.8, ALL);   // rooftop
