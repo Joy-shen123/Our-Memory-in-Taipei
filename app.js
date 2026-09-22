@@ -17,7 +17,7 @@
   // both in chapter 1 (ERA_MIX scales them for the others). Set together against step0-0.05.png:
   // the road and the shop walls sit 3–8 levels brighter than before and the saturation is unchanged,
   // while the clipped-white share of the frame goes from 3% to 0.
-  const EXPOSURE = 0.8;
+  const EXPOSURE = 0.85;
   const ENV_I = 0.35;
   const HEMI = 0.65;
   const KEY = 1.3;
@@ -86,9 +86,32 @@
   const SURFACE_OF = { bone: 'plaster', walk: 'concrete', haze: 'concrete', brick: 'brick', road: 'asphalt' };
   const TILE = 3;
   const surface = name => { const Core = window.NostalgiaCore; return name && Core && Core.surface ? Core.surface(name) : null; };
+  // ── ambient occlusion, baked per vertex at build time (issue #3 step 4) ──────
+  // No screen-space pass: every lit material reads vertex colours, and the geometry carries the
+  // occlusion. aoBake(geo) is the cheap rule for the engine's shared geometries (every part() box,
+  // every instanced set): the bottom ring of vertices sits at AO_MIN and the top at 1, and any
+  // face pointing down (an eave, a canopy, a deck) is AO_MIN, so walls darken where they meet the
+  // road and undersides read as shade. Geometries that already carry colours are left alone.
+  // aoBakeAsset() is the library's heuristic, in asset() below. AO_MIN = 0.75 is the darkest.
+  const AO_MIN = 0.75, aoBaked = new Set();
+  function aoBake(geo) {
+    if (!geo || aoBaked.has(geo) || !geo.attributes.position || geo.attributes.color) return geo;
+    aoBaked.add(geo);
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox, pos = geo.attributes.position, nor = geo.attributes.normal, n = pos.count;
+    const col = new Float32Array(n * 3), span = Math.max(1e-6, bb.max.y - bb.min.y);
+    for (let i = 0; i < n; i++) {
+      let t = (pos.getY(i) - bb.min.y) / span; t = t * t * (3 - 2 * t);
+      let ao = AO_MIN + (1 - AO_MIN) * t;
+      if (nor && nor.getY(i) < -0.5) ao = AO_MIN;
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return geo;
+  }
   const litMats = [];   // every material that reads scene.environment, so the era tween can scale it
   const lit = params => {
-    const p = Object.assign({ roughness: 0.92, metalness: 0, envMapIntensity: ENV_I }, params);
+    const p = Object.assign({ roughness: 0.92, metalness: 0, envMapIntensity: ENV_I, vertexColors: true }, params);
     const S = surface(p.surface); delete p.surface;
     if (S) { if (!p.map) p.map = S.map.clone(); p.normalMap = S.normalMap; }
     const m = new THREE.MeshStandardMaterial(p); litMats.push(m); return m;
@@ -237,7 +260,7 @@
   const parts = [];
   function part(x, y, z, w, d, look, rotY, geo) {
     const first = ERAS.map(e => look[e.key]).find(s => s && s.h > 0);          // the surface family follows the first era's colour
-    const mesh = new THREE.Mesh(geo || boxGeo, withFog(lit({ color: C('bone'), surface: first ? SURFACE_OF[first.col] : null })));
+    const mesh = new THREE.Mesh(aoBake(geo || boxGeo), withFog(lit({ color: C('bone'), surface: first ? SURFACE_OF[first.col] : null })));
     mesh.position.set(x, y, z);
     mesh.scale.set(w, 1, d);
     if (rotY) mesh.rotation.y = rotY;
@@ -319,7 +342,7 @@
   // per-era instanced sets: each instance has a place and a height per era, tweened together
   const instSets = [];
   function instSet(geo, mat, items, opts) {
-    const mesh = new THREE.InstancedMesh(geo, withFog(mat), items.length);
+    const mesh = new THREE.InstancedMesh(aoBake(geo), withFog(mat), items.length);
     mesh.frustumCulled = false;
     if (mat.map && mat.map.userData.tile && items.length) {           // one repeat for the set: its median footprint and height
       const med = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
@@ -397,6 +420,18 @@
   const roadMaps = { red: roadTexture('dirt'), dadao: roadTexture('plain'), tower: roadTexture('lines') }; // Dihua Street: plain asphalt, no tram, no centre line
   const roadMesh = scene.children.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.width === GRID.roadWidth);
   roadMesh.material.map = roadMaps.red; roadMesh.material.needsUpdate = true;
+  // (issue #3 step 4) the road is eight strips across so its vertex colours can darken the outer
+  // 2.5 units toward the kerbs, where the walls and the sidewalks meet it
+  roadMesh.geometry.dispose();
+  roadMesh.geometry = new THREE.PlaneGeometry(GRID.roadWidth, 620, 8, 1); roadMesh.geometry.rotateX(-Math.PI / 2);
+  (() => {
+    const pos = roadMesh.geometry.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const e = Math.min(1, (GRID.roadWidth / 2 - Math.abs(pos.getX(i))) / 2.5), ao = 0.85 + 0.15 * e * e * (3 - 2 * e);
+      col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
+    }
+    roadMesh.geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  })();
 
   // windows on every generic building: dark grid on the facade, lit at night via emissive
   function windowTexture(cols, rows, lit) {
@@ -549,8 +584,45 @@
     o.updateMatrixWorld(true);
     libBox.setFromObject(o); libBox.getSize(libSize);
     o.userData.size = libSize.clone();
-    unfog(o); group.add(o);
+    unfog(o); aoBakeAsset(o, o.position.y); group.add(o);
     return o;
+  }
+  // (issue #3 step 4) per-vertex occlusion for a library item, no rays: each vertex darkens with
+  // its height above the item's base over the first AO_RISE units, and again when another box of
+  // the same item hangs over it within AO_OVER units (a canopy over a counter, an eave over a
+  // wall, a shelf over the goods). The darkest is AO_MIN. Library boxes each own their geometry,
+  // so the colours are per mesh; a geometry two meshes share is cloned for the second.
+  const AO_RISE = 1.2, AO_OVER = 1.5, AO_MARGIN = 0.25, aoV = new THREE.Vector3();
+  function aoBakeAsset(root, baseY) {
+    const meshes = [], boxes = [];
+    root.traverse(m => {
+      if (!m.isMesh || !m.geometry || !m.geometry.attributes.position || !m.material || !m.material.isMeshStandardMaterial || m.material.transparent) return;
+      meshes.push(m); boxes.push(new THREE.Box3().setFromObject(m));
+    });
+    const used = new Set();
+    meshes.forEach((m, mi) => {
+      let geo = m.geometry;
+      if (geo.attributes.color) return;
+      if (used.has(geo)) { geo = geo.clone(); m.geometry = geo; }
+      used.add(geo);
+      const pos = geo.attributes.position, n = pos.count, col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        aoV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        let t = Math.min(1, Math.max(0, (aoV.y - baseY) / AO_RISE)), occ = 1;
+        let ao = AO_MIN + (1 - AO_MIN) * t * t * (3 - 2 * t);
+        for (let j = 0; j < boxes.length; j++) {
+          if (j === mi) continue;
+          const b = boxes[j], dy = b.min.y - aoV.y;
+          if (dy < -0.05 || dy > AO_OVER) continue;
+          if (aoV.x < b.min.x - AO_MARGIN || aoV.x > b.max.x + AO_MARGIN || aoV.z < b.min.z - AO_MARGIN || aoV.z > b.max.z + AO_MARGIN) continue;
+          occ = Math.min(occ, AO_MIN + (1 - AO_MIN) * Math.max(0, dy) / AO_OVER);
+        }
+        ao = Math.max(AO_MIN, ao * occ);
+        col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      m.material.vertexColors = true; m.material.needsUpdate = true;
+    });
   }
 
   // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
@@ -558,7 +630,8 @@
   // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
   // lit(params)                                 the engine's lit material; params.surface = 'brick' | 'plaster' | 'concrete' | 'wood' | 'asphalt'
   // lam(col, extra?)                            lit() by palette key, surface family chosen from the key
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
+  // aoBake(geo)                                 bakes the height-rule occlusion into a geometry's vertex colours (part and instSet do it)
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
 
 
   // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
