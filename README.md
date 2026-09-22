@@ -1,6 +1,6 @@
 # Our Memory in Taipei
 
-> **▶ 線上觀看：https://joy-shen123.github.io/claude_code_build_day/**
+> **▶ 線上觀看：https://joy-shen123.github.io/Our-Memory-in-Taipei/**
 > 用滑鼠滾輪往下捲即可。建議桌機、視窗全螢幕。
 
 一個頁面，一個動作：捲動。
@@ -25,8 +25,8 @@ Claude Code Build Day 2026-09-20 參賽作品。
 
 - **捲動**就是全部的操作。捲到底走完三個年代。
 - `?year=2010` 可以直接跳到任一年份，例如
-  [`?year=1993`](https://joy-shen123.github.io/claude_code_build_day/?year=1993)、
-  [`?year=2024`](https://joy-shen123.github.io/claude_code_build_day/?year=2024)。
+  [`?year=1993`](https://joy-shen123.github.io/Our-Memory-in-Taipei/?year=1993)、
+  [`?year=2024`](https://joy-shen123.github.io/Our-Memory-in-Taipei/?year=2024)。
 - 章節大致落在捲動進度：西門町 0.08–0.3、大稻埕 0.4–0.55、101 0.75–1.0。
 
 在本機看也可以 —— **直接雙擊 `index.html`**。沒有 build、不需要 server、不連網路。
