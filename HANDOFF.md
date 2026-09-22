@@ -1,6 +1,12 @@
 # HANDOFF — Our Memory in Taipei
 
+<<<<<<< HEAD
 Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/Our-Memory-in-Taipei` (renamed from `shidaimiwu-proto` 2026-09-22 to match the repo). Worktrees go in `~/Documents/CJ-project-vault/_worktrees/Our-Memory-in-Taipei/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; its worktree is removed. Last updated 2026-09-23 (issue #3, the surface texture pass, branch `issue-3-texture`, not pushed).
+||||||| parent of aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
+Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/Our-Memory-in-Taipei` (renamed from `shidaimiwu-proto` 2026-09-22 to match the repo). Worktrees go in `~/Documents/CJ-project-vault/_worktrees/Our-Memory-in-Taipei/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; its worktree is removed. Last updated 2026-09-21 (issue #1 Part 3 and the IVRESS borrow list, branch `issue-1-part-1`).
+=======
+Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/Our-Memory-in-Taipei` (renamed from `shidaimiwu-proto` 2026-09-22 to match the repo). Worktrees go in `~/Documents/CJ-project-vault/_worktrees/Our-Memory-in-Taipei/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; its worktree is removed. Last updated 2026-09-23 (issue #5, the Blender-scripted models, branch `issue-5-models`).
+>>>>>>> aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
 
 ## What it is
 
@@ -12,7 +18,7 @@ One page, one verb: scroll. A street runs away from the camera. Scrolling moves 
 | Spring Festival | `dadao` | 2000–2019 | -140 … -290 | Dadaocheng: the 年貨大街 archway, Dihua Street's narrow arcade bays with 閩南 / 洋樓 / 巴洛克 crests, 霞海城隍廟 with a swallowtail ridge, 永樂市場, the wharf through a side-street gap, lantern strings, banners, stalls with price boards, crowd |
 | The Future | `tower` | 2020– | -290 … -460 | Xinyi: Taipei 101 with its real profile (tapered pedestal, coins, eight flared segments with 如意, crown, spire), 新光三越 A11, the skywalk, City Hall on the horizon, lit office towers, the climbing man, the closing line |
 
-Open it: double-click `index.html`. No build step, no server, no network. `index.html?year=2010` jumps to any year.
+Open it: `python3 -m http.server 8000` in the repo, then http://localhost:8000/index.html (since issue #5 the scene loads `asset/models/*.glb`, and Chrome blocks file:// fetches; GitHub Pages is unaffected). No build step, no network beyond the repo's own files. `index.html?year=2010` jumps to any year.
 
 ## CJ's decisions (quoted, so nobody re-litigates them)
 
@@ -25,29 +31,57 @@ Open it: double-click `index.html`. No build step, no server, no network. `index
 - 2026-09-21: "opneing frame title child hood change to when we were young, Memory in us change to Our Memory IN Taipei" — done.
 - 2026-09-21: 「盡量矮點才能比較後來的建設跟慢慢長大的感覺」— the opening stays low; nothing tall goes into chapter 1.
 - 2026-09-21: 「all」— go on Part 3 (the rubric) and the whole IVRESS borrow list. Done this session; see the borrows table below.
+- 2026-09-22: 「the color pallete is close but textue andthe model itself doesnt qualified」; 2026-09-23: 「still the 3d model supposed to be more detailed」, 「dont like low poly」— issue #5: model files are allowed, built by Blender scripts in the repo, rounded bevelled edges, no visible facets, no photo textures, palette colours only.
 
 ## Files and load order
 
+<<<<<<< HEAD
 `index.html` loads, in this order: `three.min.js` (r149, UMD, global `THREE`) → `asset/3d/assets-core.js` + `assets-ximen-*.js` + `assets-dadaocheng-*.js` (teammate's library, global `NOSTALGIA_ASSETS`) → `data.js` (all content, global `DATA`) → `app.js` (engine) → `scene-red.js`, `scene-dadao.js`, `scene-tower.js` (one chapter each; they build the anchors too) → `music.js` (the decade music player, issue #4).
+||||||| parent of aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
+`index.html` loads, in this order: `three.min.js` (r149, UMD, global `THREE`) → `asset/3d/assets-core.js` + `assets-ximen-*.js` + `assets-dadaocheng-*.js` (teammate's library, global `NOSTALGIA_ASSETS`) → `data.js` (all content, global `DATA`) → `app.js` (engine) → `scene-red.js`, `scene-dadao.js`, `scene-tower.js` (one chapter each; they build the anchors too).
+=======
+`index.html` loads, in this order: `three.min.js` (r149, UMD, global `THREE`) → `GLTFLoader.js` (the r147 UMD build, the last three shipped; attaches `THREE.GLTFLoader`) → `asset/3d/assets-core.js` + `assets-ximen-*.js` + `assets-dadaocheng-*.js` (teammate's library, global `NOSTALGIA_ASSETS`) → `data.js` (all content, global `DATA`) → `models.js` (glb loading, global `MODELS`) → `app.js` (engine) → `scene-red.js`, `scene-dadao.js`, `scene-tower.js` (one chapter each; they build the anchors too).
+>>>>>>> aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
 
 - `data.js` — palette, eras, anchors with captions (position and label only; the buildings are in the scene files), generic lots (Xinyi stretch only now), camera keyframes (`CAM`, 6 keyframes, z must keep decreasing), `WORDS`, `CLOSING`. Change copy here.
 - `app.js` — renderer (ACES on luminance as a CustomToneMapping, the canvas-sky environment map, the shadow-casting sun that follows the scroll, `lit()` / `lam()` / `aoBake()`, see the surface texture pass below), custom fog (currently disabled by setting the frontier to -1e5), camera rig on a Catmull-Rom curve, year/era from scroll progress with boundaries pinned where the camera crosses each road marking, the `part()`/`instSet()` system that tweens every object's height per era over 500 ms, the street furniture (lamps, trees, crowd, hanging signs, distant city), the asset-library placer, the girl, the climbing man, the words (per-glyph reveal), the two particle systems, the render warm-up, the post pass (luminance-aware grain, vignette and the chapter-cut flash; `uPrint` is 0 everywhere), mouse parallax along the camera axes, and the robustness block (pixel-ratio cap, clock reset on tab return, keyboard and touch scroll). No street trees on Dihua Street (z -138 … -292) or near the 101 base shot.
 - `style.css` — the HUD: chapter column top-left (`.hud-chapter`), site title top-right (bottom-right under 480 px), year bottom-right (bottom-left under 480 px), the words with their glyph transitions, anchor labels, the closing line at 24vh.
+<<<<<<< HEAD
 - `scene-*.js` — use `window.SCENE` API only: `part(x,y,z,w,d,lookByEra,rotY?,geo?)` (one draw call each), `instSet(geo,mat,items,{colors})`, `only(eras,h,col)`, `C(name)`, `lit(params)` (the engine's MeshStandardMaterial; `surface: 'brick'|'plaster'|'concrete'|'wood'|'asphalt'`), `lam(col, extra?)` (`lit()` by palette key, family chosen from the key), `aoBake(geo)`, `libGroup(eras)` (a group visible only in those eras), `asset(id, group, x, z, rotY, scale?)` (builds one library item into it; front faces +Z before rotation, so `-π/2` on the east side and `+π/2` on the west), `findAsset(id)`, `anchors`, `TOWER`. Items absent in an era have height 0 and are dropped underground by the engine. Each scene file sets `anchors.<id>.top` for its labels; `scene-tower.js` sets `TOWER.h` (crown top) and `TOWER.faceX(y)` (west-face x at height y) so the climbing man stays on the glass.
 - `asset/` — teammate's texts (`*.md`) and 3D library (`asset/3d/`). `asset/3d/preview.html` previews the library. `assets-core.js` now also owns the five procedural surface families (`C.surface`, `C.surfaceOf`, `C.fitSurface`, `C.TILE`), which `C.mat` attaches by colour. All six era sets are placed: Ximending items along the childhood chapter (`scene-red.js`, visible in the red era), Dadaocheng items along Spring Festival (`scene-dadao.js`, visible in red and dadao so nothing pops in at the flip). The library's own `red-house`, `chunghwa-market` and `xiahai-temple` are not used: the rebuilds below replace them.
 - `README.md` — the project note, with the live link. `docs/` holds the dispatch briefs (`docs/briefs/`) and `docs/RUBRIC.md`; `CHANGELOG.md` lists merged PRs. Moved there 2026-09-23 as the light version of CJ's project layout; code stays at the root because GitHub Pages serves from it.
+||||||| parent of aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
+- `scene-*.js` — use `window.SCENE` API only: `part(x,y,z,w,d,lookByEra,rotY?,geo?)` (one draw call each), `instSet(geo,mat,items,{colors})`, `only(eras,h,col)`, `C(name)`, `libGroup(eras)` (a group visible only in those eras), `asset(id, group, x, z, rotY, scale?)` (builds one library item into it; front faces +Z before rotation, so `-π/2` on the east side and `+π/2` on the west), `findAsset(id)`, `anchors`, `TOWER`. Items absent in an era have height 0 and are dropped underground by the engine. Each scene file sets `anchors.<id>.top` for its labels; `scene-tower.js` sets `TOWER.h` (crown top) and `TOWER.faceX(y)` (west-face x at height y) so the climbing man stays on the glass.
+- `asset/` — teammate's texts (`*.md`) and 3D library (`asset/3d/`). `asset/3d/preview.html` previews the library. All six era sets are placed: Ximending items along the childhood chapter (`scene-red.js`, visible in the red era), Dadaocheng items along Spring Festival (`scene-dadao.js`, visible in red and dadao so nothing pops in at the flip). The library's own `red-house`, `chunghwa-market` and `xiahai-temple` are not used: the rebuilds below replace them.
+- `README.md` — the original note that this was a throwaway prototype. Out of date: this is now the entry.
+=======
+- `scene-*.js` — use `window.SCENE` API only: `part(x,y,z,w,d,lookByEra,rotY?,geo?)` (one draw call each), `instSet(geo,mat,items,{colors})`, `only(eras,h,col)`, `C(name)`, `libGroup(eras)` (a group visible only in those eras), `asset(id, group, x, z, rotY, scale?)` (builds one library item into it; front faces +Z before rotation, so `-π/2` on the east side and `+π/2` on the west), `findAsset(id)`, `anchors`, `TOWER`. Items absent in an era have height 0 and are dropped underground by the engine. Each scene file sets `anchors.<id>.top` for its labels; `scene-tower.js` sets `TOWER.h` (crown top) and `TOWER.faceX(y)` (west-face x at height y) so the climbing man stays on the glass.
+- `models.js` — `MODELS.load(name, cb)` loads `asset/models/<name>.glb` once; `lambertize` swaps the loader's Standard materials for the page's Lambert with the fog chunk; `instance(node, items, opts)` makes one `instSet` per primitive so a glb street element keeps the per-era height tween (`opts.colorPrim` recolours one primitive per instance, `opts.emissive` lights the 'lamp' primitives).
+- `asset/blender/` — the Blender scripts, one per model, on `stylized.py` (builders, palette materials, bevel rules, boolean cutters, join, glb export, Workbench preview). `asset/models/` — their output. See the Models section.
+- `asset/` — teammate's texts (`*.md`) and 3D library (`asset/3d/`). `asset/3d/preview.html` previews the library. All six era sets are placed: Ximending items along the childhood chapter (`scene-red.js`, visible in the red era), Dadaocheng items along Spring Festival (`scene-dadao.js`, visible in red and dadao so nothing pops in at the flip). The library's own `red-house`, `chunghwa-market` and `xiahai-temple` are not used: the rebuilds below replace them.
+- `README.md` — the original note that this was a throwaway prototype. Out of date: this is now the entry.
+>>>>>>> aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
 
 ## How to test (what has worked every time)
 
 ```
+python3 -m http.server 8017 &                                                       # any free port; the glbs need http
 export AGENT_BROWSER_SESSION=memtaipei
-agent-browser open "file://$PWD/index.html"; agent-browser set viewport 1440 900   # headless; add --headed only to measure fps
+agent-browser open "http://localhost:8017/index.html"; agent-browser set viewport 1440 900   # headless; add --headed only to measure fps
 # scroll to a fraction F (0..1) and wait 80 frames:
 agent-browser eval -b "$(printf 'new Promise(r=>{window.scrollTo(0,%s*(document.documentElement.scrollHeight-innerHeight));let n=0;(function t(){if(++n<80)requestAnimationFrame(t);else r("ok")})()})' 0.45 | base64)"
 agent-browser screenshot /tmp/f.png; agent-browser console; agent-browser close
 ```
 
+<<<<<<< HEAD
 Chapter fractions: red 0.02–0.347, dadao 0.347–0.582, tower 0.582–1.0 (the exact boundaries are `window.__fog.BOUNDS`; the flash and the parallax fade key on them). `window.__fog` exposes `progress`, `year`, `era`, `camZ`, `BOUNDS`, `jumpToYear(y)`, `drift` (parallax x, y, fade), `warm` (warm-up ms, programs, textures) and `hitch` (longest frame gap since load, for measuring). `index.html?nowarm=1` skips the warm-up. Syntax-check any file with `node -e "new Function(require('fs').readFileSync('app.js','utf8'))"`. Last measured 2026-09-23 after issue #3: 100.6 / 100.6 / 100.5 / 100.6 fps headed at 0.2 / 0.44 / 0.78 / 0.9 (display cap; the light stream is on at 0.9), 1440x900 pixel ratio 1, 1333 meshes, console empty, zero page errors; warm-up 331 ms for 30 programs and 261 textures, and the load frame is about 1.9 s before any scroll. `window.__fog.shadow` reports the shadow flags and the sun's box.
+||||||| parent of aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
+Chapter fractions: red 0.02–0.347, dadao 0.347–0.582, tower 0.582–1.0 (the exact boundaries are `window.__fog.BOUNDS`; the flash and the parallax fade key on them). `window.__fog` exposes `progress`, `year`, `era`, `camZ`, `BOUNDS`, `jumpToYear(y)`, `drift` (parallax x, y, fade), `warm` (warm-up ms, programs, textures) and `hitch` (longest frame gap since load, for measuring). `index.html?nowarm=1` skips the warm-up. Syntax-check any file with `node -e "new Function(require('fs').readFileSync('app.js','utf8'))"`. Last measured 2026-09-21 after Part 3 and the borrows: 100.8 / 100.9 / 100.8 fps headed at 0.2 / 0.44 / 0.78 (display cap), 96.8 at 0.9 with the light stream on, 1440x900 pixel ratio 1, 1269 meshes + 59 instanced sets + 2 Points, console empty, zero page errors.
+=======
+Chapter fractions: red 0.02–0.347, dadao 0.347–0.582, tower 0.582–1.0 (the exact boundaries are `window.__fog.BOUNDS`; the flash and the parallax fade key on them). `window.__fog` exposes `progress`, `year`, `era`, `camZ`, `BOUNDS`, `jumpToYear(y)`, `drift` (parallax x, y, fade), `warm` (warm-up ms, programs, textures) and `hitch` (longest frame gap since load, for measuring). `index.html?nowarm=1` skips the warm-up. Syntax-check any file with `node -e "new Function(require('fs').readFileSync('app.js','utf8'))"`. Last measured 2026-09-23 after issue #5 (every model in): 100.4 / 100.4 / 100.4 fps headed at 0.2 / 0.44 / 0.78 (display cap), 1440x900 pixel ratio 1, 1264 meshes + 84 instanced sets + 2 Points, console empty, the three scene files re-run clean. Before issue #5 (2026-09-21): 100.8 / 100.9 / 100.8, 1269 meshes + 59 sets.
+
+A page-load exception is NOT captured by the session (it fires before the session attaches): after the screenshots, re-run each scene file in the page inside try/catch (`fetch('scene-red.js').then(t => t.text()).then(src => { try { new Function(src)(); return 'ok' } catch (e) { return e.message } })`) — issue #5 found scene-red.js silently dead for four commits this way. Other agents' servers may sit on port 8000; use your own port and never `pkill` by pattern.
+>>>>>>> aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
 
 The frame loop starts on `DOMContentLoaded`, not at the end of `app.js`: the parser can yield to a frame between two script tags, and the first frame's one-time work (shadow flags, warm-up) must see the finished scene. Headless notes: wait ~40 frames after `open` before scrolling (the first frames carry the shader compiles); `agent-browser errors --json` accumulates for the life of a session, so judge "console empty" on a fresh session; CSS transitions only advance with the frame clock, so a mid-transition screenshot needs a short frame wait (about 26 frames for the word reveal), not a long one. If `open` returns "Resource temporarily unavailable (os error 35)", that session's daemon is wedged: `agent-browser close` it, remove only that session's files under `~/.agent-browser/`, and use a new session name; never `pkill` the daemon binary, other sessions on this machine share it.
 
@@ -105,6 +139,7 @@ The eight cheap effects from `research/ivress/README.md`, one commit each, scree
 | h. Render warm-up | `warmUp` | first frame: everything visible, `renderer.compile`, one offscreen draw, restore; 50 ms, 16 programs, 165 textures. The crossing hitch was 12 ms with or without it on the M4 Max, so this is insurance for a slower laptop | `h-render-warmup-0.0.png` |
 | Robustness | `IS_PHONE`, `resetClocks`, keydown, touchmove | pixel ratio 2 desktop / 1.5 phone; dt ≤ 50 ms and clocks reset on tab return; arrows, page keys, space, home, end; touch fallback if a swipe does not move `scrollY` | `robust-390x844-0.05.png`, `-0.44.png`, `-0.97.png` |
 
+<<<<<<< HEAD
 ## Surface texture pass (issue #3, 2026-09-22 to 23, branch `issue-3-texture`)
 
 CJ, 2026-09-22: 「work GitHub issue #3 … one commit and screenshots per step, no push until I say.」 Four step commits and this docs commit, screenshots in `~/Desktop/issue3-texture/` (`step0..4-<fraction>.png` at 0.05 / 0.44 / 0.78, `fps.txt`, `rubric-2/`, `rubric-2-comment.md`). Every wall, roof and road now reads as a material under one sun; procedural only, no image or model file, daylight, no fog, no bloom, no height changed. Brightness was held against `step0-0.05.png` at every step (CJ 2026-09-20, bright, not greyer): whole-frame luminance 193 / 184 / 187 vs 193 / 186 / 183 at the three fractions, saturation 0.136 vs 0.144, clipped-white pixels 3% → 0.
@@ -137,6 +172,40 @@ CJ, 2026-09-22: 「i want music for different section can you find 1980s 1990s 2
 - **Real songs.** `research/music/README.md` lists five recognisable hits per decade with rights holders and what a sync plus master licence would take; embedding YouTube's own uploads needs none of that, which is why this route won. Nothing copyrighted is in the repo.
 - **Testing.** `window.__music` exposes `mode` (`pending` / `youtube` / `local`), `why`, `decade`, `video`, `loadedId`, `index`, `count`, `ytState`, `failed`, `private`, `src`, `localIndex`, `localCount`, `playing`, `gestured`, `manual`, `embed`, `setDecade(key)`, `nextVideo(d)`, `nextLocal(d)`, `toggle()`, `setMuted(m)`. To rehearse the private folder, two silent files do: `ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t 3 -c:a aac asset/music/private/test-a.m4a` plus a `manifest.js` naming them; delete both after. Serve the folder (`python3 -m http.server 8766 --bind 127.0.0.1`) to exercise the YouTube path. Mute the page right after `open` (`agent-browser eval "document.querySelectorAll('audio').forEach(a=>a.muted=true)"`, which finds both players since they sit hidden in the body; `__music.state` shows `muted` per player): new headless Chrome plays audio through the speakers, and the YouTube iframe cannot be muted from outside before the player is ready, so do not click the page in a session you leave open. Close every session at the end of a check. Do not use `agent-browser press` or `reload` on this page: both wedged the session daemon repeatedly (os error 35); dispatch a `KeyboardEvent` from `eval` and re-`open` the URL instead. Measured 2026-09-23: 100.4 / 100.4 / 100.3 fps headed at 0.2 / 0.44 / 0.78 (loops, after YouTube's refusal), against 100.4 / 100.4 / 100.3 on main.
 
+||||||| parent of aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
+=======
+## Models (issue #5, 2026-09-23)
+
+Model files are allowed from issue #5 on. Every model is a Blender script in `asset/blender/` that builds from primitives with boolean-cut openings and a bevel on every edge (0.05 m, 2 segments, hardened normals; 1 segment on small trim, none on thin bars), assigns flat palette materials (raw hex/255, so the loaded colour equals `C(name)`), joins everything into one object per group and exports `asset/models/<name>.glb`. No textures, no UVs. Rebuild one with:
+
+```
+/Applications/Blender.app/Contents/MacOS/Blender --background --python asset/blender/<name>.py -- --out asset/models/<name>.glb [--stats] [--preview /tmp/x.png]
+```
+
+Blender 5.2 LTS. `stylized.py` holds the shared mechanics; `dihua_common.py` the shared Dihua bay. Fix the script, never the glb. The lead's per-part triangle budgets are in each script's header comment. `models.js` loads them (see Files); hero buildings are added as objects in a `libGroup(eras)`, street elements are instanced through `MODELS.instance` so the engine's per-era height tween still applies.
+
+| glb | script | what | triangles | KB | where |
+|---|---|---|---|---|---|
+| `red-house` | `red-house.py` | 西門紅樓 octagon + 十字樓 | 30,700 | 842 | `scene-red.js`, every era |
+| `tower101` | `tower101.py` | 台北101, same profile constants as `TOWER.faceX` | 13,144 | 279 | `scene-tower.js`, tower era |
+| `temple` | `temple.py` | 霞海城隍廟 | 8,352 | 179 | `scene-dadao.js`, every era |
+| `yongle` | `yongle.py` | 永樂市場 | 9,052 | 232 | `scene-dadao.js`, every era |
+| `chunghwa` | `chunghwa.py` | one 中華商場 block, cloned 8× | 3,148 | 71 | `scene-red.js`, red era |
+| `lux` | `lux.py` | 樂聲戲院 | 4,296 | 96 | `scene-red.js`, every era |
+| `dihua-min` / `-yang` / `-baroque` | `dihua-*.py` | one shophouse bay per crest style, instanced (9 / 10 / 19 bays) | 3,052 / 3,700 / 3,624 | 70 / 90 / 82 | `scene-dadao.js` |
+| `stall` | `stall.py` | 年貨大街 stall, instanced ×30 | 2,464 | 53 | `scene-dadao.js` |
+| `shopfront` | `shopfront.py` | ground / storey / roof modules tiled into every Ximending body | 1,984 | 50 | `scene-red.js` |
+| `lamp` / `bollard` / `tree` | same names | street lamp ×84, bollard ×8, street tree | 436 / 164 / 1,332 | 10 / 5 / 26 | `app.js`, `scene-red.js` |
+| `props` | `props.py` | crate, sack, bicycle, aboard, plant, boxes | 2,420 | 58 | `scene-dadao.js`, `scene-red.js` |
+| `girl` | `girl.py` | 張君雅小妹妹, runA / runB frames | 2 × 2,968 | 117 | `app.js` |
+
+Total `asset/models/`: 2.3 MB (cap 6 MB). Canvas-text boards stay on top of the models (posters, name boards, price boards, neon): text is the one thing the pipeline does not draw.
+
+What the models dropped or could not do, so nobody hunts for it: Dihua bays are all two upper floors (the old `floors: 3` and `tall:` options are ignored); the 101 lost its lit-window emissive grid (geometry mullions instead, daylight anyway); the Red House fanlights are plain recesses; the temple's carved relief and ridge dragons are not there; the girl's bowl cut is a cap, a back block, side flaps and a fringe (seams up close); the Lux has two poster cases, not six, because the lobby recess took the wall; the tree canopy silhouette is faintly polygonal up close. The 中華商場 neon frames, the name plates, and every text sign are still primitives.
+
+Engine changes made for this: `libGroup()` sets the group's initial visibility from the current era (the first tower-only group showed the 101 in 1994); `instSet()` no longer throws on an empty coloured set; `models.js` loads before `app.js`. The girl in `app.js` swaps her primitive build for the glb frames when they arrive and flips `runA`/`runB` on the stride's sign.
+
+>>>>>>> aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
 ## Open items
 
 0. **Issue #8, the next pass, research first** (CJ, 2026-09-23: 「下次要執行之前要先做研究 先搞清楚完整的plan 有必要分開issue 也可以」): sky, font, light and shadow, the man climbing to the top of the 101, polish, and the closing words "Just like the man on Taipei 101". A Sonnet research dispatch writes `research/plan-6/README.md` with options and costs per item; CJ picks; items with their own done-when split into separate issues. Issue #5 (models, branch `issue-5-models`) is done and waits for CJ's merge; merging it changes "Open it" to a local http server. Undecided, not filed: a painted sky dome (needs a reference picture from CJ), offline Blender renders for the ship kit, exporting the JS-built parts to glb for hand editing.
@@ -144,8 +213,16 @@ CJ, 2026-09-22: 「i want music for different section can you find 1980s 1990s 2
 1. ~~Issue #3, surface texture pass~~ — done above, on `issue-3-texture`, not pushed; CJ decides the push.
 2. **Ship kit** (not filed yet; proposed as #4): README first line carries the Pages link (the current link still points at the old repo name and 404s); a `submission/` folder with a one-paragraph pitch, five screenshots (one per chapter, the 101 base, the climb) and a 60-second scroll recording.
 3. **Waiting on CJ, from the rubric:** gate the 1980s / 1990s / 2000s Ximending sets by scroll year (about an hour in `scene-red.js`, thins the 1985 street) or keep all three on for density. A 1989 frame currently shows a NOKIA sign.
+<<<<<<< HEAD
 4. **Waiting on CJ:** Blender. Modelling hero buildings (Red House, temple, 101) in Blender and loading GLB files breaks the no-model-files and double-click rules and needs a served page plus a loader. Everything in #3 carries over if that comes; decided after Build Day unless CJ says otherwise.
 5. ~~Second rubric scoring after #3~~ — done, `docs/RUBRIC.md` scoring 2 (2026-09-23): ch02 story beat 2 → 3 and ch03 density 2 → 3 on the flash and the particles; Palette and light stays 4 in every chapter with the same named weak spots. The comment draft is `~/Desktop/issue3-texture/rubric-2-comment.md`; the lead posts it after CJ says.
+||||||| parent of aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
+4. **Waiting on CJ:** Blender. Modelling hero buildings (Red House, temple, 101) in Blender and loading GLB files breaks the no-model-files and double-click rules and needs a served page plus a loader. Everything in #3 carries over if that comes; decided after Build Day unless CJ says otherwise.
+5. Second rubric scoring after #3: ch02 story beat (2) and ch03 density (2) were addressed by the chapter-cut flash and the particles after the first scoring; not re-scored yet.
+=======
+4. Blender: decided, done as issue #5 on branch `issue-5-models` (see Models). The page now needs a static server; the double-click rule is gone. Not merged yet.
+5. Second rubric scoring after #3: ch02 story beat (2) and ch03 density (2) were addressed by the chapter-cut flash and the particles after the first scoring; not re-scored yet.
+>>>>>>> aebfdf1 (docs(models): step 5, README and HANDOFF for the glb pipeline; size and fps check)
 6. The base-shot keyframe (CAM[4] in `data.js`, camera y 3 at z -372 looking at y 50) puts the 101 podium below the frame. Lower the target (y 40) or move the camera back (z -380) if the podium should show.
 7. The wharf is only seen peripherally. A keyframe that glances west at z ≈ -200 would show it.
 8. Mobile: 390x844 checked 2026-09-21 in headless Chrome. Not yet checked on a real phone: the touch fallback and the 1.5 pixel-ratio cap.

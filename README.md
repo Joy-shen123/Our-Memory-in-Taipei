@@ -29,23 +29,24 @@ Claude Code Build Day 2026-09-20 參賽作品。
   [`?year=2024`](https://joy-shen123.github.io/Our-Memory-in-Taipei/?year=2024)。
 - 章節大致落在捲動進度：西門町 0.08–0.3、大稻埕 0.4–0.55、101 0.75–1.0。
 
-在本機看也可以 —— **直接雙擊 `index.html`**。沒有 build、不需要 server、不連網路。
+在本機看：在 repo 目錄跑 `python3 -m http.server 8000`，再開 http://localhost:8000/index.html 。（2026-09-23 起場景載入 `asset/models/*.glb`，Chrome 擋 file:// 的 fetch，所以要一個靜態 server；還是沒有 build、不連網路。）
 
 ## 技術
 
-沒有框架、沒有 CDN、沒有打包工具、不在 runtime 抓任何資料。
+沒有框架、沒有 CDN、沒有打包工具。runtime 只抓 repo 裡的 `asset/models/*.glb`。
 
 - **three.js r149**（`three.min.js`，UMD，直接 vendored 進 repo）
 - 全部 classic script，靠 `<script>` 執行順序建立全域相依，所以載入順序是有意義的：
 
-  `three.min.js` → `asset/3d/assets-*.js`（`NOSTALGIA_ASSETS`）→ `data.js`（`DATA`）→ `app.js`（引擎）→ `scene-red.js` / `scene-dadao.js` / `scene-tower.js`（各章節細節）
+  `three.min.js` → `GLTFLoader.js` → `asset/3d/assets-*.js`（`NOSTALGIA_ASSETS`）→ `data.js`（`DATA`）→ `models.js`（glb 載入）→ `app.js`（引擎）→ `scene-red.js` / `scene-dadao.js` / `scene-tower.js`（各章節細節）
 
 | 檔案 | 負責 |
 |---|---|
 | `data.js` | **所有內容都在這** —— 配色、年代定義、鏡頭關鍵影格、浮現的字句、收尾句。改文案改這裡。 |
 | `app.js` | 渲染器、Catmull-Rom 曲線上的鏡頭、捲動進度 → 年份／年代、每個物件依年代補間高度的 `part()`／`instSet()` 系統、女孩、攀爬的男人、後處理（顆粒與暗角） |
 | `scene-*.js` | 各章節細節，只透過 `window.SCENE` API 建物件 |
-| `asset/` | 場景考據文字（`*.md`）與 3D 資產庫（`asset/3d/`，`preview.html` 可單獨預覽） |
+| `asset/` | 場景考據文字（`*.md`）、3D 資產庫（`asset/3d/`，`preview.html` 可單獨預覽）、Blender 建模腳本（`asset/blender/*.py`）與它們輸出的模型（`asset/models/*.glb`） |
+| `models.js` | 載入 glb、換成頁面的 Lambert 材質、把街道元件經 `instSet` 做 instancing |
 | `HANDOFF.md` | 完整交接文件：設計決策、測試方式、待辦 |
 
 除錯用：`window.__fog` 會露出 `progress`、`year`、`era`、`camZ`、`BOUNDS`、`jumpToYear(y)`。
