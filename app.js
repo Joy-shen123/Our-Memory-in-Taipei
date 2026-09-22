@@ -568,7 +568,9 @@
   // Library materials are unfogged: the mist is off and its shader chunk is not theirs.
   const libGroups = [];
   function libGroup(eras) {
-    const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g); return g;
+    const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g);
+    g.visible = eras.indexOf(ERAS[eraIdx].key) >= 0;   // the scene files run after the first setEra, so start in the right state
+    return g;
   }
   const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; if (m.isMeshStandardMaterial) { m.envMapIntensity = ENV_I; litMats.push(m); } m.needsUpdate = true; }); } });
   const libBox = new THREE.Box3(), libSize = new THREE.Vector3();

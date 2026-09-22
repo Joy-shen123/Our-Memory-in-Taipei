@@ -137,11 +137,15 @@
   // a marquee canopy over the doors and poster cases at the pavement. West side, opposite the
   // Red House, so it is in frame with the octagon from the second keyframe.
   (() => {
-    const z = -66, W = 15, D = 12, Hh = 10, XF = -9.3;                              // three storeys: the childhood street stays low
-    part(XF - D / 2, 0, z, D, W, only(ALL, Hh, 'bone'));
-    part(XF - D / 2, Hh, z, D + 0.4, W + 0.4, only(ALL, 0.5, 'haze'));
-    part(XF - 0.6, 4.2, z, 3.2, W - 2, only(ALL, 0.35, 'ink'));                   // marquee canopy over the entrance
-    [-1, 1].forEach(s => part(XF + 0.02, 0, z + s * (W / 2 - 0.5), 0.05, 0.05, only(ALL, 4.2, 'ink')));
+    const z = -66, W = 15, XF = -9.3;                                              // three storeys: the childhood street stays low
+    // Issue #5 step 2: the block, marquee, lobby, ticket booth, poster cases and roof lattice are
+    // the glb from asset/blender/lux.py; the painted billboards below stay canvas text on it.
+    const lux = libGroup(ALL);
+    MODELS.load('lux', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(XF, 0, z); root.rotation.y = Math.PI / 2;
+      lux.add(root);
+    });
     // two painted billboards filling the upper facade
     function poster(title, sub, bg, blob) {
       const { cv, g } = canvas(1024, 768, bg);
@@ -160,7 +164,6 @@
     const v = vertTex('樂聲戲院', 'verm', 'bone', 'bone');
     board(XF + 0.9, 3.6, z + W / 2 + 0.36, 6 * v.aspect, 6, v.t, ALL, 'z', 0.6);      // corner neon, read from the street
     F(XF + 0.6, z + W / 2 + 0.12, 3.4, 2.2, 0.3, 6.4, 'ink', ALL);                    // its dark backing, behind the board
-    for (let k = 0; k < 6; k++) F(XF + 0.06, z - 5 + k * 2, 0.9, 0.06, 1.2, 1.6, k % 2 ? 'lamp' : 'haze', ALL);  // poster cases
   })();
 
   // ═══ 4. 萬年大樓 — the 1973 commercial tower, the tall landmark at the end of the chapter ═
