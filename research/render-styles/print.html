@@ -1,0 +1,161 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>print test</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#e9d2ad}canvas{display:block}</style>
+</head><body>
+<script src="../../three.min.js"></script>
+<script src="../../asset/3d/assets-core.js"></script>
+<script src="../../asset/3d/assets-ximen-1980s.js"></script>
+<script src="../../asset/3d/assets-ximen-1990s.js"></script>
+<script src="../../asset/3d/assets-ximen-2000s.js"></script>
+<script src="../../asset/3d/assets-dadaocheng-1980s.js"></script>
+<script src="../../asset/3d/assets-dadaocheng-1990s.js"></script>
+<script src="../../asset/3d/assets-dadaocheng-2000s.js"></script>
+<script>
+(() => {
+  const Q = new URLSearchParams(location.search);
+  const SET = Q.get('set') || 'dadao';          // dadao | ximen | one
+  const ONE = Q.get('id');                       // with set=one: a single asset id
+  const PRINT = Q.get('print') !== '0';
+  const W = innerWidth, H = innerHeight;
+
+  const PAPER = new THREE.Color('#ead3ae'), ORANGE = new THREE.Color('#e28a4c'), INK = new THREE.Color('#27211c');
+
+  const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+  renderer.setSize(W, H); renderer.setPixelRatio(1); document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene(); scene.background = PAPER.clone();
+  const cam = new THREE.PerspectiveCamera(42, W / H, 0.5, 400);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x777777, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-6, 14, 8); scene.add(sun);
+
+  const REG = window.NOSTALGIA_ASSETS, Core = window.NostalgiaCore;
+  const find = id => { for (const k in REG) { const a = REG[k].find(a => a.id === id); if (a) return a; } };
+  const box = new THREE.Box3(), size = new THREE.Vector3();
+  const build = id => { const a = find(id); if (!a) { console.warn('no asset', id); return null; } return a.build(Core); };
+
+  // ground + road
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshLambertMaterial({ color: 0xe8d6b4 }));
+  ground.rotation.x = -Math.PI / 2; scene.add(ground);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(13, 1200), new THREE.MeshLambertMaterial({ color: 0xdcc8a4 }));
+  road.rotation.x = -Math.PI / 2; road.position.y = 0.02; scene.add(road);
+  const kerbM = new THREE.MeshLambertMaterial({ color: 0x8a7a66 });
+  [-6.6, 6.6].forEach(x => { const k = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 1200), kerbM); k.position.set(x, 0.12, 0); scene.add(k); });
+
+  // trees: trunk + leaf blobs (become orange blobs with ink outline in print)
+  const trunkM = new THREE.MeshLambertMaterial({ color: 0x2a2320 }), leafM = new THREE.MeshLambertMaterial({ color: 0xd8763a });
+  function tree(x, z, s) {
+    s = s || 1; const g = new THREE.Group();
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 4.2 * s, 6), trunkM); t.position.y = 2.1 * s; g.add(t);
+    [[0, 5.2, 0, 2.2], [1.4, 4.4, 0.3, 1.5], [-1.3, 4.6, -0.2, 1.6], [0.3, 6.4, 0.5, 1.4], [-0.6, 4.0, 1.2, 1.2]].forEach(([dx, dy, dz, r]) => {
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r * s, 1), leafM); m.position.set(dx * s, dy * s, dz * s); g.add(m);
+    });
+    g.position.set(x, 0, z); scene.add(g);
+  }
+
+  // place along the road, front facing the road, alternating sides
+  function placeSide(obj, side, zc, scale) {
+    if (scale) obj.scale.setScalar(scale);
+    obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+    obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
+    obj.position.set(side * (7.2 + size.x / 2), 0, zc); scene.add(obj); return size.z;
+  }
+  function street(ids, opts) {
+    let zE = 12, zW = 8;
+    ids.forEach((id, i) => {
+      const obj = build(id); if (!obj) return;
+      const side = i % 2 ? 1 : -1;
+      obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
+      const depth = size.z; const zc = (side > 0 ? zE : zW) - depth / 2;
+      placeSide(obj, side, zc);
+      if (side > 0) zE -= depth + 2.5; else zW -= depth + 2.5;
+    });
+    // a landmark closes the street, centred, like the gate in the reference
+    if (opts.landmark) { const o = build(opts.landmark); if (o) { o.scale.setScalar(opts.landmarkScale || 2.2); o.updateMatrixWorld(true); box.setFromObject(o); box.getSize(size); o.position.set(0, 0, Math.min(zE, zW) - 6 - size.z / 2); scene.add(o); } }
+    for (let z = 10; z > -80; z -= 11) { tree(-9.5, z + 3, 1.15); tree(9.5, z, 1.05); }
+  }
+
+  if (SET === 'dadao') {
+    street(['red-brick-arcade', 'baroque-gable-townhouse', 'dried-goods-shop', 'qipao-fabric-shop', 'nianhuo-stall', 'herbal-medicine-counter', 'new-year-market-stall', 'bolero-restaurant'], { landmark: 'xiahai-temple', landmarkScale: 2.4 });
+    const s = build('sanlunche'); if (s) { s.position.set(-2.2, 0, -6); s.rotation.y = Math.PI; scene.add(s); }
+    const t = build('blue-mini-truck'); if (t) { t.position.set(3, 0, -30); t.rotation.y = Math.PI; scene.add(t); }
+    cam.position.set(0, 3.2, 22); cam.lookAt(0, 4, -40);
+  } else if (SET === 'ximen') {
+    street(['chunghwa-market', 'movie-billboard-wall', 'record-shop', 'tower-records', 'comic-rental-shop', 'internet-cafe', 'manga-rental', 'phone-shop-window'], { landmark: 'red-house', landmarkScale: 2.0 });
+    const b = build('yeh-lang-125'); if (b) { b.position.set(2, 0, -4); b.rotation.y = Math.PI * 0.9; scene.add(b); }
+    const p = build('public-phone-booth'); if (p) { p.position.set(-5.6, 0, 2); scene.add(p); }
+    cam.position.set(0, 3.2, 22); cam.lookAt(0, 4, -40);
+  } else {
+    const o = build(ONE || 'xiahai-temple'); if (o) { o.updateMatrixWorld(true); box.setFromObject(o); box.getSize(size); o.rotation.y = -0.5; scene.add(o);
+      const d = Math.max(size.x, size.y, size.z); cam.position.set(d * 0.9, size.y * 0.55 + d * 0.25, d * 1.5); cam.lookAt(0, size.y * 0.45, 0); }
+    tree(-9, -6, 1.1); tree(8, -9, 1.0);
+  }
+
+  // ── two-colour print pass: paper / orange / ink, depth+lum outline, misregistration, paper grain ──
+  const rt = new THREE.WebGLRenderTarget(W, H, { depthBuffer: true });
+  rt.depthTexture = new THREE.DepthTexture(W, H); rt.depthTexture.type = THREE.UnsignedIntType;
+  const post = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: rt.texture }, tDepth: { value: rt.depthTexture }, uRes: { value: new THREE.Vector2(W, H) },
+      uPaper: { value: PAPER }, uOrange: { value: ORANGE }, uInk: { value: INK }, uNear: { value: cam.near }, uFar: { value: cam.far }, uOn: { value: PRINT ? 1 : 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `
+      uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform vec3 uPaper, uOrange, uInk; uniform float uNear, uFar, uOn;
+      varying vec2 vUv;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+      float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+      float lin(float d){ float z = d * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
+      float depthAt(vec2 uv){ return lin(texture2D(tDepth, uv).x); }
+      void main(){
+        vec2 px = 1.0 / uRes;
+        vec3 c = texture2D(tDiffuse, vUv).rgb;
+        if (uOn < 0.5) { gl_FragColor = vec4(c, 1.0); return; }
+        float d0 = depthAt(vUv);
+        // OUTLINE: depth discontinuity (silhouettes) + luminance edge (painted detail), thinner far away
+        float dd = 0.0, ld = 0.0, l0 = lum(c);
+        // second derivative of depth: a flat plane at any angle gives ~0, a silhouette gives a spike
+        float dL = depthAt(vUv - vec2(px.x * 1.6, 0.0)), dR = depthAt(vUv + vec2(px.x * 1.6, 0.0));
+        float dD = depthAt(vUv - vec2(0.0, px.y * 1.6)), dU = depthAt(vUv + vec2(0.0, px.y * 1.6));
+        dd = abs(dL + dR - 2.0 * d0) + abs(dD + dU - 2.0 * d0);
+        ld = abs(l0 - lum(texture2D(tDiffuse, vUv + vec2(px.x * 1.6, 0.0)).rgb)) + abs(l0 - lum(texture2D(tDiffuse, vUv - vec2(px.x * 1.6, 0.0)).rgb))
+           + abs(l0 - lum(texture2D(tDiffuse, vUv + vec2(0.0, px.y * 1.6)).rgb)) + abs(l0 - lum(texture2D(tDiffuse, vUv - vec2(0.0, px.y * 1.6)).rgb));
+        float edge = smoothstep(0.02, 0.06, dd / d0) + smoothstep(0.10, 0.26, ld);
+        // paper-fibre noise breaks the edges up like a carved line
+        float fib = noise(gl_FragCoord.xy * 0.9) * 0.35;
+        float fade0 = smoothstep(60.0, 220.0, d0);
+        float ink = clamp(edge - fib, 0.0, 1.0) * (1.0 - fade0);
+        // TONE: three inks. Saturated colour leans orange. Far things fade to paper (aerial perspective in print).
+        float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+        float l = l0 - sat * 0.18 + (noise(gl_FragCoord.xy * 0.35) - 0.5) * 0.035;
+        float fade = smoothstep(60.0, 220.0, d0);
+        l = mix(l, 1.0, fade * 0.6);
+        // orange layer sampled slightly off-register, like a second block that did not line up
+        vec3 c2 = texture2D(tDiffuse, vUv + vec2(1.6, -1.1) * px).rgb;
+        float sat2 = max(c2.r, max(c2.g, c2.b)) - min(c2.r, min(c2.g, c2.b));
+        float l2 = lum(c2) - sat2 * 0.18 + (noise(gl_FragCoord.xy * 0.35 + 7.0) - 0.5) * 0.035; l2 = mix(l2, 1.0, fade * 0.6);
+        float darkM = 1.0 - smoothstep(0.20, 0.27, l);        // ink block
+        float midM  = 1.0 - smoothstep(0.58, 0.66, l2);       // orange block
+        vec3 col = uPaper;
+        col = mix(col, uOrange, midM);
+        col = mix(col, uInk, darkM);
+        col = mix(col, uInk, ink * (1.0 - fade * 0.7));
+        // paper: fibre grain + faint blotches + a warm vignette
+        float g = (hash(floor(gl_FragCoord.xy / 1.5)) - 0.5) * 0.06 + (noise(gl_FragCoord.xy * 0.02) - 0.5) * 0.05;
+        col += g;
+        float v = distance(vUv, vec2(0.5)); col *= 1.0 - smoothstep(0.5, 0.95, v) * 0.18;
+        gl_FragColor = vec4(col, 1.0);
+      }`, depthTest: false, depthWrite: false });
+  const postScene = new THREE.Scene(); postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  function frame() {
+    renderer.setRenderTarget(rt); renderer.render(scene, cam);
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', () => { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); rt.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); post.uniforms.uRes.value.set(w, h); });
+  frame();
+  window.__ready = true;
+})();
+</script>
+</body></html>

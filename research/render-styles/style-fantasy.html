@@ -1,0 +1,275 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>style: fantasy</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#2a1f3d}canvas{display:block}</style>
+</head><body>
+<script src="../../three.min.js"></script>
+<script src="../../asset/3d/assets-core.js"></script>
+<script src="../../asset/3d/assets-ximen-1980s.js"></script>
+<script src="../../asset/3d/assets-ximen-1990s.js"></script>
+<script src="../../asset/3d/assets-ximen-2000s.js"></script>
+<script src="../../asset/3d/assets-dadaocheng-1980s.js"></script>
+<script src="../../asset/3d/assets-dadaocheng-1990s.js"></script>
+<script src="../../asset/3d/assets-dadaocheng-2000s.js"></script>
+<script>
+// fantasy — Unreal / fantasy realism: the realism base at golden hour, light shafts through the trees, violet fog, an oversized moon, floating lanterns, soft bloom.
+// Same street/camera as print.html. Only SETUP (lights, ground, material swap) and POST (shader) differ.
+(() => {
+  const Q = new URLSearchParams(location.search);
+  const SET = Q.get('set') || 'dadao';          // dadao | ximen | one | iso (a style may frame one street as a diorama)
+  const STREET = Q.get('street') || (SET === 'iso' ? 'ximen' : SET);
+  const ONE = Q.get('id');                       // with set=one: a single asset id
+  const W = innerWidth, H = innerHeight;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+  renderer.setSize(W, H); renderer.setPixelRatio(1); document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  let cam = new THREE.PerspectiveCamera(42, W / H, 0.5, 400);
+  const lam = c => new THREE.MeshLambertMaterial({ color: c });
+  const S = { treeDetail: 1, resScale: 1, rtFilter: THREE.LinearFilter };   // style hooks
+
+  // ── SETUP: background, lights, page materials (ground/road/kerb/trees), S.override(mesh) ──
+
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  scene.background = new THREE.Color('#5a3f6a');
+  scene.add(new THREE.HemisphereLight('#7a5fa8', '#3a2a2a', 0.6));
+  const sun = new THREE.DirectionalLight('#ffb36a', 1.6); sun.position.set(-20, 17, -70); sun.target.position.set(0, 0, -30); scene.add(sun, sun.target);
+  sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05; sun.shadow.radius = 4;
+  const sc = sun.shadow.camera; sc.left = -90; sc.right = 90; sc.top = 90; sc.bottom = -90; sc.near = 0.5; sc.far = 260;
+  S.sunDir = sun.position.clone().sub(sun.target.position).normalize();
+  // procedural surface texture, drawn on a canvas at load: brick bumps, plaster noise, asphalt grit
+  const rnd = window.NostalgiaCore.rand(7);
+  const mkTex = (fn, size) => { const c = document.createElement('canvas'); c.width = c.height = size || 256; const x = c.getContext('2d'); fn(x, c.width);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+  const noiseFill = (x, s, base, amp) => { const img = x.createImageData(s, s); for (let i = 0; i < img.data.length; i += 4) { const v = base + rnd() * amp | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; } x.putImageData(img, 0, 0); };
+  const brickTex = mkTex((x, s) => { noiseFill(x, s, 90, 30); const bh = s / 8, bw = s / 4;
+    for (let r = 0; r < 8; r++) for (let c = -1; c < 5; c++) { const off = r % 2 ? bw / 2 : 0; const g = 150 + rnd() * 70 | 0; x.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')'; x.fillRect(c * bw + off + 2, r * bh + 2, bw - 4, bh - 4); } });
+  const plasterTex = mkTex((x, s) => noiseFill(x, s, 110, 40));
+  const gritTex = mkTex((x, s) => noiseFill(x, s, 80, 100), 512);
+  const tex = (t, rep) => { const c = t.clone(); c.needsUpdate = true; c.repeat.set(rep, rep); return c; };
+  const std = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85, metalness: 0 }, o || {}));
+  S.M = { ground: std('#6a5a58', { bumpMap: tex(gritTex, 60), bumpScale: 0.02, roughness: 0.95 }), road: std('#3a3540', { bumpMap: tex(gritTex, 40), bumpScale: 0.015, roughness: 0.7 }),
+    kerb: std('#8f8a80', { roughness: 0.9 }), trunk: std('#4a3728', { bumpMap: tex(plasterTex, 3), bumpScale: 0.03, roughness: 1 }), leaf: std('#3d6b3a', { roughness: 0.9 }) };
+  const cache = new Map();
+  const conv = m => {
+    if (!m || m.isMeshBasicMaterial || m.isShaderMaterial) return m;
+    if (cache.has(m.uuid)) return cache.get(m.uuid);
+    const h = {}; m.color.getHSL(h); const hex = m.color.getHex();
+    let rough = 0.72 + rnd() * 0.2, metal = 0, bump = plasterTex, rep = 2, scale = 0.02;
+    if (hex === 0x7d8489) { rough = 0.35; metal = 0.85; bump = null; }                        // steel
+    else if (h.l < 0.12) { rough = 0.18; bump = null; }                                            // glass / dark lacquer
+    else if (h.s > 0.28 && (h.h < 0.09 || h.h > 0.93) && h.l < 0.5) { bump = brickTex; rep = 3; scale = 0.035; }   // red / brown walls: brick
+    const t = std(m.color, { map: m.map || null, roughness: rough, metalness: metal, bumpMap: bump ? tex(bump, rep) : null, bumpScale: scale,
+      emissive: m.emissive || 0x000000, emissiveIntensity: m.emissiveIntensity !== undefined ? m.emissiveIntensity : 1,
+      transparent: m.transparent, opacity: m.opacity, side: m.side, alphaTest: m.alphaTest });
+    cache.set(m.uuid, t); return t;
+  };
+  S.override = o => { o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+    const m0 = Array.isArray(o.material) ? o.material[0] : o.material; o.castShadow = !(m0 && m0.transparent); o.receiveShadow = true; };
+
+  scene.fog = new THREE.Fog('#6a4a7a', 30, 190);
+  S.afterBuild = () => {   // floating lanterns: procedural spheres, warm emissive, so the bloom pass has something to catch
+    const r = window.NostalgiaCore.rand(11); const geo = new THREE.SphereGeometry(0.45, 10, 8);
+    for (let i = 0; i < 44; i++) { const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#ff8a3a', emissive: '#ff6a2a', emissiveIntensity: 1.3, roughness: 0.6 }));
+      m.position.set((r() - 0.5) * 30, 5 + r() * 24, 10 - r() * 110); m.scale.setScalar(0.35 + r() * 0.7); scene.add(m); }
+  };
+
+  const M = S.M;
+
+  const REG = window.NOSTALGIA_ASSETS, Core = window.NostalgiaCore;
+  const find = id => { for (const k in REG) { const a = REG[k].find(a => a.id === id); if (a) return a; } };
+  const box = new THREE.Box3(), size = new THREE.Vector3();
+  const build = id => { const a = find(id); if (!a) { console.warn('no asset', id); return null; } return a.build(Core); };
+
+  // ground + road
+  const ground = new THREE.Mesh(S.groundGeo ? S.groundGeo() : new THREE.PlaneGeometry(1200, 1200), M.ground);
+  ground.rotation.x = -Math.PI / 2; scene.add(ground);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(13, 1200), M.road);
+  road.rotation.x = -Math.PI / 2; road.position.y = 0.02; scene.add(road);
+  [-6.6, 6.6].forEach(x => { const k = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 1200), M.kerb); k.position.set(x, 0.12, 0); scene.add(k); });
+
+  // trees: trunk + leaf blobs
+  function tree(x, z, s) {
+    s = s || 1; const g = new THREE.Group();
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 4.2 * s, 6), M.trunk); t.position.y = 2.1 * s; g.add(t);
+    [[0, 5.2, 0, 2.2], [1.4, 4.4, 0.3, 1.5], [-1.3, 4.6, -0.2, 1.6], [0.3, 6.4, 0.5, 1.4], [-0.6, 4.0, 1.2, 1.2]].forEach(([dx, dy, dz, r]) => {
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r * s, S.treeDetail), M.leaf); m.position.set(dx * s, dy * s, dz * s); g.add(m);
+    });
+    g.position.set(x, 0, z); scene.add(g);
+  }
+
+  // place along the road, front facing the road, alternating sides
+  function placeSide(obj, side, zc, scale) {
+    if (scale) obj.scale.setScalar(scale);
+    obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+    obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
+    obj.position.set(side * (7.2 + size.x / 2), 0, zc); scene.add(obj); return size.z;
+  }
+  function street(ids, opts) {
+    let zE = 12, zW = 8;
+    ids.forEach((id, i) => {
+      const obj = build(id); if (!obj) return;
+      const side = i % 2 ? 1 : -1;
+      obj.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; obj.updateMatrixWorld(true); box.setFromObject(obj); box.getSize(size);
+      const depth = size.z; const zc = (side > 0 ? zE : zW) - depth / 2;
+      placeSide(obj, side, zc);
+      if (side > 0) zE -= depth + 2.5; else zW -= depth + 2.5;
+    });
+    if (opts.landmark) { const o = build(opts.landmark); if (o) { o.scale.setScalar(opts.landmarkScale || 2.2); o.updateMatrixWorld(true); box.setFromObject(o); box.getSize(size); o.position.set(0, 0, Math.min(zE, zW) - 6 - size.z / 2); scene.add(o); } }
+    for (let z = 10; z > -80; z -= 11) { tree(-9.5, z + 3, 1.15); tree(9.5, z, 1.05); }
+  }
+
+  if (STREET === 'dadao') {
+    street(['red-brick-arcade', 'baroque-gable-townhouse', 'dried-goods-shop', 'qipao-fabric-shop', 'nianhuo-stall', 'herbal-medicine-counter', 'new-year-market-stall', 'bolero-restaurant'], { landmark: 'xiahai-temple', landmarkScale: 2.4 });
+    const s = build('sanlunche'); if (s) { s.position.set(-2.2, 0, -6); s.rotation.y = Math.PI; scene.add(s); }
+    const t = build('blue-mini-truck'); if (t) { t.position.set(3, 0, -30); t.rotation.y = Math.PI; scene.add(t); }
+    cam.position.set(0, 3.2, 22); cam.lookAt(0, 4, -40);
+  } else if (STREET === 'ximen') {
+    street(['chunghwa-market', 'movie-billboard-wall', 'record-shop', 'tower-records', 'comic-rental-shop', 'internet-cafe', 'manga-rental', 'phone-shop-window'], { landmark: 'red-house', landmarkScale: 2.0 });
+    const b = build('yeh-lang-125'); if (b) { b.position.set(2, 0, -4); b.rotation.y = Math.PI * 0.9; scene.add(b); }
+    const p = build('public-phone-booth'); if (p) { p.position.set(-5.6, 0, 2); scene.add(p); }
+    cam.position.set(0, 3.2, 22); cam.lookAt(0, 4, -40);
+  } else {
+    const o = build(ONE || 'xiahai-temple'); if (o) { o.updateMatrixWorld(true); box.setFromObject(o); box.getSize(size); o.rotation.y = -0.5; scene.add(o);
+      const d = Math.max(size.x, size.y, size.z); cam.position.set(d * 0.9, size.y * 0.55 + d * 0.25, d * 1.5); cam.lookAt(0, size.y * 0.45, 0); }
+    tree(-9, -6, 1.1); tree(8, -9, 1.0);
+  }
+  if (S.camera) cam = S.camera(SET, cam) || cam;   // a style may move or replace the camera
+  cam.updateMatrixWorld(true);
+
+  // runtime material swap (models untouched on disk; only the built meshes get new materials)
+  if (S.override) scene.traverse(o => { if (o.isMesh) S.override(o); });
+  if (S.afterBuild) S.afterBuild();
+
+  // ── POST: shared render target + fullscreen-quad helper ──
+  const RW = Math.round(W * S.resScale), RH = Math.round(H * S.resScale);
+  const rt = new THREE.WebGLRenderTarget(RW, RH, { depthBuffer: true, minFilter: S.rtFilter, magFilter: S.rtFilter });
+  rt.depthTexture = new THREE.DepthTexture(RW, RH); rt.depthTexture.type = THREE.UnsignedIntType;
+  const VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+  const GLSL = `
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uOrtho; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+      return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+    float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + 17.0; a *= 0.5; } return v; }
+    float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+    vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+    float lin(float d){ if (uOrtho > 0.5) return uNear + d * (uFar - uNear); float z = d * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
+    float rawDepth(vec2 uv){ return texture2D(tDepth, uv).x; }
+    float depthAt(vec2 uv){ return lin(rawDepth(uv)); }
+    // silhouettes + creases: 2nd derivative of linear depth, k = kernel radius in px. Flat planes give ~0.
+    float depthEdge(vec2 uv, float k){ vec2 px = k / uRes; float d0 = depthAt(uv);
+      float dd = abs(depthAt(uv - vec2(px.x, 0.0)) + depthAt(uv + vec2(px.x, 0.0)) - 2.0 * d0)
+               + abs(depthAt(uv - vec2(0.0, px.y)) + depthAt(uv + vec2(0.0, px.y)) - 2.0 * d0);
+      return dd / d0; }
+    // painted detail (text, posters, colour changes on one surface)
+    float lumEdge(vec2 uv, float k){ vec2 px = k / uRes; float l0 = lum(texture2D(tDiffuse, uv).rgb);
+      return abs(l0 - lum(texture2D(tDiffuse, uv + vec2(px.x, 0.0)).rgb)) + abs(l0 - lum(texture2D(tDiffuse, uv - vec2(px.x, 0.0)).rgb))
+           + abs(l0 - lum(texture2D(tDiffuse, uv + vec2(0.0, px.y)).rgb)) + abs(l0 - lum(texture2D(tDiffuse, uv - vec2(0.0, px.y)).rgb)); }
+  `;
+  const baseUniforms = () => ({ tDiffuse: { value: rt.texture }, tDepth: { value: rt.depthTexture }, uRes: { value: new THREE.Vector2(RW, RH) }, uNear: { value: cam.near }, uFar: { value: cam.far }, uOrtho: { value: cam.isOrthographicCamera ? 1 : 0 } });
+  const quad = (frag, uniforms) => { const m = new THREE.ShaderMaterial({ uniforms, vertexShader: VS, fragmentShader: GLSL + frag, depthTest: false, depthWrite: false });
+    const s = new THREE.Scene(); s.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m)); return { m, s, u: uniforms }; };
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const passes = [];   // every quad pass whose uRes must follow the render target size
+
+
+  const rtN = new THREE.WebGLRenderTarget(RW, RH, { depthBuffer: true });
+  const normalMat = new THREE.MeshNormalMaterial();
+  const renderNormals = () => { const hid = []; scene.traverse(o => { if (o.userData.noNormal && o.visible) { o.visible = false; hid.push(o); } });
+    scene.overrideMaterial = normalMat; renderer.setRenderTarget(rtN); renderer.render(scene, cam); scene.overrideMaterial = null; hid.forEach(o => o.visible = true); };
+
+  const sunNdc = S.sunDir.clone().multiplyScalar(800).add(cam.position).project(cam);
+  const sunUV = new THREE.Vector2(sunNdc.x * 0.5 + 0.5, sunNdc.y * 0.5 + 0.5);
+
+  const BW = Math.round(RW / 4), BH = Math.round(RH / 4);
+  const mkB = () => new THREE.WebGLRenderTarget(BW, BH, { depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+  const rtA = mkB(), rtB = mkB();
+  const bright = quad(`
+    uniform float uThresh;
+    void main(){ vec2 px = 1.0 / uRes; vec3 c = vec3(0.0);
+      c += texture2D(tDiffuse, vUv + px * vec2(-1.0, -1.0)).rgb; c += texture2D(tDiffuse, vUv + px * vec2(1.0, -1.0)).rgb;
+      c += texture2D(tDiffuse, vUv + px * vec2(-1.0, 1.0)).rgb;  c += texture2D(tDiffuse, vUv + px * vec2(1.0, 1.0)).rgb; c *= 0.25;
+      float k = smoothstep(uThresh, uThresh + 0.3, lum(c)); gl_FragColor = vec4(c * k, 1.0); }`,
+    Object.assign(baseUniforms(), { uThresh: { value: 0.75 } }));
+  passes.push(bright);
+  const blur = quad(`
+    uniform sampler2D tSrc; uniform vec2 uDir, uSrcRes;
+    void main(){ vec2 px = uDir / uSrcRes; vec3 c = texture2D(tSrc, vUv).rgb * 0.227;
+      float w[4]; w[0] = 0.194; w[1] = 0.121; w[2] = 0.054; w[3] = 0.016;
+      for (int i = 1; i <= 4; i++) { float o = float(i) * 1.5; c += (texture2D(tSrc, vUv + px * o).rgb + texture2D(tSrc, vUv - px * o).rgb) * w[i - 1]; }
+      gl_FragColor = vec4(c, 1.0); }`,
+    Object.assign(baseUniforms(), { tSrc: { value: null }, uDir: { value: new THREE.Vector2(1, 0) }, uSrcRes: { value: new THREE.Vector2(BW, BH) } }));
+  const runBloom = () => { renderer.setRenderTarget(rtA); renderer.render(bright.s, postCam);
+    for (let i = 0; i < 2; i++) {
+      blur.u.tSrc.value = rtA.texture; blur.u.uDir.value.set(1, 0); renderer.setRenderTarget(rtB); renderer.render(blur.s, postCam);
+      blur.u.tSrc.value = rtB.texture; blur.u.uDir.value.set(0, 1); renderer.setRenderTarget(rtA); renderer.render(blur.s, postCam); } };
+
+  // light shafts: sky/bright mask at quarter res, then a radial blur toward the sun
+  const shaftMask = quad(`
+    uniform vec2 uSunUV;
+    void main(){ float raw = rawDepth(vUv); vec3 c = texture2D(tDiffuse, vUv).rgb; vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+      float sky = raw > 0.9999 ? 1.0 : 0.0; float w = exp(-distance(vUv * asp, uSunUV * asp) * 2.4);
+      gl_FragColor = vec4(vec3(max(sky * w, smoothstep(0.9, 1.4, lum(c)) * 0.3)), 1.0); }`,
+    Object.assign(baseUniforms(), { uSunUV: { value: sunUV } }));
+  passes.push(shaftMask);
+  const rtS = mkB(), rtS2 = mkB();
+  const radial = quad(`
+    uniform sampler2D tSrc; uniform vec2 uSunUV;
+    void main(){ vec2 d = (uSunUV - vUv) / 60.0; vec2 uv = vUv; float w = 1.0, sum = 0.0, acc = 0.0;
+      for (int i = 0; i < 60; i++) { uv += d; acc += texture2D(tSrc, uv).r * w; sum += w; w *= 0.965; }
+      gl_FragColor = vec4(vec3(acc / sum), 1.0); }`,
+    Object.assign(baseUniforms(), { tSrc: { value: rtS.texture }, uSunUV: { value: sunUV } }));
+  const P = quad(`
+    uniform sampler2D tNormal; uniform mat4 uInvProj;
+    vec3 viewPos(vec2 uv){ float z = rawDepth(uv) * 2.0 - 1.0; vec4 p = uInvProj * vec4(uv * 2.0 - 1.0, z, 1.0); return p.xyz / p.w; }
+    // screen-space ambient occlusion from depth + normals; strongest where walls meet the ground
+    float ssao(vec2 uv, float d0){ vec3 p0 = viewPos(uv); vec3 n = normalize(texture2D(tNormal, uv).rgb * 2.0 - 1.0);
+      float r = clamp(160.0 / d0, 3.0, 36.0); float occ = 0.0; float a0 = hash(gl_FragCoord.xy) * 6.283;
+      for (int i = 0; i < 12; i++) { float a = a0 + float(i) * 0.5236; float rr = r * (0.3 + 0.7 * fract(float(i) * 0.618 + 0.1));
+        vec2 o = vec2(cos(a), sin(a)) * rr / uRes; vec3 p = viewPos(uv + o); vec3 v = p - p0; float dist = max(length(v), 0.001);
+        float rc = smoothstep(0.0, 1.0, 2.5 / dist); occ += max(dot(n, v / dist) - 0.12, 0.0) * rc; }
+      return clamp(1.0 - occ / 12.0 * 1.6, 0.0, 1.0); }
+
+    uniform sampler2D tBloom, tShaft; uniform vec2 uSunUV;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb; float raw = rawDepth(vUv); float d0 = lin(raw); bool isSky = raw > 0.9999;
+      vec2 asp = vec2(uRes.x / uRes.y, 1.0); vec2 p = gl_FragCoord.xy;
+      // dusk sky: violet top, gold at the sun, an oversized moon with craters
+      float t = clamp((vUv.y - 0.44) / 0.56, 0.0, 1.0);
+      vec3 sky = mix(vec3(0.95, 0.62, 0.42), vec3(0.22, 0.14, 0.42), pow(t, 0.7));
+      float sd = distance(vUv * asp, uSunUV * asp); sky += vec3(1.0, 0.8, 0.5) * (exp(-sd * 5.0) * 1.0 + exp(-sd * 1.6) * 0.25);
+      vec2 moonC = vec2(0.74, 0.76); float md = distance(vUv * asp, moonC * asp); float moonR = 0.16;
+      float moon = 1.0 - smoothstep(moonR - 0.004, moonR + 0.004, md);
+      vec3 moonCol = vec3(0.98, 0.93, 0.82) * (0.8 + 0.2 * fbm(p * 0.012)) * (1.0 - smoothstep(0.35, 0.75, fbm(p * 0.02 + 5.0)) * 0.35);
+      moonCol *= 1.0 - smoothstep(moonR * 0.5, moonR, md) * 0.25;
+      sky = mix(sky, moonCol, moon); sky += vec3(0.9, 0.85, 0.7) * exp(-max(md - moonR, 0.0) * 12.0) * 0.35;
+      float far = smoothstep(30.0, 200.0, d0);
+      vec3 col = isSky ? sky : c * mix(1.0, ssao(vUv, d0), 0.8);
+      if (!isSky) col = mix(col, vec3(0.55, 0.36, 0.6), far * 0.55);   // violet fog
+      col += texture2D(tShaft, vUv).r * vec3(1.0, 0.72, 0.4) * 0.8;
+      col += texture2D(tBloom, vUv).rgb * 0.9;
+      col = mix(col, aces(col * 1.1), 0.9);
+      float v = distance(vUv, vec2(0.5)); col *= 1.0 - smoothstep(0.45, 1.0, v) * 0.3;
+      gl_FragColor = vec4(col, 1.0);
+    }`, Object.assign(baseUniforms(), { tNormal: { value: rtN.texture }, uInvProj: { value: cam.projectionMatrixInverse }, tBloom: { value: rtA.texture }, tShaft: { value: rtS2.texture }, uSunUV: { value: sunUV } }));
+  passes.push(P);
+  function frame() {
+    renderer.setRenderTarget(rt); renderer.render(scene, cam); renderNormals();
+    runBloom();
+    renderer.setRenderTarget(rtS); renderer.render(shaftMask.s, postCam);
+    radial.u.tSrc.value = rtS.texture; renderer.setRenderTarget(rtS2); renderer.render(radial.s, postCam);
+    radial.u.tSrc.value = rtS2.texture; renderer.setRenderTarget(rtS); renderer.render(radial.s, postCam);
+    radial.u.tSrc.value = rtS.texture; renderer.setRenderTarget(rtS2); renderer.render(radial.s, postCam);
+    renderer.setRenderTarget(null); renderer.render(P.s, postCam);
+    requestAnimationFrame(frame);
+  }
+  S.onResize = (w, h) => { rtN.setSize(w, h); [rtA, rtB, rtS, rtS2].forEach(r => r.setSize(Math.round(w / 4), Math.round(h / 4))); blur.u.uSrcRes.value.set(Math.round(w / 4), Math.round(h / 4)); };
+
+
+  addEventListener('resize', () => { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix();
+    if (S.resScale === 1) { rt.setSize(w, h); passes.forEach(p => p.u.uRes.value.set(w, h)); } if (S.onResize) S.onResize(w, h); });
+  frame();
+  window.__S = S; window.__scene = scene; window.__cam = cam; window.__ready = true;
+})();
+</script>
+</body></html>
