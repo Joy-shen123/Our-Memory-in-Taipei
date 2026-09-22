@@ -144,7 +144,7 @@
   }
 
   // ── local fallback: two <audio> loops, alternating ──────────────────────────
-  const players = [0, 1].map(() => { const a = document.createElement('audio'); a.preload = 'none'; a.loop = true; a.volume = 0; a.setAttribute('aria-hidden', 'true'); return a; });
+  const players = [0, 1].map(() => { const a = document.createElement('audio'); a.preload = 'none'; a.loop = true; a.volume = 0; a.setAttribute('aria-hidden', 'true'); a.hidden = true; document.body.appendChild(a); return a; });   // in the DOM, so a test can mute them from outside
   let active = 0, unlocked = false, playing = false, fade = null;
   players.forEach(p => { p.muted = muted; p.addEventListener('error', () => { /* a missing file only means silence */ }); });
 
@@ -314,6 +314,7 @@
     get unlocked() { return mode === 'youtube' ? gestured : unlocked; },
     get manual() { return manual ? DECADES[manual.decade].key : null; }, get scrollDecade() { return DECADES[lastScrollDecade < 0 ? 0 : lastScrollDecade].key; },
     get fading() { return !!fade; }, get volumes() { return players.map(p => +p.volume.toFixed(2)); }, get failed() { return failed; },
+    get state() { return players.map(p => ({ src: (p.getAttribute('src') || '').split('/').pop(), paused: p.paused, ready: p.readyState, err: p.error && p.error.code, t: +p.currentTime.toFixed(1), dur: +(p.duration || 0).toFixed(0), muted: p.muted })); },
     get embed() { const f = document.querySelector('#music iframe'); return f ? { src: f.src.slice(0, 60), w: f.clientWidth, h: f.clientHeight } : null; },
     setDecade, nextVideo, nextLocal, toggle, setMuted, YT_VIDEOS, DECADES,
   };
