@@ -2,10 +2,10 @@
 // real building: the Red House octagon and its cross-shaped market wing, the eight blocks of
 // 中華商場 with their rooftop neon, 樂聲戲院 with hand-painted billboards, 萬年大樓, and the
 // 1999 pedestrian zone. The teammate's Ximending asset library fills the shopfronts between.
-// Primitives, canvas textures and the palette only. References are listed in HANDOFF.md.
+// Primitives, canvas textures and the palette, plus the Red House glb (issue #5). References are listed in HANDOFF.md.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam, withFog } = window.SCENE;
   const RED = ['red'], ALL = ['red', 'dadao', 'tower'];
   const RH = anchors.redhouse;                                                  // { x: 11, z: -70 }
   const hOf = (h, eras) => { const o = {}; (eras || RED).forEach(k => o[k] = h); return o; };
@@ -13,19 +13,9 @@
 
   // ── shared geometry (base at y = 0) ─────────────────────────────────────────
   const pyr = new THREE.CylinderGeometry(0, 1, 1, 4); pyr.translate(0, 0.5, 0);
-  const oct = new THREE.CylinderGeometry(1, 1, 1, 8); oct.translate(0, 0.5, 0);
-  const octCone = new THREE.CylinderGeometry(0.06, 1, 1, 8); octCone.translate(0, 0.5, 0);
   const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.15, 10); wheelGeo.rotateZ(Math.PI / 2); wheelGeo.translate(0, 0.5, 0);
   const basketGeo = new THREE.CylinderGeometry(0.5, 0.38, 1, 8); basketGeo.translate(0, 0.5, 0);
   const planeGeo = new THREE.PlaneGeometry(1, 1); planeGeo.translate(0, 0.5, 0);           // faces +z
-  // gable roof: unit triangular prism. wedgeZ has its ridge along z, wedgeX along x.
-  function wedge(alongX) {
-    const sh = new THREE.Shape(); sh.moveTo(-0.5, 0); sh.lineTo(0.5, 0); sh.lineTo(0, 1); sh.closePath();
-    const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -0.5);
-    if (alongX) g.rotateY(Math.PI / 2);
-    return g;
-  }
-  const wedgeZ = wedge(false), wedgeX = wedge(true);
 
   // ── item buckets, one InstancedMesh each ────────────────────────────────────
   const furn = [], crowd = [], wheels = [], baskets = [], bodies = [], columns = [], winBoxes = [];
@@ -81,51 +71,31 @@
   // arched openings at street level, paired windows above, pale horizontal bands and quoins,
   // an eight-sided slate roof with a small lantern) and, behind it, the one-storey cross-shaped
   // hall with gable roofs. Octagon centred east of the road; the cross wing runs away from it.
+  // Issue #5 step 1: the building is a glb built by asset/blender/red-house.py (bevelled edges,
+  // boolean-cut openings, flat palette materials, 30.7k triangles) and loaded here in place of
+  // the canvas-textured primitives. The glb keeps the primitive build's sizes: circumradius
+  // 7.2, eave 8.8, the long arm 30 x 8.4 centred 21 m behind the octagon, the cross arm 23 m.
+  // Its front faces +Z before rotation, like the library assets, so -π/2 turns it to the road.
   (() => {
-    const R = 7.2, EAVE = 8.8, cx = 16.6, cz = RH.z, S = 58;                    // S = px per metre on the wall texture
-    // the wall: one texture for all eight facets. Canvas y runs top→bottom, metres bottom→top.
-    const { cv, g } = canvas(2048, Math.round(EAVE * S), 'brick');
-    const Y = m => cv.height - m * S;
-    g.fillStyle = PALETTE.bone;
-    g.fillRect(0, Y(4.55), 2048, 0.35 * S);                                        // string course between floors
-    g.fillRect(0, Y(EAVE), 2048, 0.55 * S);                                        // cornice
-    g.fillRect(0, Y(0.5), 2048, 0.5 * S);                                          // plinth
-    for (let f = 0; f < 8; f++) {
-      const x0 = f * 256;
-      for (let q = 0; q < 14; q++) { g.fillStyle = q % 2 ? PALETTE.brick : PALETTE.bone; g.fillRect(x0 - 10, Y(0.6 * q + 0.6), 20, 0.6 * S); } // quoins on each corner
-      g.fillStyle = PALETTE.bone; g.fillRect(x0 + 82, Y(3.9), 92, 3.4 * S);         // ground floor: pale arch surround
-      g.beginPath(); g.arc(x0 + 128, Y(3.9) + 46, 46, 0, Math.PI * 2); g.fill();
-      g.fillStyle = PALETTE.ink; g.fillRect(x0 + 92, Y(3.6), 72, 3.1 * S);          // the arched opening, dark inside
-      g.beginPath(); g.arc(x0 + 128, Y(3.6) + 36, 36, 0, Math.PI * 2); g.fill();
-      [x0 + 60, x0 + 150].forEach(wx => {                                          // upper floor: two tall windows with pale frames
-        g.fillStyle = PALETTE.bone; g.fillRect(wx - 6, Y(7.6), 58, 2.5 * S);
-        g.fillStyle = PALETTE.ink; g.fillRect(wx, Y(7.45), 46, 2.2 * S);
-        g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(wx, Y(7.45), 46, 14);
-      });
+    const cx = 16.6, cz = RH.z, EAVE = 8.8;
+    const house = libGroup(ALL);                                                  // there in every era
+    if (THREE.GLTFLoader) {
+      new THREE.GLTFLoader().load('asset/models/red-house.glb', gltf => {
+        const root = gltf.scene;
+        root.traverse(o => {
+          if (!o.isMesh) return;
+          // the loader makes MeshStandardMaterial; the rest of the street is Lambert with the
+          // page's fog chunk, so the glb gets the same, colour carried over (raw palette hex)
+          o.material = withFog(new THREE.MeshLambertMaterial({ color: o.material.color }));
+          o.castShadow = o.receiveShadow = true;
+        });
+        root.position.set(cx, 0, cz);
+        root.rotation.y = -Math.PI / 2;
+        house.add(root);
+      }, undefined, err => console.error('red-house.glb failed to load', err));
+    } else {
+      console.error('THREE.GLTFLoader is missing: load GLTFLoader.js after three.min.js');
     }
-    const wall = part(cx, 0, cz, R, R, only(ALL, EAVE, 'bone'), Math.PI / 8, oct);
-    wall.mesh.material.map = tex(cv); wall.mesh.material.needsUpdate = true;
-    part(cx, EAVE, cz, R + 0.7, R + 0.7, only(ALL, 0.35, 'ink'), Math.PI / 8, oct);                  // eave slab
-    part(cx, EAVE + 0.35, cz, R + 0.6, R + 0.6, only(ALL, 3.4, 'ink'), Math.PI / 8, octCone);         // slate roof
-    part(cx, EAVE + 3.55, cz, 1.3, 1.3, only(ALL, 1.3, 'bone'), Math.PI / 8, oct);                    // the lantern
-    part(cx, EAVE + 4.85, cz, 1.6, 1.6, only(ALL, 0.9, 'ink'), Math.PI / 8, octCone);
-    part(cx, EAVE + 5.7, cz, 0.12, 0.12, only(ALL, 1.2, 'ink'));                                      // finial
-    // the cross-shaped hall behind the octagon: two gabled arms crossing, brick with pale bands
-    const H = 4.6, AX = 22.6 + 15, AZ = cz;                                                           // the long arm starts inside the octagon's rear face (x 23.25)
-    const arm = (x, z, w, d, alongX) => {
-      part(x, 0, z, w, d, only(ALL, H, 'brick'));
-      part(x, H - 0.4, z, w + 0.3, d + 0.3, only(ALL, 0.35, 'bone'));                                 // cornice band
-      part(x, H - 0.05, z, w + 0.6, d + 0.6, only(ALL, 2.6, 'ink'), 0, alongX ? wedgeX : wedgeZ);     // gable roof
-      // windows: ink boxes on both long sides
-      const n = Math.floor((alongX ? w : d) / 2.4);
-      for (let i = 0; i < n; i++) {
-        const u = -(alongX ? w : d) / 2 + 1.2 + i * 2.4 + 0.6;
-        [-1, 1].forEach(s => winBoxes.push(alongX ? { x: x + u, z: z + s * (d / 2 + 0.03), y: 1.2, w: 1.0, d: 0.06, h: hOf(2.2, ALL) }
-                                                    : { x: x + s * (w / 2 + 0.03), z: z + u, y: 1.2, w: 0.06, d: 1.0, h: hOf(2.2, ALL) }));
-      }
-    };
-    arm(AX, AZ, 30, 8.4, true);                                                                       // the long arm, away from the road
-    arm(AX + 2, AZ, 8.4, 30, false);                                                                  // the cross arm
     // the plaza in front: packed earth in the 80s, the 2002 paving after
     part(cx - 2, 0, cz + 11, 18, 10, { red: { h: 0.06, col: 'haze' }, dadao: { h: 0.08, col: 'walk' }, tower: { h: 0.08, col: 'walk' } });
     RH.top = EAVE + 7.5;
