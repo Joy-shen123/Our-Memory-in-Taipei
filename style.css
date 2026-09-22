@@ -86,12 +86,13 @@ html, body {
 }
 
 /* the music player, bottom-left: the same rule-and-caps language as the chapter column. music.js drives it;
-   the Spotify iFrame API replaces #musEmbed with its iframe (80 px tall, the width of the control). */
+   the YouTube API replaces #musEmbed with its iframe inside the MV box (200 px tall, the width of the control;
+   YouTube's terms want the player visible, so the box is never hidden while it plays). */
 .hud-music {
   position: absolute;
   left: clamp(20px, 4vw, 56px);
   bottom: clamp(24px, 6vh, 72px);
-  width: min(320px, calc(100vw - 40px));
+  width: min(356px, calc(100vw - 40px));
   pointer-events: auto;
   text-shadow: 0 2px 16px var(--ink);
   font-size: 11px;
@@ -101,9 +102,9 @@ html, body {
 .mus-body { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--bone); padding-top: 8px; }
 .mus-k { opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mus-track { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mus-embed-wrap { height: 80px; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--ink) 28%, transparent); }
-.mus-embed-wrap iframe, #musEmbed { display: block; width: 100%; height: 80px; border: 0; }
-.hud-music[data-mode="local"] .mus-embed-wrap { display: none; }
+.mus-box { height: 200px; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--ink) 28%, transparent); }
+.mus-box iframe, #musEmbed { display: block; width: 100%; height: 200px; border: 0; }
+.hud-music[data-mode="local"] .mus-box { display: none; }
 .mus-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mus-decades { display: flex; gap: 6px; }
 .hud-music button {
@@ -131,7 +132,8 @@ html, body {
 
 @media (max-width: 480px) {
   .hud-music { left: 20px; bottom: 72px; width: calc(100vw - 40px); }   /* above the year, which owns the bottom-left corner on a phone */
-  .hud-music .mus-k, .hud-music .mus-track { display: none; }            /* the embed and the buttons only */
+  .hud-music .mus-k, .hud-music .mus-track, .hud-music .mus-decades { display: none; }   /* the sound toggle and the MV box only */
+  .hud-music.muted .mus-box, .hud-music.locked .mus-box { display: none; }             /* the toggle shows the box (and unmutes) or hides it (muted and paused) */
   .hud-music button { font-size: 10px; padding: 5px 9px 4px 11px; }
   .hud-title { font-size: 10px; letter-spacing: 0.24em; top: auto; bottom: 28px; }   /* bottom-right on a phone: the chapter column owns the top */
   .hud-chapter { gap: 12px; }
