@@ -137,6 +137,37 @@
   const key = new THREE.DirectionalLight(C('lamp'), 0.9);
   key.position.set(18, 26, 12);
   scene.add(key);
+  // ── the sun casts shadows (issue #3 step 3) ──────────────────────────────────
+  // One shadow map for the whole street: an orthographic box SUN_BOX units square, re-centred every
+  // frame on a point SUN_AHEAD units down the road from the scroll camera, so the map's texels are
+  // spent where the camera looks and the 460-unit street never needs a bigger map. PCF soft, 2048
+  // on a desktop and 1024 on a phone (texel 0.06 / 0.12 units). Every lit, opaque mesh casts and
+  // receives; the two biases are what keep the flat walls free of acne.
+  const SUN_DIR = key.position.clone().normalize(), SUN_BOX = 120, SUN_AHEAD = 45, SUN_DIST = 160;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  key.castShadow = true;
+  key.shadow.mapSize.set(IS_PHONE ? 1024 : 2048, IS_PHONE ? 1024 : 2048);
+  key.shadow.camera.left = -SUN_BOX / 2; key.shadow.camera.right = SUN_BOX / 2;
+  key.shadow.camera.top = SUN_BOX / 2; key.shadow.camera.bottom = -SUN_BOX / 2;
+  key.shadow.camera.near = 1; key.shadow.camera.far = SUN_DIST + SUN_BOX;
+  key.shadow.camera.updateProjectionMatrix();
+  key.shadow.bias = -0.0004; key.shadow.normalBias = 0.05;
+  scene.add(key.target);
+  function sunFollow(camZ) {
+    key.target.position.set(0, 0, camZ - SUN_AHEAD);
+    key.position.copy(key.target.position).addScaledVector(SUN_DIR, SUN_DIST);
+  }
+  // flags set once, after the scene files have built, before the first draw
+  function enableShadows() {
+    scene.traverse(o => {
+      if (!o.isMesh && !o.isInstancedMesh) return;
+      const m = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (!m || !m.isMeshStandardMaterial) return;                  // unlit signs, the sky, the mountains, the particles: no
+      o.receiveShadow = true;
+      o.castShadow = !m.transparent;
+    });
+  }
 
   // ── environment: a canvas-drawn sky, PMREM'd into scene.environment (issue #3 step 1) ──
   // Every Standard material (the asset library and, from this step, the engine's lit() surfaces)
@@ -991,12 +1022,13 @@
     warm = { ms: Math.round(performance.now() - t0), programs: renderer.info.programs.length, textures: renderer.info.memory.textures };
   }
   const NOWARM = new URLSearchParams(location.search).get('nowarm') === '1';
+  if (NOWARM) requestAnimationFrame(enableShadows);                 // still once, before the first draw
   const hitch = { max: 0, at: 0 };                                 // the longest frame gap since load, for measuring
   function frame(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000);
     if (now - lastT > hitch.max && lastT > 0) { hitch.max = Math.round(now - lastT); hitch.at = +progress.toFixed(3); }
     lastT = now;
-    if (!warm && !NOWARM) { warmUp(); hitch.max = 0; }
+    if (!warm && !NOWARM) { enableShadows(); warmUp(); hitch.max = 0; }
     const target = Math.min(1, Math.max(0, window.scrollY / maxScroll()));
     progress += (target - progress) * (1 - Math.exp(-DAMP * dt));
     if (Math.abs(target - progress) < 0.00005) progress = target;
@@ -1004,6 +1036,7 @@
     driftY += (-mouseY * PARALLAX_Y - driftY) * (1 - Math.exp(-2 * dt));
 
     const camZ = placeCamera(progress);
+    sunFollow(camZ);
     frontier = Math.min(frontier, camZ - FOG_LEAD);
     FOG_U.frontier.value = -1e5; // mist switched off: the whole street is visible in daylight
 
@@ -1045,7 +1078,14 @@
 
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; },
-                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear };
+                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
+                   get shadow() { let c = 0, r = 0, t = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; } });
+                     return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, map: !!key.shadow.map, size: key.shadow.mapSize.x,
+                              box: [key.shadow.camera.left, key.shadow.camera.right], pos: key.position.toArray().map(v => +v.toFixed(1)), target: key.target.position.toArray().map(v => +v.toFixed(1)), camZ: +camera.position.z.toFixed(1) }; } };
 
-  requestAnimationFrame(frame);
+  // The first frame does the one-time work (shadow flags, warm-up), so it must not run before the
+  // scene files have built: the parser may yield to a frame between two script tags, and it did
+  // once the environment map was generated at load. DOMContentLoaded fires after the last script.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(frame));
+  else requestAnimationFrame(frame);
 })();
