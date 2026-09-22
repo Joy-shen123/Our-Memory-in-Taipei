@@ -101,20 +101,17 @@
     const NAMES = ['忠', '孝', '仁', '愛', '信', '義', '和', '平'];
     const NEON = [['國際牌', 'verm'], ['黑松汽水', 'lamp'], ['三洋', 'verm'], ['聲寶', 'lamp'], ['歌林', 'verm'], ['大同', 'lamp'], ['味全', 'verm'], ['SONY', 'lamp']];
     const L = 10, GAP = 1.6, FLOOR = 3.3, XF = -6.2, DEPTH = 10;                 // block length, gap, storey height, arcade line, depth
-    const upper = [], plates = [];
-    const upperTex = facadeTex(3, 2, 'bone', 'haze');
+    // Issue #5 step 2: one block is the glb from asset/blender/chunghwa.py (arcade columns, shop
+    // wall with dark doorways and sign boards, the balcony-window storey, parapet, roof tank),
+    // cloned eight times. The name plates and the rooftop neon stay canvas text on it.
+    const blocks = libGroup(RED), blockZ = NAMES.map((nm, i) => 46 - L / 2 - i * (L + GAP));
+    MODELS.load('chunghwa', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      blockZ.forEach(z => { const b = root.clone(); b.position.set(XF, 0, z); b.rotation.y = Math.PI / 2; blocks.add(b); });
+    });
+    const plates = [];
     NAMES.forEach((nm, i) => {
-      const z = 46 - L / 2 - i * (L + GAP), x0 = XF - DEPTH / 2;
-      // arcade: columns at the kerb line, the shop wall behind, a sign band on it
-      for (let k = 0; k < 4; k++) columns.push({ x: XF - 0.25, z: z - L / 2 + 0.45 + k * (L - 0.9) / 3, w: 0.5, d: 0.5, h: hOf(FLOOR), c: C('walk') });
-      part(XF - 1.7, 0, z, 3.0, L, only(RED, FLOOR, 'haze'));                    // the ground-floor shop wall (x -7.7 … -10.7)
-      for (let k = 0; k < 3; k++) {
-        F(XF - 0.15, z - L / 2 + 1.7 + k * 3.3, 2.2, 0.1, 2.6, 0.7, k % 2 ? 'verm' : 'lamp');      // shop signs under the arcade
-        F(XF - 1.6 + 1.5 - 0.02, z - L / 2 + 1.7 + k * 3.3, 0, 0.06, 2.0, 2.2, 'ink');            // the open shop doorway, dark
-      }
-      // upper two storeys, over the arcade, with balcony windows (instanced, one shared texture)
-      upper.push({ x: x0, z, y: FLOOR, w: DEPTH, d: L, h: hOf(FLOOR), c: C('bone') });
-      part(x0, FLOOR * 2, z, DEPTH + 0.3, L + 0.3, only(RED, 0.5, 'haze'));      // parapet / roof slab
+      const z = blockZ[i], x0 = XF - DEPTH / 2;
       // block name: a pale plate on the road-facing corner
       const v = vertTex(nm + '棟', 'bone', 'ink', 'verm');
       board(XF + 0.02, FLOOR + 0.3, z + L / 2 - 1.2, 3.0 * v.aspect, 3.0, v.t, RED, 'x');
@@ -128,7 +125,6 @@
       const p = board(sx + 0.15, y + 0.5, sz, 4.4, 2.5, t, RED, 'x', 0.7); p.mesh.rotation.y = -0.35; // faces the road, turned toward the camera
       plates.push(p);
     });
-    instSet(boxGeo, lam('bone', { map: upperTex }), upper, { colors: true }).mesh.material.map.repeat.set(6, 1);
   })();
 
   // ═══ 3. 樂聲戲院 — the cinema on 武昌街 with hand-painted billboards ═══════════════════
