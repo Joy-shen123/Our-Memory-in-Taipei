@@ -66,3 +66,51 @@ Reading the middle: 3 = the thing is there but a fraction of the chapter fails i
 1. Chapter 02 story beat (2) — agent. A chapter-cut flash at the 2000 and 2020 markings (IVRESS borrow list, item a) makes the boundary visible without switching the Dadaocheng items to dadao-only.
 2. Chapter 03 density and life (2) — agent. A light stream up the tower and more crowd on the 101 plaza and the A11 entrance; particles are borrow item g.
 3. Chapter 01 period (3) — CJ decision. Should the 1980s, 1990s and 2000s Ximending asset sets appear by scroll year (1986 has no Nokia sign, 1998 has the internet café) or stay all on as now? Gating by year is an hour of work in `scene-red.js`; it also thins the street at 1985, which pulls against "density and life".
+
+## Scoring 2 — 2026-09-23, branch `issue-3-texture` at 86e1e8f (after issue #3, the surface texture pass)
+
+Twelve fresh headless screenshots at 1440x900 in `~/Desktop/issue3-texture/rubric-2/` (same twelve fractions as scoring 1, plus `cut-0.347.png` and `cut-0.582.png` taken 45 frames after landing on each boundary, for the story beat). Fps headed and alone, 2 s of `requestAnimationFrame`, in `~/Desktop/issue3-texture/fps.txt`. Issue #3 changed surfaces and light only, so recognition, period, composition and density move only where the IVRESS borrows (the chapter-cut flash and the particles, added after scoring 1 and never re-scored) moved them.
+
+| Chapter | Recognition | Period | Composition | Density and life | Palette and light | Story beat | Performance |
+|---|---|---|---|---|---|---|---|
+| 01 When We Were Young (Ximending) | 4 | 3 | 3 | 3 | 4 | 3 | 5 |
+| 02 Spring Festival (Dadaocheng) | 4 | 3 | 3 | 3 | 4 | 3 | 5 |
+| 03 The Future (Xinyi) | 4 | 3 | 4 | 3 | 4 | 4 | 5 |
+
+### 01 When We Were Young — evidence
+
+- Recognition 4: at 0.20 the Red House octagon, the vertical 樂聲戲院 sign and the 西門町 gate read without the label, and the octagon's brick now sits under a real sun with its forecourt in shade; at 0.30 the right side is still plain window-grid blocks, plaster-textured now but no more Taipei than before.
+- Period 3: unchanged. 0.10 shows 小虎隊 and a NOKIA · Sony Ericsson sign in the same 1989 frame (CJ decision, `HANDOFF.md` open item 3).
+- Composition 3: 0.20 is the composed shot (樂聲 sign, Red House, gate); at 0.02 the 中華商場 rooftop sign slab still fills the top third and the title sits on it.
+- Density and life 3: unchanged. Signs and stalls at every fraction, the crowd is dark-headed boxes, and the 0.02 slab still counts as blocking the camera.
+- Palette and light 4: bone, vermilion and lamp on a blue sky at every fraction. From this pass the walls take the sun: the west row's shadow lies across the road at 0.10, the 中華商場 arcade darkens inside at 0.02, the plaster reads as plaster at 0.30. Nothing clips to white any more (3.3% of the 0.05 frame did; now 0) and saturation is held at the step 0 level (0.144 → 0.136). The yellow-green 淘兒 front at 0.20 is still the one off-palette block, so 4 not 5.
+- Story beat 3: unchanged. The opening descends from y 7 while the first words surface; nothing in the world changes on entering.
+- Performance 5: 100.6 fps headed at 0.2 with the shadow map on, 1333 meshes, console empty.
+
+### 02 Spring Festival — evidence
+
+- Recognition 4: at 0.36 the arcade columns are brick courses, the bays' pilasters plaster, the 巴洛克 crests and the 年貨大街 banner read as Dihua Street; the temple is still known only from its label, no keyframe frames it.
+- Period 3: unchanged. The 三輪車 and blue 小貨車 at 0.36 in a 2001 frame; nothing in 2010–2019 differs from 2001.
+- Composition 3: 0.44 has stalls in the foreground under the lantern strings and the shophouse rows above; the "Dihua Street" label now sits top right, clear of the word; at 0.52 the nearest lantern string still covers the top quarter of the frame.
+- Density and life 3: 30 stalls, banners and crowd at 0.44; the goods are white boxes; 0.58 (still this chapter, year 2020) is an empty road with trees and grey boxes.
+- Palette and light 4: brick, bone, vermilion and lamp, consistent at every fraction. The east row's arcade sits in the sun's shadow at 0.36 and 0.44 while the west row is lit, the first time the two sides of the street differ, and the bricks are visible on the columns without shouting. 0.58 is the chapter's one dull frame: hazy, grey boxes on green.
+- Story beat 3 (was 2): crossing the 2000 marking fires the white chapter-cut flash (`cut-0.347.png`: the 年貨大街 archway and the 2000 digits under it) and the trees, lamps and road texture change in the same scroll; the Dadaocheng items were already on in the red era, so the street itself does not transform.
+- Performance 5: 100.6 fps headed at 0.44, console empty.
+
+### 03 The Future — evidence
+
+- Recognition 4: the 101 profile is named on sight at 0.66, 0.78 and 0.90, and its glass now carries the sky and a sun highlight up the west face at 0.78; every other tower is a generic lit box and City Hall is still in none of the four frames.
+- Period 3: unchanged. Lit curtain walls and the skywalk say 2010s or later; nothing separates 2020 from 2039.
+- Composition 4: 0.66 (flanking towers, 101 centred, XINYI sign) and 0.97 (man near the crown, closing line left) are composed; at 0.78 the near blocks warp under the 62° fov and the podium is below the frame.
+- Density and life 3 (was 2): the light stream spirals up the tower at 0.90 and 0.97, and at 0.78 the office towers throw shadows on one another, which reads as a city; at 0.66 the road still has only the girl and the plaza has no people.
+- Palette and light 4: glass green, bone and lamp windows, bright and consistent; the office walls are concrete with a faint grain and darker bases at 0.78. Lit windows in daylight remain the one mixed signal.
+- Story beat 4: the 2020 marking fires the gold flash (`cut-0.582.png`) and the tower grows from the ground; the 0.58 to 0.66 stretch before it is empty road.
+- Performance 5: 100.5 fps headed at 0.78, 100.6 at 0.9 with the light stream on, console empty.
+
+### What issue #3 moved, and the three lowest now
+
+The pass shows up under Palette and light in every chapter (sun, shade, materials, no clipping) without lifting any of those cells to 5, because each chapter's named weak spot on that line is a colour or a frame, not a surface. The two cells that rose, ch02 story beat and ch03 density, rose on the flash and the particles from the issue #1 Part 3 session, scored here for the first time.
+
+1. Chapter 01 period (3) — CJ decision, unchanged from scoring 1: gate the Ximending sets by scroll year or keep all three on.
+2. Chapter 01 composition (3) — agent, in `scene-red.js`: the 中華商場 rooftop slab at 0.02 is the first frame everyone sees; moving the slab back from the road edge (not the camera, `CAM` stays) clears the title.
+3. Chapter 02 density and life (3) — agent, in `scene-dadao.js`: dress the 2020 stretch at 0.58 (the last frame of the chapter) so the chapter does not end on an empty road.
