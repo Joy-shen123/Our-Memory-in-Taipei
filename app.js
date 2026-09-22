@@ -12,9 +12,20 @@
   const DAMP = 5.5;           // scroll damping. higher = snappier
   const ERA_MS = 500;         // the world re-renders into the next era over this long
   const LABEL_NEAR = 70;      // anchor labels fade in inside this distance
+  // surface pass (issue #3 step 1): the light budget. EXPOSURE is the tone-mapping knob, ENV_I how
+  // much of the canvas sky every lit surface receives, HEMI the hemisphere light and KEY the sun,
+  // both in chapter 1 (ERA_MIX scales them for the others). Set together against step0-0.05.png:
+  // the road and the shop walls sit 3–8 levels brighter than before and the saturation is unchanged,
+  // while the clipped-white share of the frame goes from 3% to 0.
+  const EXPOSURE = 0.8;
+  const ENV_I = 0.35;
+  const HEMI = 0.65;
+  const KEY = 1.3;
   // per-era mix of the five colours: sky/fog darkens, lamp light grows, print fades
-  const ERA_MIX = { red: { night: 0.0, lamp: 1.1, hemi: 1.1 }, dadao: { night: 0.05, lamp: 1.2, hemi: 1.0 },
-                    tower: { night: 0.45, lamp: 1.1, hemi: 0.75 } };
+  // (hemi is the hemisphere light only; the canvas-sky environment adds its own ambient on top)
+  // (hemi is the hemisphere light, env scales the canvas-sky environment; both fall toward the future)
+  const ERA_MIX = { red: { night: 0.0, lamp: KEY, hemi: HEMI, env: 1.0 }, dadao: { night: 0.05, lamp: KEY * 1.09, hemi: HEMI * 0.91, env: 0.95 },
+                    tower: { night: 0.45, lamp: KEY, hemi: HEMI * 0.68, env: 0.7 } };
 
   // ── fog: directional, permanent, and cheap ───────────────────────────────────
   // three.js fog is distance-from-camera. The brief's fog is "the part of the century you
@@ -61,6 +72,13 @@
     };
     return mat;
   };
+  // lit(params): the one material every lit engine surface uses (issue #3 step 1). It was
+  // MeshLambertMaterial; it is MeshStandardMaterial now so scene.environment reaches it (in r149
+  // the environment map lights Standard materials only) and so step 2's normal maps have a
+  // material that reads them. Rough and non-metal, so it shades like the Lambert it replaces
+  // plus the sky's ambient; every option Lambert took (map, emissive, vertexColors) still works.
+  const litMats = [];   // every material that reads scene.environment, so the era tween can scale it
+  const lit = params => { const m = new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.92, metalness: 0, envMapIntensity: ENV_I }, params)); litMats.push(m); return m; };
 
   // ── renderer, scene, camera ──────────────────────────────────────────────────
   const canvas = document.getElementById('scene');
@@ -70,22 +88,73 @@
   const IS_PHONE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_PHONE ? 1.5 : 2));
   renderer.outputEncoding = THREE.LinearEncoding; // gamma is applied at the end of the post pass
+  // tone mapping (issue #3 step 1): the ACES filmic curve on the renderer. In this r149 build the
+  // renderer's tone mapping runs on the offscreen draw as well (only outputEncoding is gated on
+  // the render target), so the post pass receives a tone-mapped linear frame and gamma-encodes it
+  // as before. What changes is the highlight shoulder: a sunlit wall keeps its gradation instead
+  // of clipping to white. The curve is applied to luminance only, as a CustomToneMapping: the
+  // stock ACESFilmicToneMapping runs its curve through the RRT matrices and lost 30% of the frame's
+  // saturation (measured 0.144 → 0.103 at 0.05, the lit windows and the 101 glass going cream),
+  // which is the greyer page CJ ruled out on 2026-09-20. Scaling the colour by curve(Y)/Y keeps
+  // every hue and only rolls the highlights off. The sky dome and the particles are
+  // ShaderMaterials and are untouched by it.
+  THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
+    'vec3 CustomToneMapping( vec3 color ) { return color; }',
+    `vec3 CustomToneMapping( vec3 color ) {
+      color *= toneMappingExposure;
+      float y = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+      float t = ( y * ( 2.51 * y + 0.03 ) ) / ( y * ( 2.43 * y + 0.59 ) + 0.14 );
+      return color * ( t / max( y, 1e-4 ) );
+    }`);
+  renderer.toneMapping = THREE.CustomToneMapping;
+  renderer.toneMappingExposure = EXPOSURE;
 
   const scene = new THREE.Scene();
   scene.background = C('haze');
   scene.fog = new THREE.FogExp2(PALETTE.haze, HAZE_DENSITY);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 600);
 
-  const hemi = new THREE.HemisphereLight(C('bone'), C('ink'), 0.55);
+  // hemisphere: pale blue sky above, a warm pavement bounce below, so a roof and an underside are
+  // never the same colour; its intensity is ERA_MIX.hemi, tweened per era
+  const hemi = new THREE.HemisphereLight(C('bone').lerp(C('sky'), 0.2), C('walk').lerp(C('ink'), 0.5), 0.55);
   scene.add(hemi);
   const key = new THREE.DirectionalLight(C('lamp'), 0.9);
   key.position.set(18, 26, 12);
   scene.add(key);
 
+  // ── environment: a canvas-drawn sky, PMREM'd into scene.environment (issue #3 step 1) ──
+  // Every Standard material (the asset library and, from this step, the engine's lit() surfaces)
+  // reads scene.environment: upward faces pick up sky, sides pick up the warm ground band, and the
+  // 101 curtain wall has something to reflect. Drawn at load with two gradients and a sun disc
+  // placed where the key light is (equirect u from atan2(z, x), v from asin(y)); no image file.
+  const skyEnv = (() => {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 256;
+    const g = cv.getContext('2d');
+    const up = g.createLinearGradient(0, 0, 0, 128);          // zenith → horizon
+    up.addColorStop(0, '#8ec3f0'); up.addColorStop(0.72, '#bcd8ee'); up.addColorStop(1, PALETTE.bone);
+    g.fillStyle = up; g.fillRect(0, 0, 512, 128);
+    const dn = g.createLinearGradient(0, 128, 0, 256);        // horizon → ground bounce
+    dn.addColorStop(0, PALETTE.bone); dn.addColorStop(0.5, '#cfc6b4'); dn.addColorStop(1, '#8e8778');
+    g.fillStyle = dn; g.fillRect(0, 128, 512, 128);
+    const kd = key.position.clone().normalize();
+    const sx = (Math.atan2(kd.z, kd.x) / (2 * Math.PI) + 0.5) * 512, sy = (0.5 - Math.asin(kd.y) / Math.PI) * 256;
+    const sun = g.createRadialGradient(sx, sy, 4, sx, sy, 78);
+    sun.addColorStop(0, '#fff6e2'); sun.addColorStop(1, 'rgba(255,246,226,0)');
+    g.fillStyle = sun; g.fillRect(sx - 90, 0, 180, 140);
+    const t = new THREE.CanvasTexture(cv);
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    return t;
+  })();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  scene.environment = pmrem.fromEquirectangular(skyEnv).texture;
+  pmrem.dispose(); skyEnv.dispose();
+
   // ── ground, road, river ──────────────────────────────────────────────────────
   const flat = (w, d, col, x, y, z) => {
     const g = new THREE.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(g, withFog(new THREE.MeshLambertMaterial({ color: C(col) })));
+    const m = new THREE.Mesh(g, withFog(lit({ color: C(col) })));
     m.position.set(x, y, z); scene.add(m); return m;
   };
   flat(400, 900, 'leaf', 0, 0, -200).material.color.lerp(C('ink'), 0.45);
@@ -120,7 +189,7 @@
   boxGeo.translate(0, 0.5, 0); // origin at the base so scale.y is height
   const parts = [];
   function part(x, y, z, w, d, look, rotY, geo) {
-    const mesh = new THREE.Mesh(geo || boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') })));
+    const mesh = new THREE.Mesh(geo || boxGeo, withFog(lit({ color: C('bone') })));
     mesh.position.set(x, y, z);
     mesh.scale.set(w, 1, d);
     if (rotY) mesh.rotation.y = rotY;
@@ -153,9 +222,9 @@
 
   // the man climbing the west face: a small figure whose height follows the scroll in the last chapter
   const man = new THREE.Group();
-  const manMat = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
+  const manMat = withFog(lit({ color: C('verm') }));
   const manBody = new THREE.Mesh(boxGeo, manMat); manBody.scale.set(0.7, 1.4, 0.5); man.add(manBody);
-  const manHead = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('bone') }))); manHead.scale.set(0.5, 0.5, 0.5); manHead.position.y = 1.45; man.add(manHead);
+  const manHead = new THREE.Mesh(boxGeo, withFog(lit({ color: C('bone') }))); manHead.scale.set(0.5, 0.5, 0.5); manHead.position.y = 1.45; man.add(manHead);
   const armL = new THREE.Mesh(boxGeo, manMat); armL.scale.set(0.25, 1.1, 0.25); armL.position.set(-0.55, 1.0, 0); man.add(armL);
   const armR = new THREE.Mesh(boxGeo, manMat); armR.scale.set(0.25, 1.1, 0.25); armR.position.set(0.55, 0.7, 0); man.add(armR);
   man.scale.setScalar(1.6);
@@ -240,14 +309,14 @@
       if (x < -28 && z < -186 && z > -244) continue;                              // the river behind the Dadaocheng wharf
       items.push({ x, z, w, d, h: { red: 2 + rnd() * 3, dadao: 3 + rnd() * 6, tower: 6 + rnd() * (10 + 30 * far) } });
     }
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items);
+    instSet(boxGeo, lit({ color: C('haze') }), items);
   })();
 
   // ── STREET DETAIL ────────────────────────────────────────────────────────────
   // sidewalks and curbs
   const walkX = GRID.roadWidth / 2 + 1.6;
   [-1, 1].forEach(s => {
-    const m = new THREE.Mesh(boxGeo, withFog(new THREE.MeshLambertMaterial({ color: C('walk') })));
+    const m = new THREE.Mesh(boxGeo, withFog(lit({ color: C('walk') })));
     m.position.set(s * walkX, 0, -200); m.scale.set(3.2, 0.22, 620); scene.add(m);
   });
   // road surface pattern: dirt at first, then a painted centre line — drawn to a canvas, repeated
@@ -307,8 +376,8 @@
       posts.push({ x: s * (walkX + 0.9), z, w: 0.22, d: 0.22, h });
       heads.push({ x: s * (walkX + 0.9), z, y: 0, w: 0.7, d: 0.7, h: { red: k ? 0.5 : 0, dadao: 0.5, tower: 0.5 }, lift: true });
     });
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), posts);
-    const headSet = instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('lamp'), emissive: C('lamp'), emissiveIntensity: 0.6 }), heads);
+    instSet(boxGeo, lit({ color: C('haze') }), posts);
+    const headSet = instSet(boxGeo, lit({ color: C('lamp'), emissive: C('lamp'), emissiveIntensity: 0.6 }), heads);
     headSet.items.forEach((it, i) => { it.yOf = posts[i]; });
   })();
   // trees along the sidewalks from the 1930s
@@ -320,8 +389,8 @@
       trunks.push({ x: s * (walkX - 0.8), z, w: 0.35, d: 0.35, h: { red: 0, dadao: 2.6, tower: 3.2 } });
       crowns.push({ x: s * (walkX - 0.8), z, w: 2.8 + rnd(), d: 2.8 + rnd(), h: { red: 0, dadao: 2.4, tower: 3 }, yOf: trunks[trunks.length - 1] });
     });
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), trunks);
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('leaf') }), crowns);
+    instSet(boxGeo, lit({ color: C('haze') }), trunks);
+    instSet(boxGeo, lit({ color: C('leaf') }), crowns);
   })();
   // people on the sidewalks: more each era
   (() => {
@@ -331,7 +400,7 @@
       const c = i % 7 === 0 ? C('verm') : (i % 3 === 0 ? C('haze') : C('bone'));
       items.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c, h: { red: i < 12 ? 1.6 : 0, dadao: i < 36 ? 1.6 : 0, tower: 1.6 } });
     }
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('bone') }), items, { colors: true });
+    instSet(boxGeo, lit({ color: C('bone') }), items, { colors: true });
   })();
   // shop signs hanging off the facades: a few painted boards, then a wall of neon
   (() => {
@@ -342,14 +411,14 @@
       const ximen = z > -140;                                                     // Ximending 1985–1999 already wore a wall of signs
       items.push({ x: s * (GRID.roadWidth / 2 + 3.2), z, y, w: 1.4, d: 0.25, c, h: { red: ximen ? (i % 2 === 0 ? 1.6 : 0) : (i % 6 === 0 ? 0.8 : 0), dadao: i % 2 === 0 ? 1.6 : 0, tower: 2.2 } });
     }
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('bone'), emissive: C('lamp'), emissiveIntensity: 0.25 }), items, { colors: true });
+    instSet(boxGeo, lit({ color: C('bone'), emissive: C('lamp'), emissiveIntensity: 0.25 }), items, { colors: true });
   })();
   // utility poles, from the 1930s
   (() => {
     const items = [];
     for (let z = 30; z > -460; z -= 22) items.push({ x: walkX + 2.2, z, w: 0.3, d: 0.3, h: { red: 0, dadao: 7, tower: 8 } });
     for (let z = 30; z > -460; z -= 22) items.push({ x: walkX + 2.2, z, y: 6.5, w: 2.4, d: 0.2, h: { red: 0, dadao: 0.2, tower: 0.2 } });
-    instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('ink') }), items);
+    instSet(boxGeo, lit({ color: C('ink') }), items);
   })();
 
   // traffic: moving wallpaper. Only on ground already reached. Density per era is the point.
@@ -361,7 +430,7 @@
                    speed: (big ? 9 : 14) + rnd() * 8, c: i % 4 === 0 ? C('bone') : (i % 9 === 0 ? C('verm') : C('haze')),
                    h: { red: i < 3 ? 1.3 : 0, dadao: i < 12 ? 1.2 : 0, tower: big ? 2.2 : 1.3 } });
     }
-    const set = instSet(boxGeo, new THREE.MeshLambertMaterial({ color: C('haze') }), items, { colors: true });
+    const set = instSet(boxGeo, lit({ color: C('haze') }), items, { colors: true });
     set.mesh.visible = false; // traffic switched off: nothing moves on the road except the girl
     return set;
   })();
@@ -397,7 +466,7 @@
   function libGroup(eras) {
     const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g); return g;
   }
-  const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; m.needsUpdate = true; }); } });
+  const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; if (m.isMeshStandardMaterial) { m.envMapIntensity = ENV_I; litMats.push(m); } m.needsUpdate = true; }); } });
   const libBox = new THREE.Box3(), libSize = new THREE.Vector3();
   function findAsset(id) {
     const REG = window.NOSTALGIA_ASSETS || {};
@@ -423,7 +492,8 @@
   // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
   // part(x, y, z, w, d, lookByEra, rotY?, geo?)  lookByEra: { red:{h,col}, dadao:{h,col}, tower:{h,col} }
   // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
+  // lit(params)                                 the engine's lit material; use it for every wall, roof and road
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
 
 
   // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
@@ -432,11 +502,11 @@
   // noodles carried in both hands in front of her. She is the viewer's memory, so she runs the
   // whole street, not only the 2000s. Primitives and the palette only.
   const girl = new THREE.Group();
-  const gSkin = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
-  const gShirt = withFog(new THREE.MeshLambertMaterial({ color: C('bone') }));
-  const gInk = withFog(new THREE.MeshLambertMaterial({ color: C('ink') }));
-  const gVerm = withFog(new THREE.MeshLambertMaterial({ color: C('verm') }));
-  const gLamp = withFog(new THREE.MeshLambertMaterial({ color: C('lamp') }));
+  const gSkin = withFog(lit({ color: C('bone') }));
+  const gShirt = withFog(lit({ color: C('bone') }));
+  const gInk = withFog(lit({ color: C('ink') }));
+  const gVerm = withFog(lit({ color: C('verm') }));
+  const gLamp = withFog(lit({ color: C('lamp') }));
   const skirtGeo = new THREE.ConeGeometry(0.5, 1, 10); skirtGeo.translate(0, 0.5, 0);
   const skirt = new THREE.Mesh(skirtGeo, gInk); skirt.scale.set(1, 0.85, 1); skirt.position.y = 0.8; girl.add(skirt);        // dark skirt
   const torso = new THREE.Mesh(boxGeo, gShirt); torso.scale.set(0.52, 0.6, 0.32); torso.position.y = 1.62; girl.add(torso);   // white shirt
@@ -583,14 +653,15 @@
     parts.forEach(p => { p.fromH = p.mesh.scale.y; p.fromC = p.mesh.material.color.clone(); });
     instSnapshot();
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
-    mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, print: mixCur.print };
+    mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, env: mixCur.env, print: mixCur.print };
     eraFrom = eraIdx; eraIdx = i;
     libGroups.forEach(g => { g.visible = g.userData.eras.indexOf(ERAS[i].key) >= 0; });
     eraT0 = instant ? now - ERA_MS : now;
     swapEraLabel(ERAS[i], instant);
   }
   const tmpC = new THREE.Color(), skyC = new THREE.Color();
-  let mixCur = { night: 0, lamp: 0.55, hemi: 0.7, print: 1 }, mixFrom = { ...mixCur };
+  let mixCur = { night: 0, lamp: KEY * 0.5, hemi: HEMI * 0.65, env: 0.7, print: 1 }, mixFrom = { ...mixCur };
+  let envCur = -1;
   function updateWorld(now) {
     const k = Math.min(1, (now - eraT0) / ERA_MS);
     const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // ease in-out
@@ -608,6 +679,7 @@
     mixCur.night = mixFrom.night + (M.night - mixFrom.night) * e;
     mixCur.lamp = mixFrom.lamp + (M.lamp - mixFrom.lamp) * e;
     mixCur.hemi = mixFrom.hemi + (M.hemi - mixFrom.hemi) * e;
+    mixCur.env = mixFrom.env + (M.env - mixFrom.env) * e;
     mixCur.print = mixFrom.print + (era.uPrint - mixFrom.print) * e;
     // photograph: the sky darkens toward ink. print: unreached fog is blank paper.
     // horizon: pale day → warm dusk. top: blue → deep blue.
@@ -625,6 +697,8 @@
     updateWindows(key);
     key.intensity = mixCur.lamp;
     hemi.intensity = mixCur.hemi;
+    const ei = ENV_I * mixCur.env;                                   // only touched while an era tween runs
+    if (ei !== envCur) { envCur = ei; litMats.forEach(m => { m.envMapIntensity = ei; }); }
     post.uniforms.uPrint.value = mixCur.print;
   }
 

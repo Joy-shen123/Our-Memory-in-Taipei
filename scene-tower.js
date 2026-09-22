@@ -10,7 +10,7 @@
 // predate the engine hiding absent instances; they still give one draw call per set.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors, lit } = window.SCENE;
 
   const tw = h => ({ red: 0, dadao: 0, tower: h });      // instSet heights: tower era only
   const old = h => ({ red: h, dadao: h, tower: 0 });     // instSet heights: fields era only
@@ -45,7 +45,7 @@
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     return geo;
   }
-  const vcMat = () => new THREE.MeshLambertMaterial({ vertexColors: true });
+  const vcMat = () => lit({ vertexColors: true });
   // place a compound: w/d scale the footprint (1 = as drawn), h is the era-height map
   const at = (x, z, hMap, w, d, r) => ({ x, z, y: -LIFT, w: w || 1, d: d || 1, r: r || 0, h: hMap });
   // a plain box whose base sits half its height above its origin: item y = -h/2 puts the base on the
@@ -75,7 +75,7 @@
     }
     const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
   }
-  const facadeMat = (cols, rows, seed) => new THREE.MeshLambertMaterial({
+  const facadeMat = (cols, rows, seed) => lit({
     color: C('haze'), map: winTex(cols, rows, false, seed),
     emissive: C('lamp'), emissiveMap: winTex(cols, rows, true, seed), emissiveIntensity: 0.5 });
 
@@ -106,7 +106,11 @@
   function glassify(mat, cols, rows) {
     mat.map = glassTex(cols, rows, false); mat.map.repeat.set(cols * 4, rows);
     mat.emissiveMap = glassTex(cols, rows, true); mat.emissiveMap.repeat.set(cols * 4, rows);
-    mat.emissive = C('lamp'); mat.emissiveIntensity = 0.45; mat.needsUpdate = true;
+    mat.emissive = C('lamp'); mat.emissiveIntensity = 0.45;
+    // curtain wall (issue #3 step 1): smooth and a little metallic so it reflects the canvas sky
+    // through scene.environment: pale at the top of the frame, warm near the ground band
+    mat.roughness = 0.35; mat.metalness = 0.4; mat.envMapIntensity = 0.7;
+    mat.needsUpdate = true;
     return mat;
   }
   // podium: the mall block at the road side, with the steps in front of it
@@ -128,7 +132,7 @@
   (() => {
     const items = [];
     for (let i = 0; i < SEG_N; i++) items.push({ x: TX, z: TZ, y: SEG_Y0 + i * SEG_H, w: 1, d: 1, h: tw(SEG_H) });
-    instSet(frustum(SEG_HB, SEG_HT), glassify(new THREE.MeshLambertMaterial({ color: C('glass') }), 4, 8), items);
+    instSet(frustum(SEG_HB, SEG_HT), glassify(lit({ color: C('glass') }), 4, 8), items);
   })();
   // 如意 at the four bottom corners of every segment: bone, a squashed sphere on a little foot
   (() => {
@@ -136,7 +140,7 @@
     const items = [];
     for (let i = 0; i < SEG_N; i++) [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) =>
       items.push({ x: TX + sx * (SEG_HB + 0.25), z: TZ + sz * (SEG_HB + 0.25), y: SEG_Y0 + i * SEG_H + 0.15, w: 1.4, d: 1.4, h: tw(1.1) }));
-    instSet(g, new THREE.MeshLambertMaterial({ color: C('bone') }), items);
+    instSet(g, lit({ color: C('bone') }), items);
   })();
   // crown, mechanical box, mast, spire
   glassify(part(TX, CROWN_Y0, TZ, 1, 1, TW(CROWN_H, 'glass'), 0, frustum(CROWN_HB, CROWN_HT)).mesh.material, 3, 10);
@@ -193,7 +197,7 @@
   const A11 = { x0: 14, x1: 30, z0: -403, z1: -385, h: 34, r: 6 };
   (() => {
     const cx = A11.x0 + A11.r, cz = A11.z1 - A11.r;                      // the rounded corner's axis
-    const fm = () => { const m = new THREE.MeshLambertMaterial({ color: C('haze') }); return m; };
+    const fm = () => { const m = lit({ color: C('haze') }); return m; };
     const body = part((A11.x0 + A11.r + A11.x1) / 2, 0, (A11.z0 + A11.z1) / 2, A11.x1 - A11.x0 - A11.r, A11.z1 - A11.z0, TW(A11.h, 'bone'));
     const wing = part((A11.x0 + cx) / 2, 0, (A11.z0 + cz) / 2, cx - A11.x0, cz - A11.z0, TW(A11.h, 'bone'));
     const cyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 24); cyl.translate(0, 0.5, 0);
@@ -310,7 +314,7 @@
     [9.6, 17, 25, 33, 41].forEach(x => flats.push(flat(s * x, -390, 0.5, 190, 0.45, old(0.45), C('haze'))));                    // dykes
     for (let z = -300; z >= -480; z -= 17) flats.push(flat(s * 26, z, 36, 0.5, 0.45, old(0.45), C('haze')));
   });
-  instSet(liftGeo, new THREE.MeshLambertMaterial({ color: C('bone') }), flats, { colors: true });
+  instSet(liftGeo, lit({ color: C('bone') }), flats, { colors: true });
 
   // ── plaza furniture: planters (haze box, ink plant) and benches (haze legs, bone slab) ──
   const planterGeo = compound([
@@ -373,7 +377,7 @@
   }
   [[8.4, -341.5], [8.6, -339.2], [7.9, -338.4], [7.4, -324.5], [-7.4, -324.3], [-7.6, -335.4], [7.6, -335.8]].forEach(([x, z], i) =>
     crowd.push(flat(x, z, 0.5, 0.4, 1.6, tw(1.6), i % 4 === 0 ? C('haze') : C('bone'), rnd() * 6.28)));
-  instSet(liftGeo, new THREE.MeshLambertMaterial({ color: C('bone') }), crowd, { colors: true });
+  instSet(liftGeo, lit({ color: C('bone') }), crowd, { colors: true });
 
   // ── aircraft-warning lights on the spire top and crown corners: tiny verm cubes, no glow ──
   part(TX, SPIRE_TOP, TZ, 0.4, 0.4, TW(0.5, 'verm'));

@@ -7,12 +7,12 @@
 // Everything exists in all three eras (the tower era only ever sees this stretch behind it).
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd, libGroup, asset } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd, libGroup, asset, lit } = window.SCENE;
 
   const ALL = ['red', 'dadao', 'tower'], DT = ['dadao', 'tower'], T = ['tower'];
   const H = (r, d, t) => ({ red: r, dadao: d, tower: t });
   const HA = h => ({ red: h, dadao: h, tower: h });
-  const lam = (col, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: C(col) }, extra || {}));
+  const lam = (col, extra) => lit(Object.assign({ color: C(col) }, extra || {}));   // the engine's lit material (issue #3)
   const D = anchors.dihua, G = anchors.chenghuang;
   const WALK = 0.22;                                          // top of the sidewalk slab
   const lib = libGroup(['red', 'dadao']);                     // library items, there before the flip
