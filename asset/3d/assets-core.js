@@ -114,6 +114,10 @@
   // C.surfaceOf(color)：色票 → 家族名或 null（木色系 → wood、水泥/鋼 → concrete、米白 → plaster …）。
   // ---------------------------------------------------------------
   C.TILE = 3;
+  // C.SURFACE_STRENGTH：材質貼圖的強度旋鈕，一個數同時放大顏色圖的對比（偏離 1 的量）與法線圖的起伏。
+  // 1 = 各配方原本的細微值（CJ 2026-09-23 說看不出材質），2 以上在 0.05 / 0.44 的鏡頭距離看得見磚、灰泥、木紋。
+  // 要在第一次呼叫 C.surface 之前設定（app.js 載入時已經是這個值）。
+  C.SURFACE_STRENGTH = 3.0;
   C.SURFACE_OF = {
     woodDark: 'wood', woodLight: 'wood', kraft: 'wood', rust: 'wood',
     concrete: 'concrete', cream: 'plaster', white: 'plaster', asphalt: 'asphalt'
@@ -284,7 +288,9 @@
     var recipe = RECIPES[name];
     if (!recipe) return null;
     var height = new Float32Array(SURF_N * SURF_N), tint = new Float32Array(SURF_N * SURF_N * 3);
-    var k = recipe(C.rand(SURF_SEED[name]), height, tint);
+    var S = C.SURFACE_STRENGTH || 1;
+    var k = recipe(C.rand(SURF_SEED[name]), height, tint) * S;
+    for (var i = 0; i < tint.length; i++) tint[i] = 1 + (tint[i] - 1) * S;
     var map = tintTexture(tint); map.userData.tile = C.TILE;
     surfaces[name] = { map: map, normalMap: normalTexture(height, k) };
     return surfaces[name];
