@@ -18,7 +18,8 @@
   const planeGeo = new THREE.PlaneGeometry(1, 1); planeGeo.translate(0, 0.5, 0);           // faces +z
 
   // ── item buckets, one InstancedMesh each ────────────────────────────────────
-  const furn = [], crowd = [], wheels = [], baskets = [], bodies = [], columns = [], winBoxes = [];
+  const furn = [], crowd = [], wheels = [], baskets = [];
+  const bollards = [], aboards = [], plants = [], boxes = [];                     // issue #5 glb instances
   const F = (x, z, y, w, d, h, col, eras, r) => furn.push({ x, z, y: y || 0, w, d, r: r || 0, h: hOf(h, eras), c: C(col) });
 
   // ── canvas text helpers ─────────────────────────────────────────────────────
@@ -192,7 +193,7 @@
     const t = tex(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 16);
     const pv = part(0, 0, (z0 + z1) / 2, 12.4, z0 - z1, only(ALL, 0.08, 'haze'));
     pv.mesh.material.map = t; pv.mesh.material.needsUpdate = true;
-    [-5.4, -3.2, 3.2, 5.4].forEach(x => F(x, z0 + 0.6, 0, 0.3, 0.3, 0.9, 'haze', ALL));   // bollards, the centre kept clear for the girl
+    [-5.4, -3.2, 3.2, 5.4].forEach(x => [z0 + 0.6, z1 - 0.6].forEach(z => bollards.push({ x, z, w: 1, d: 1, h: hOf(1, ALL) })));   // bollards (bollard.glb), the centre kept clear for the girl
     // the gateway: two posts, a flat arch, the sign
     [-6.4, 6.4].forEach(x => part(x, 0, z0, 0.5, 0.5, only(ALL, 6.2, 'verm')));
     const sh = new THREE.Shape(); sh.absarc(0, 0, 1, 0, Math.PI, false); sh.absarc(0, 0, 0.82, Math.PI, 0, true);
@@ -203,7 +204,6 @@
 
   // ═══ the shopfronts between: the teammate's Ximending library, with building bodies behind ═
   const lib = libGroup(['red']);
-  const bodyTex = facadeTex(4, 3, 'bone'); bodyTex.needsUpdate = true;
   // place a library storefront with its front on the sidewalk's outer edge (|x| = 9.2)
   function front(id, side, z, scale) {
     const a = findAsset(id); if (!a) return null;
@@ -211,8 +211,20 @@
     const b = new THREE.Box3().setFromObject(probe), maxz = b.max.z * (scale || 1);
     return asset(id, lib, side * (9.2 + maxz), z, side > 0 ? -Math.PI / 2 : Math.PI / 2, scale);
   }
-  // a plain building body, x 9.4 outward, with a window texture on the road face
-  const body = (side, z, len, h, col) => bodies.push({ x: side * (9.4 + 4.6), z, w: 9.2, d: len, h: hOf(h), c: C(col) });
+  // a building body behind the storefront, x 9.4 outward. Issue #5: tiled from shopfront.glb
+  // (asset/blender/shopfront.py): a ground module, one storey module per floor, a roof module,
+  // each 6 m wide and scaled to the body's length; the body's colour goes on the walls.
+  const tiles = { ground: [], storey: [], roof: [] };
+  const body = (side, z, len, h, col) => {
+    const nx = Math.max(1, Math.round(len / 6)), tw = len / nx, ny = Math.max(1, Math.round((h - 0.6) / 3.3));
+    const r = side > 0 ? -Math.PI / 2 : Math.PI / 2, c = C(col);
+    for (let i = 0; i < nx; i++) {
+      const zz = z + len / 2 - tw * (i + 0.5);
+      tiles.ground.push({ x: side * 9.4, z: zz, y: 0, r, w: tw / 6, d: 1, h: hOf(1), c });
+      for (let f = 1; f < ny; f++) tiles.storey.push({ x: side * 9.4, z: zz, y: f * 3.3, r, w: tw / 6, d: 1, h: hOf(1), c });
+      tiles.roof.push({ x: side * 9.4, z: zz, y: ny * 3.3, r, w: tw / 6, d: 1, h: hOf(1), c });
+    }
+  };
   // east side, from the street start: the 1980s row, then the Red House, then the 1990s
   // CJ, 2026-09-21: 「我希望一開始的兩邊不要太多大建築」— the opening stays open: two-storey
   // bodies only until the Red House plaza; the tall blocks start further down the street.
@@ -334,6 +346,17 @@
   // kerb stalls under the arcades, facing the road, clear of the library props and the camera
   [[1, 32], [1, 21.5], [1, -19.5], [1, -33], [-1, -52], [-1, -76], [-1, -114], [1, -74], [1, -86], [1, -100]].forEach(([s, z], i) => stall(s * 7.9, z, -s, 0, i + 5, [1.3, 2.0]));
 
+  // ── small props along the sidewalks (props.glb): A-board signs at the kerb, potted plants and
+  //    box stacks by the shop walls; kept off the camera keyframe (-3, 3.5, -34) and the gateway ──
+  for (let z = 30, i = 0; z > -132; z -= 9, i++) {
+    const s = i % 2 ? 1 : -1;
+    if (s < 0 && z < -27 && z > -41) continue;
+    if (Math.abs(z + 96) < 3) continue;
+    aboards.push({ x: s * 7.3, z: z + 1.5, w: 1, d: 1, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, h: hOf(1) });
+    plants.push({ x: s * 8.9, z: z - 2.2, w: 1, d: 1, r: rnd() * 6.28, h: hOf(1) });
+    if (i % 3 === 0) boxes.push({ x: s * 8.6, z: z + 3.8, w: 1, d: 1, r: (rnd() - 0.5) * 0.4, h: hOf(1) });
+  }
+
   // ── the street crowd along both kerbs, thick at the pedestrian zone ──
   (() => {
     let n = 0;
@@ -365,12 +388,9 @@
 
   // ── build the instanced sets ────────────────────────────────────────────────
   instSet(boxGeo, lam('bone'), furn, { colors: true });
-  instSet(boxGeo, lam('walk'), columns, { colors: true });
-  instSet(boxGeo, lam('ink'), winBoxes);
-  // window rows scale with height: three rows on the low bodies, six on the tall ones
-  instSet(boxGeo, lam('bone', { map: bodyTex }), bodies.filter(b => b.h.red <= 4.5), { colors: true }).mesh.material.map.repeat.set(2, 0.34);
-  instSet(boxGeo, lam('bone', { map: bodyTex.clone() }), bodies.filter(b => b.h.red > 4.5 && b.h.red <= 8), { colors: true }).mesh.material.map.repeat.set(2, 0.67);
-  instSet(boxGeo, lam('bone', { map: bodyTex.clone() }), bodies.filter(b => b.h.red > 8), { colors: true }).mesh.material.map.repeat.set(2, 1);
+  MODELS.load('shopfront', gltf => Object.keys(tiles).forEach(k => MODELS.instance(MODELS.node(gltf.scene, k), tiles[k], { colorPrim: 'bone' })));
+  MODELS.load('bollard', gltf => MODELS.instance(gltf.scene, bollards));
+  MODELS.load('props', gltf => { MODELS.instance(MODELS.node(gltf.scene, 'aboard'), aboards); MODELS.instance(MODELS.node(gltf.scene, 'plant'), plants); MODELS.instance(MODELS.node(gltf.scene, 'boxes'), boxes); });
   instSet(basketGeo, lam('bone'), baskets, { colors: true });
   instSet(boxGeo, lam('bone'), crowd, { colors: true });
 })();

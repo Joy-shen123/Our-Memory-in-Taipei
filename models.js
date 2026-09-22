@@ -1,4 +1,5 @@
-// models.js — the glb models (issue #5). Loaded after app.js and before the scene files.
+// models.js — the glb models (issue #5). Loaded before app.js; everything here that touches the
+// engine (window.SCENE) runs inside load callbacks, after every script has run.
 // Every model is built by a Blender script in asset/blender/ and exported to asset/models/
 // (see asset/blender/stylized.py). This file loads them once, hands the scene files what they
 // need, and keeps the page's look on them: Lambert materials with the fog chunk, flat palette
