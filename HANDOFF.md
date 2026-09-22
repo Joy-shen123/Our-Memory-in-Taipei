@@ -1,6 +1,6 @@
 # HANDOFF — Our Memory in Taipei
 
-Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/shidaimiwu-proto`. Worktrees go in `~/Documents/CJ-project-vault/_worktrees/shidaimiwu-proto/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; the `issue-1-part-1` worktree can be removed. Last updated 2026-09-21 (issue #1 Part 3 and the IVRESS borrow list, branch `issue-1-part-1`).
+Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/Our-Memory-in-Taipei` (renamed from `shidaimiwu-proto` 2026-09-22 to match the repo). Worktrees go in `~/Documents/CJ-project-vault/_worktrees/Our-Memory-in-Taipei/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; its worktree is removed. Last updated 2026-09-21 (issue #1 Part 3 and the IVRESS borrow list, branch `issue-1-part-1`).
 
 ## What it is
 
