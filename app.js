@@ -181,12 +181,17 @@
     key.target.position.set(0, 0, camZ - SUN_AHEAD);
     key.position.copy(key.target.position).addScaledVector(SUN_DIR, SUN_DIST);
   }
-  // flags set once, after the scene files have built, before the first draw
+  // flags set once, after the scene files have built, before the first draw. The same pass bakes
+  // the occlusion into any geometry a vertex-colour material draws that has no colour attribute
+  // yet (the girl, the climbing man, anything a scene file gave lit() directly): three.js only
+  // substitutes a default colour for a missing attribute on ShaderMaterial, so a lit() material
+  // over a bare geometry would draw black (CJ, 2026-09-23: 「the character all black」).
   function enableShadows() {
     scene.traverse(o => {
       if (!o.isMesh && !o.isInstancedMesh) return;
       const m = Array.isArray(o.material) ? o.material[0] : o.material;
       if (!m || !m.isMeshStandardMaterial) return;                  // unlit signs, the sky, the mountains, the particles: no
+      if (m.vertexColors && o.geometry && !o.geometry.attributes.color) aoBake(o.geometry);
       o.receiveShadow = true;
       o.castShadow = !m.transparent;
     });
@@ -1152,8 +1157,8 @@
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; },
                    get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
-                   get shadow() { let c = 0, r = 0, t = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; } });
-                     return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, map: !!key.shadow.map, size: key.shadow.mapSize.x,
+                   get shadow() { let c = 0, r = 0, t = 0, black = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m && m.vertexColors && o.geometry && !o.geometry.attributes.color) black++; } });
+                     return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, uncoloured: black, map: !!key.shadow.map, size: key.shadow.mapSize.x,
                               box: [key.shadow.camera.left, key.shadow.camera.right], pos: key.position.toArray().map(v => +v.toFixed(1)), target: key.target.position.toArray().map(v => +v.toFixed(1)), camZ: +camera.position.z.toFixed(1) }; } };
 
   // The first frame does the one-time work (shadow flags, warm-up), so it must not run before the
