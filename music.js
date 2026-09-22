@@ -19,12 +19,13 @@
 (function () {
   'use strict';
 
-  // ── the videos, one list per decade, played in order. Swap entries freely: id is the v= of the watch link ──
+  // ── the videos, one list per decade, played in order. Swap entries freely: id is the v= of the watch link;
+  //    start (seconds) jumps to the chorus, CJ 2026-09-23 「use chorus」 ──
   const YT_VIDEOS = {
     '1980s': [
-      { id: 'CRqwLPDSTkA', title: '望春風', artist: '鄧麗君', year: 1980, channel: 'Henry Chen (fan upload, may be taken down)' },
+      { id: 'CRqwLPDSTkA', title: '望春風', artist: '鄧麗君', year: 1980, channel: 'Henry Chen (fan upload, may be taken down)', start: 56 },
       { id: 'ZGRrJY7VELU', title: '台北的天空', artist: '王芷蕾', year: 1985, channel: 'Timeless Music (official lyric video)' },
-      { id: 'lTxZmhAoSGU', title: '我的未來不是夢', artist: '張雨生', year: 1988, channel: '滾石唱片 ROCK RECORDS' },
+      { id: 'lTxZmhAoSGU', title: '我的未來不是夢', artist: '張雨生', year: 1988, channel: '滾石唱片 ROCK RECORDS', start: 100 },
       { id: 'ZYkxIi8H13w', title: '大約在冬季', artist: '齊秦', year: 1987, channel: '齊秦經典 Classic Chyi Chin', fallback: true },
     ],
     '1990s': [
@@ -32,7 +33,7 @@
       { id: 'ZSWeurc1yMw', title: '心太軟', artist: '任賢齊', year: 1996, channel: '滾石唱片 ROCK RECORDS', fallback: true },
     ],
     '2000s': [
-      { id: 'Bbp9ZaJD_eA', title: '七里香', artist: '周杰倫', year: 2004, channel: '周杰倫 Jay Chou' },
+      { id: 'Bbp9ZaJD_eA', title: '七里香', artist: '周杰倫', year: 2004, channel: '周杰倫 Jay Chou', start: 80 },
     ],
     '2010s': [
       { id: 'pd3eV-SG23E', title: '後來的我們', artist: '五月天', year: 2016, channel: '相信音樂BinMusic' },
@@ -100,7 +101,7 @@
       try {
         yt = new YT.Player(el.embed, {
           width: '100%', height: '100%', videoId: v ? v.id : undefined,
-          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 1, iv_load_policy: 3 },
+          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 1, iv_load_policy: 3, start: v && v.start ? Math.floor(v.start) : 0 },
           events: {
             onReady: () => {
               clearTimeout(ytTimer); ytReady = true; mode = 'youtube'; ytLoadedId = v ? v.id : '';
@@ -140,7 +141,8 @@
     if (!ytReady) return;
     const v = videoOf(d); if (!v) return;
     ytLoadedId = v.id;
-    if (gestured && !(muted && isPhone())) yt.loadVideoById(v.id); else yt.cueVideoById(v.id);
+    const spec = { videoId: v.id, startSeconds: v.start ? Math.floor(v.start) : 0 };
+    if (gestured && !(muted && isPhone())) yt.loadVideoById(spec); else yt.cueVideoById(spec);
   }
 
   // ── local fallback: two <audio> loops, alternating ──────────────────────────
@@ -148,14 +150,25 @@
   let active = 0, unlocked = false, playing = false, fade = null;
   players.forEach(p => { p.muted = muted; p.addEventListener('error', () => { /* a missing file only means silence */ }); });
 
-  function load(p, d) { const t = localOf(d), id = DECADES[d].key + '|' + t.src; if (p.dataset.track !== id) { p.dataset.track = id; p.src = t.src; p.load(); } }
+  function load(p, d) {
+    const t = localOf(d), id = DECADES[d].key + '|' + t.src;
+    if (p.dataset.track !== id) { p.dataset.track = id; p.src = t.src; p.loop = !(t.start || t.end); p.load(); }
+  }
+  // every start of a track (first play, crossfade in, restart of the list entry) begins at its chorus
+  function cue(p, d) { const t = localOf(d); if (t.start) { try { p.currentTime = t.start; } catch (e) { p.addEventListener('loadedmetadata', () => { p.currentTime = t.start; }, { once: true }); } } else p.currentTime = 0; }
+  // a chorus loop: at end (or the natural end when only start is set) go back to start instead of playing on
+  function keepInChorus(p) {
+    const key = (p.dataset.track || '').split('|')[0], d = decadeIndex(key); if (d < 0 || p.paused) return;
+    const t = localOf(d); if (!t.start && !t.end) return;
+    if ((t.end && p.currentTime >= t.end) || (p.ended)) { p.currentTime = t.start || 0; if (p.ended) tryPlay(p); }
+  }
   function tryPlay(p) { const r = p.play(); if (r && r.catch) r.catch(() => { }); }
   function localStart() { load(players[active], cur >= 0 ? cur : decadeOfYear(currentYear())); if (gestured) unlock(); }
   // switch the local audio to decade d (its current entry), crossfading from whatever plays now
   function localGo(d, instant) {
     const from = players[active], to = players[1 - active];
     load(to, d);
-    if (unlocked) { to.currentTime = 0; tryPlay(to); }
+    if (unlocked) { cue(to, d); tryPlay(to); }
     active = 1 - active;
     if (instant || !unlocked) { to.volume = unlocked ? VOLUME : 0; from.volume = 0; from.pause(); fade = null; }
     else fade = { from, to, t0: performance.now() };
@@ -170,7 +183,7 @@
   function unlock() {
     if (unlocked || mode !== 'local') return;
     unlocked = true;
-    const p = players[active]; load(p, cur);
+    const p = players[active]; load(p, cur); cue(p, cur);
     p.volume = VOLUME;
     const r = p.play();
     if (r && r.catch) r.catch(() => { unlocked = false; p.volume = 0; render(); });   // the browser refused (no gesture yet): stay locked
@@ -260,7 +273,7 @@
     const want = manual ? manual.decade : sd;
     if (want !== cur) goTo(want, cur < 0);
     lastScrollDecade = sd;
-    if (mode === 'local') { stepFade(); const p = players[active]; playing = unlocked && !p.paused && !p.ended; }
+    if (mode === 'local') { stepFade(); players.forEach(keepInChorus); const p = players[active]; playing = unlocked && !p.paused && !p.ended; }
     else playing = mode === 'youtube' && ytState === 1;
     requestAnimationFrame(frame);
   }
@@ -283,7 +296,8 @@
     let n = 0;
     Object.keys(lists).forEach(k => {
       const d = decadeIndex(k); if (d < 0) return;
-      DECADES[d].local = lists[k].map(e => ({ src: PRIVATE_DIR + e.file, title: e.title || e.file, credit: [e.artist, e.year].filter(Boolean).join(' · ') || 'your copy' }));
+      DECADES[d].local = lists[k].map(e => ({ src: PRIVATE_DIR + e.file, title: e.title || e.file, credit: [e.artist, e.year].filter(Boolean).join(' · ') || 'your copy',
+                                             start: +e.start > 0 ? +e.start : 0, end: +e.end > 0 ? +e.end : 0 }));   // start / end in seconds: the chorus loop
       DECADES[d].li = 0; n++;
     });
     if (!n) return;
@@ -309,7 +323,7 @@
     get mode() { return mode; }, get why() { return why; }, get decade() { return DECADES[cur].key; }, get video() { return videoOf(cur) || null; }, get loadedId() { return ytLoadedId; },
     get index() { return DECADES[cur].vi; }, get count() { return DECADES[cur].videos.length; },
     get track() { return mode === 'local' ? localOf(cur).title : (videoOf(cur) || {}).title; }, get src() { return localOf(cur).src; },
-    get private() { return privateOn; }, get localCount() { return DECADES[cur].local.length; }, get localIndex() { return DECADES[cur].li; },
+    get private() { return privateOn; }, get localCount() { return DECADES[cur].local.length; }, get localIndex() { return DECADES[cur].li; }, get chorus() { const t = localOf(cur); return [t.start || 0, t.end || 0]; },
     get playing() { return playing; }, get ytState() { return ytState; }, get muted() { return muted; }, get gestured() { return gestured; },
     get unlocked() { return mode === 'youtube' ? gestured : unlocked; },
     get manual() { return manual ? DECADES[manual.decade].key : null; }, get scrollDecade() { return DECADES[lastScrollDecade < 0 ? 0 : lastScrollDecade].key; },

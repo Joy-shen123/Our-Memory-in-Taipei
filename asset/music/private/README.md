@@ -7,7 +7,8 @@ This folder holds CJ's own bought copies of the real songs, so the page can play
 1. Buy the songs on the iTunes Store (Music app → iTunes Store). Purchased files are DRM-free AAC `.m4a`; they land under `~/Music/Music/Media.localized/Music/<Artist>/<Album>/`.
 2. Copy the files into this folder. `.m4a` and `.mp3` both work. Rename freely; only the manifest has to match.
 3. Copy `manifest.example.js` to `manifest.js` in this folder and edit the `file` names to match. Keep one entry per song; repeat a decade to give it a list, played in that order.
-4. Double-click `index.html`. The control reads "your songs · YouTube needs http" and plays the 1980s list; click once for sound.
+4. Optional `start` and `end`, in seconds: the song begins at `start` (its chorus; CJ, 2026-09-23: 「use chorus」) and at `end` jumps back to `start`, a chorus loop, instead of playing on. Leave both out to play the whole file. To find a chorus without listening, a loudness curve works: `ffmpeg -i song.mp3 -af ebur128=peak=none -f null -` prints momentary loudness per 100 ms; average it per 2 s and take the first sustained loud stretch after about a third of the track, then cross-check against an LRC lyric file when one exists.
+5. Double-click `index.html`. The control reads "your songs · YouTube needs http" and plays the 1980s list; click once for sound.
 
 ## What plays when
 
