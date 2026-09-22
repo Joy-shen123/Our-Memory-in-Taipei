@@ -79,23 +79,12 @@
   (() => {
     const cx = 16.6, cz = RH.z, EAVE = 8.8;
     const house = libGroup(ALL);                                                  // there in every era
-    if (THREE.GLTFLoader) {
-      new THREE.GLTFLoader().load('asset/models/red-house.glb', gltf => {
-        const root = gltf.scene;
-        root.traverse(o => {
-          if (!o.isMesh) return;
-          // the loader makes MeshStandardMaterial; the rest of the street is Lambert with the
-          // page's fog chunk, so the glb gets the same, colour carried over (raw palette hex)
-          o.material = withFog(new THREE.MeshLambertMaterial({ color: o.material.color }));
-          o.castShadow = o.receiveShadow = true;
-        });
-        root.position.set(cx, 0, cz);
-        root.rotation.y = -Math.PI / 2;
-        house.add(root);
-      }, undefined, err => console.error('red-house.glb failed to load', err));
-    } else {
-      console.error('THREE.GLTFLoader is missing: load GLTFLoader.js after three.min.js');
-    }
+    MODELS.load('red-house', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(cx, 0, cz);
+      root.rotation.y = -Math.PI / 2;
+      house.add(root);
+    });
     // the plaza in front: packed earth in the 80s, the 2002 paving after
     part(cx - 2, 0, cz + 11, 18, 10, { red: { h: 0.06, col: 'haze' }, dadao: { h: 0.08, col: 'walk' }, tower: { h: 0.08, col: 'walk' } });
     RH.top = EAVE + 7.5;

@@ -16,31 +16,20 @@
 # exporter turns into +Z, the library convention (front faces +Z before rotation). The cross
 # wing runs along +Y (away from the road). Origin at the octagon's centre on the ground.
 #
-# Look (issue #5, CJ 2026-09-23 「dont like low poly」): everything is built from primitives with
-# boolean cuts for the openings and a bevel modifier on every edge (0.05 m, 2 segments,
-# hardened normals so flat faces stay flat and only the edges round). Colours are flat
-# per-material values from the palette in data.js, written as raw hex/255 so the loaded
-# three.js Color equals C(name) in app.js (the page renders in linear and applies gamma in
-# its post pass). No textures, no UVs. One object, one material slot per palette colour.
+# Look (issue #5, CJ 2026-09-23 「dont like low poly」): primitives with boolean cuts for the
+# openings and a bevel on every edge, flat palette materials, no textures. The shared mechanics
+# (builders, materials, bevel rules, join, export, preview) live in stylized.py in this folder.
 
-import argparse
 import math
+import os
 import sys
 
 import bmesh
-import bpy
 from mathutils import Matrix, Vector
 
-# ── palette: the hexes in data.js ────────────────────────────────────────────
-PALETTE = {
-    'ink':   '#2b2f3a',   # slate roof, window glass, dark openings
-    'haze':  '#9fb6c9',   # roof ridges and hips
-    'lamp':  '#ffb347',
-    'bone':  '#f7f2e8',   # string courses, quoins, surrounds, the lantern
-    'verm':  '#d9483b',
-    'brick': '#b8664c',   # the walls
-    'walk':  '#e2dccb',   # steps and plinth
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import stylized as S
+from stylized import bm_box, bm_prism, bm_solid, bm_bar, arch_pts, rect_pts, circle_pts, face_frame, solid, cutter
 
 # ── dimensions (metres), from scene-red.js ───────────────────────────────────
 R = 7.2                 # octagon circumradius
@@ -53,164 +42,6 @@ ARM_W = 8.4             # cross-wing arm width
 ARM_L = 30.0            # cross-wing arm length
 LONG_ARM_Y = 21.0       # long arm centre, behind the octagon (world x 37.6 - 16.6)
 CROSS_ARM_Y = 23.0      # cross arm centre (world x 39.6 - 16.6)
-BEVEL = 0.05
-SEGMENTS = 2
-
-# ─────────────────────────────────────────────────────────────────────────────
-# materials
-# ─────────────────────────────────────────────────────────────────────────────
-_mats = {}
-
-
-def hex_rgb(h):
-    return tuple(int(h[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
-
-
-def mat(name):
-    """One flat material per palette colour. Raw hex/255, no sRGB→linear conversion."""
-    if name in _mats:
-        return _mats[name]
-    m = bpy.data.materials.new(name)
-    m.use_nodes = True
-    r, g, b = hex_rgb(PALETTE[name])
-    bsdf = m.node_tree.nodes.get('Principled BSDF')
-    bsdf.inputs['Base Color'].default_value = (r, g, b, 1.0)
-    bsdf.inputs['Roughness'].default_value = 1.0
-    bsdf.inputs['Metallic'].default_value = 0.0
-    m.diffuse_color = (r, g, b, 1.0)
-    _mats[name] = m
-    return m
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# bmesh builders. Every solid is closed and manifold so the booleans stay clean.
-# ─────────────────────────────────────────────────────────────────────────────
-def bm_solid(bm, pts, y0, y1, xform=None):
-    """Extrude a closed 2D polygon (points in the X-Z plane) along Y from y0 to y1."""
-    a = [bm.verts.new((x, y0, z)) for x, z in pts]
-    b = [bm.verts.new((x, y1, z)) for x, z in pts]
-    n = len(pts)
-    bm.faces.new(a[::-1])
-    bm.faces.new(b)
-    for i in range(n):
-        bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
-    if xform is not None:
-        bmesh.ops.transform(bm, matrix=xform, verts=a + b)
-    return a + b
-
-
-def bm_box(bm, size, center=(0, 0, 0), xform=None):
-    """Axis-aligned box. size = (x, y, z), centred at center, then transformed."""
-    sx, sy, sz = size
-    cx, cy, cz = center
-    pts = [(cx - sx / 2, cz - sz / 2), (cx + sx / 2, cz - sz / 2), (cx + sx / 2, cz + sz / 2), (cx - sx / 2, cz + sz / 2)]
-    return bm_solid(bm, pts, cy - sy / 2, cy + sy / 2, xform)
-
-
-def bm_prism(bm, n, r0, r1, z0, z1, rot=math.pi / 8, xform=None):
-    """A regular n-gon prism / frustum standing on Z: radius r0 at z0, r1 at z1."""
-    ring0 = [bm.verts.new((r0 * math.cos(rot + i * 2 * math.pi / n), r0 * math.sin(rot + i * 2 * math.pi / n), z0)) for i in range(n)]
-    ring1 = [bm.verts.new((r1 * math.cos(rot + i * 2 * math.pi / n), r1 * math.sin(rot + i * 2 * math.pi / n), z1)) for i in range(n)]
-    bm.faces.new(ring0[::-1])
-    bm.faces.new(ring1)
-    for i in range(n):
-        bm.faces.new((ring0[i], ring0[(i + 1) % n], ring1[(i + 1) % n], ring1[i]))
-    if xform is not None:
-        bmesh.ops.transform(bm, matrix=xform, verts=ring0 + ring1)
-    return ring0 + ring1
-
-
-def bm_bar(bm, p0, p1, t, xform=None):
-    """A square-section bar of thickness t from p0 to p1 (a ridge, a hip, a rod)."""
-    p0, p1 = Vector(p0), Vector(p1)
-    d = p1 - p0
-    L = d.length
-    q = d.normalized().to_track_quat('Z', 'Y')
-    m = Matrix.Translation(p0) @ q.to_matrix().to_4x4()
-    return bm_box(bm, (t, t, L), (0, 0, L / 2), (xform @ m) if xform is not None else m)
-
-
-def arch_pts(w, straight, n=8):
-    """Closed arch profile in X-Z: a rectangle w wide, straight tall, with a semicircle on top."""
-    r = w / 2
-    pts = [(-r, 0), (r, 0)]
-    for i in range(n + 1):
-        a = i * math.pi / n
-        pts.append((r * math.cos(a), straight + r * math.sin(a)))
-    return pts
-
-
-def rect_pts(w, h, z0=0):
-    return [(-w / 2, z0), (w / 2, z0), (w / 2, z0 + h), (-w / 2, z0 + h)]
-
-
-def circle_pts(r, n=16):
-    return [(r * math.cos(i * 2 * math.pi / n), r * math.sin(i * 2 * math.pi / n)) for i in range(n)]
-
-
-def face_frame(theta, apothem, center=(0, 0, 0)):
-    """Local frame of a wall face: x along the face, y into the wall, z up; the wall surface at
-    y = 0 with its outward normal at -Y before the rotation theta about Z. theta 0 = the front."""
-    n = Matrix.Rotation(theta, 4, 'Z') @ Vector((0, -1, 0, 0))
-    return Matrix.Translation(Vector(center) + Vector(n[:3]) * apothem) @ Matrix.Rotation(theta, 4, 'Z')
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# objects
-# ─────────────────────────────────────────────────────────────────────────────
-OBJECTS = []      # everything that ends up in the glb
-CUTTERS = []      # cutter objects, deleted after the booleans are applied
-
-
-def new_object(name, bm, material, bevel=BEVEL, cutters=()):
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    me.materials.append(mat(material))
-    for p in me.polygons:
-        p.use_smooth = True
-    ob = bpy.data.objects.new(name, me)
-    bpy.context.scene.collection.objects.link(ob)
-    for cutter in cutters:
-        b = ob.modifiers.new('cut_' + cutter.name, 'BOOLEAN')
-        b.operation = 'DIFFERENCE'
-        b.solver = 'EXACT'
-        b.material_mode = 'TRANSFER'     # the cut faces take the cutter's colour
-        b.object = cutter
-    # bevel: two segments on the building's edges, one on small trim (a 3 cm chamfer reads as
-    # rounded from the street), none on thin bars, which would only cost triangles
-    if bevel >= 0.025:
-        bv = ob.modifiers.new('bevel', 'BEVEL')
-        bv.width = bevel
-        bv.segments = SEGMENTS if bevel >= 0.04 else 1
-        bv.limit_method = 'ANGLE'
-        bv.angle_limit = math.radians(30)
-        bv.use_clamp_overlap = True
-        bv.harden_normals = True
-    OBJECTS.append(ob)
-    return ob
-
-
-def new_cutter(name, bm, material):
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    me.materials.append(mat(material))
-    ob = bpy.data.objects.new(name, me)
-    bpy.context.scene.collection.objects.link(ob)
-    ob.hide_render = True
-    CUTTERS.append(ob)
-    return ob
-
-
-def solid(name, material, builder, bevel=BEVEL, cutters=()):
-    bm = bmesh.new()
-    builder(bm)
-    return new_object(name, bm, material, bevel, cutters)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # the octagon
 # ─────────────────────────────────────────────────────────────────────────────
@@ -236,8 +67,8 @@ def octagon_walls():
         for dx in (-WIN_DX, WIN_DX):
             bm_solid(surround, rect_pts(WIN_W, WIN_H, WIN_Z), -0.6, 0.1, F @ Matrix.Translation((dx, 0, 0)))
             bm_solid(recess, rect_pts(GLASS_W, GLASS_H, WIN_Z + 0.15), -0.6, 0.32, F @ Matrix.Translation((dx, 0, 0)))
-    c1 = new_cutter('oct_surround', surround, 'bone')
-    c2 = new_cutter('oct_recess', recess, 'ink')
+    c1 = S.new_cutter('oct_surround', surround, 'bone')
+    c2 = S.new_cutter('oct_recess', recess, 'ink')
     solid('oct_walls', 'brick', lambda bm: bm_prism(bm, 8, R, R, 0.0, EAVE), cutters=(c1, c2))
 
 
@@ -334,7 +165,7 @@ def lantern():
     for k in range(8):
         F = face_frame(k * math.pi / 4, LR * math.cos(math.pi / 8), (0, 0, z0))
         bm_solid(louvres, rect_pts(0.34, 0.72, 0.3), -0.4, 0.1, F)
-    cut = new_cutter('lantern_louvres', louvres, 'ink')
+    cut = S.new_cutter('lantern_louvres', louvres, 'ink')
     solid('lantern', 'bone', lambda bm: bm_prism(bm, 8, LR, LR, z0, z0 + 1.3), bevel=0.03, cutters=(cut,))
     def louvre_bars(bm):
         for k in range(8):
@@ -346,8 +177,8 @@ def lantern():
     solid('lantern_cap', 'ink', lambda bm: bm_prism(bm, 8, LR + 0.22, 0.08, z0 + 1.45, z0 + 2.35), bevel=0.03)
     def finial(bm):
         bm_prism(bm, 8, 0.05, 0.05, z0 + 2.3, z0 + 3.2, rot=0)
-        bmesh.ops.create_uvsphere(bm, u_segments=14, v_segments=8, radius=0.2, matrix=Matrix.Translation((0, 0, z0 + 3.25)))
-        bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=0.11, matrix=Matrix.Translation((0, 0, z0 + 2.75)))
+        S.bm_sphere(bm, 0.2, (0, 0, z0 + 3.25), 14, 8)
+        S.bm_sphere(bm, 0.11, (0, 0, z0 + 2.75), 10, 6)
     solid('finial', 'bone', finial, bevel=0.0)
 
 
@@ -401,8 +232,8 @@ def arm(name, center, along_x):
         F = face_frame(th, L / 2, (cx, cy, 0))
         bm_solid(surround, arch_pts(1.9, 2.2), -0.6, 0.1, F @ Matrix.Translation((0, 0, 0.3)))
         bm_solid(recess, arch_pts(1.5, 2.05), -0.6, 0.45, F @ Matrix.Translation((0, 0, 0.3)))
-    c1 = new_cutter(name + '_surround', surround, 'bone')
-    c2 = new_cutter(name + '_recess', recess, 'ink')
+    c1 = S.new_cutter(name + '_surround', surround, 'bone')
+    c2 = S.new_cutter(name + '_recess', recess, 'ink')
     solid(name + '_walls', 'brick', lambda bm: bm_box(bm, size, (cx, cy, ARM_H / 2)), cutters=(c1, c2))
     # sills and mullions, pilasters between the windows (brick, so only the bevel draws them)
     def detail(bm):
@@ -460,71 +291,7 @@ def cross_wing():
     arm('cross_arm', (0, CROSS_ARM_Y), along_x=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# apply, join, export
-# ─────────────────────────────────────────────────────────────────────────────
-def apply_modifiers(ob):
-    dg = bpy.context.evaluated_depsgraph_get()
-    ob_eval = ob.evaluated_get(dg)
-    me = bpy.data.meshes.new_from_object(ob_eval, preserve_all_data_layers=True, depsgraph=dg)
-    me.name = ob.name + '_applied'
-    old = ob.data
-    ob.modifiers.clear()
-    ob.data = me
-    bpy.data.meshes.remove(old)
-
-
-def join_all(objs, name='RedHouse'):
-    main = objs[0]
-    with bpy.context.temp_override(active_object=main, selected_editable_objects=objs, selected_objects=objs):
-        bpy.ops.object.join()
-    main.name = name
-    main.data.name = name
-    return main
-
-
-def tri_count(me):
-    return sum(len(p.vertices) - 2 for p in me.polygons)
-
-
-def preview(path, ob):
-    scene = bpy.context.scene
-    scene.render.engine = 'BLENDER_WORKBENCH'
-    scene.display.shading.light = 'STUDIO'
-    scene.display.shading.color_type = 'MATERIAL'
-    scene.display.shading.show_shadows = True
-    scene.display.shading.show_cavity = False
-    scene.view_settings.view_transform = 'Standard'
-    scene.render.resolution_x, scene.render.resolution_y = 1440, 900
-    scene.render.film_transparent = False
-    world = bpy.data.worlds.new('w')
-    world.color = (0.55, 0.75, 0.95)
-    scene.world = world
-    cam_data = bpy.data.cameras.new('cam')
-    cam_data.sensor_fit = 'VERTICAL'
-    cam_data.angle = math.radians(50)
-    cam = bpy.data.objects.new('cam', cam_data)
-    scene.collection.objects.link(cam)
-    scene.camera = cam
-    # the page's Red House keyframe, in this file's frame: camera at world (-3, 3.5, -34) with the
-    # building at (16.6, -70), looking at (9, 4, -72). world +x ← local +Y, world +z ← local +X.
-    cam.location = Vector((36.0, -19.6, 3.5))
-    target = Vector((-2.0, -7.6, 4.0))
-    cam.rotation_euler = (target - cam.location).to_track_quat('-Z', 'Y').to_euler()
-    scene.render.filepath = path
-    bpy.ops.render.render(write_still=True)
-
-
-def main():
-    argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--out', required=True)
-    ap.add_argument('--preview', default=None)
-    ap.add_argument('--stats', action='store_true', help='print the triangle count per part')
-    args = ap.parse_args(argv)
-
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-
+def build():
     octagon_walls()
     octagon_trim()
     octagon_quoins()
@@ -534,33 +301,9 @@ def main():
     lantern()
     cross_wing()
 
-    for ob in OBJECTS:
-        apply_modifiers(ob)
-    if args.stats:
-        for ob in sorted(OBJECTS, key=lambda o: -tri_count(o.data)):
-            print(f'[red-house]   {ob.name:<24} {tri_count(ob.data):>6} tris')
-    for c in CUTTERS:
-        bpy.data.objects.remove(c, do_unlink=True)
-    house = join_all(OBJECTS)
-
-    n_tri = tri_count(house.data)
-    bb = [house.matrix_world @ Vector(c) for c in house.bound_box]
-    lo = Vector((min(v.x for v in bb), min(v.y for v in bb), min(v.z for v in bb)))
-    hi = Vector((max(v.x for v in bb), max(v.y for v in bb), max(v.z for v in bb)))
-    print(f'[red-house] triangles {n_tri}, verts {len(house.data.vertices)}, materials {[m.name for m in house.data.materials]}')
-    print(f'[red-house] bounds x {lo.x:.2f}..{hi.x:.2f}  y {lo.y:.2f}..{hi.y:.2f}  z {lo.z:.2f}..{hi.z:.2f}')
-
-    bpy.ops.export_scene.gltf(
-        filepath=args.out, export_format='GLB', export_apply=True, export_yup=True,
-        export_normals=True, export_texcoords=False, export_materials='EXPORT',
-        export_animations=False, export_skins=False, export_morph=False, export_cameras=False,
-        export_extras=False)
-    print(f'[red-house] wrote {args.out}')
-
-    if args.preview:
-        preview(args.preview, house)
-        print(f'[red-house] preview {args.preview}')
-
 
 if __name__ == '__main__':
-    main()
+    # preview camera: the page's Red House keyframe in this file's frame. Camera at world
+    # (-3, 3.5, -34) with the building at (16.6, -70), looking at (9, 4, -72); world +x ← local +Y,
+    # world +z ← local +X, vertical fov 50.
+    S.run(build, camera=((36.0, -19.6, 3.5), (-2.0, -7.6, 4.0), 50))
