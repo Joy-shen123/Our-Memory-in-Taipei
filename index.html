@@ -33,6 +33,20 @@
     <div class="hud-word" id="word"><div class="word-big"></div><div class="word-sub"></div></div>
     <div class="hud-closing" id="closing"></div>
     <div class="hud-year"><span class="hud-year-k">YEAR</span><span id="year">1853</span></div>
+    <!-- the decade music player (music.js). Bottom-left; on a phone only the sound toggle shows. -->
+    <div class="hud-music" id="music" role="group" aria-label="Music">
+      <button class="mus-mute" id="musMute" type="button" title="Sound (m)" aria-pressed="false">Click for sound</button>
+      <div class="mus-body">
+        <div class="mus-k">MUSIC · <span id="musDecade">1980s</span></div>
+        <div class="mus-track" id="musTrack">Neon Arcade <span>· synthesised for this page · CC0</span></div>
+        <div class="mus-decades">
+          <button type="button" data-decade="1980s" aria-label="Play the 1980s track">80s</button>
+          <button type="button" data-decade="1990s" aria-label="Play the 1990s track">90s</button>
+          <button type="button" data-decade="2000s" aria-label="Play the 2000s track">00s</button>
+          <button type="button" data-decade="2010s" aria-label="Play the 2010s track">10s</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="three.min.js"></script>
