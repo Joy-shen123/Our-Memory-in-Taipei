@@ -11,7 +11,9 @@
 // Fallback: when the YouTube API cannot load (offline), or YouTube refuses to play (it answers error
 // 153 to a double-clicked file:// page, which sends no HTTP referrer), the four synthesised loops
 // under asset/music/ (CC0) play instead, crossfading 1.5 s between two <audio> elements, and the
-// control says so. Browsers block sound until the visitor clicks, taps or presses a key: the first
+// control says so. CJ's own bought copies can stand in for the loops: a git-ignored asset/music/private/
+// folder with a manifest.js (see the README there) replaces the local audio with his .m4a / .mp3 files,
+// one list per decade, and the control shows their titles. Browsers block sound until the visitor clicks, taps or presses a key: the first
 // click on the page starts the video (or the loop); the player's own play button works too.
 // Nothing here touches the 3D scene.
 (function () {
@@ -46,8 +48,9 @@
     { key: '2000s', label: '2000s', from: 2000, to: 2010, src: 'asset/music/2000s.mp3', title: 'Night Market Slow Jam' },
     { key: '2010s', label: '2010s', from: 2010, to: Infinity, src: 'asset/music/2010s.mp3', title: 'Skyline Pulse' },
   ];
-  DECADES.forEach(d => { d.vi = 0; d.videos = YT_VIDEOS[d.key] || []; });
   const CREDIT = 'synthesised for this page · CC0';
+  const PRIVATE_DIR = 'asset/music/private/';   // CJ's own copies, never in the repo (asset/music/private/README.md)
+  DECADES.forEach(d => { d.vi = 0; d.videos = YT_VIDEOS[d.key] || []; d.li = 0; d.local = [{ src: d.src, title: d.title, credit: CREDIT }]; });
   const FADE_MS = 1500, VOLUME = 0.55, LS_MUTE = 'omit.music.muted', LS_DECADE = 'omit.music.decade';
 
   const store = {
@@ -57,6 +60,7 @@
   const decadeOfYear = y => { for (let i = DECADES.length - 1; i >= 0; i--) if (y >= DECADES[i].from) return i; return 0; };
   const decadeIndex = key => DECADES.findIndex(d => d.key === key);
   const videoOf = d => DECADES[d].videos[DECADES[d].vi];
+  const localOf = d => DECADES[d].local[DECADES[d].li];
   function currentYear() { const f = window.__fog; const y = f && typeof f.year === 'number' ? f.year : -1; return y < 0 ? 1985 : y; }
   const isPhone = () => window.matchMedia && window.matchMedia('(max-width: 480px)').matches;
 
@@ -68,6 +72,7 @@
   let gestured = false;                 // the page has had its first click, tap or key
   let muted = store.get(LS_MUTE) === '1';
   let lastScrollDecade = -1;
+  let privateOn = false;                // asset/music/private/ replaced the loops
 
   // ── the control ─────────────────────────────────────────────────────────────
   const el = {
@@ -143,10 +148,10 @@
   let active = 0, unlocked = false, playing = false, fade = null;
   players.forEach(p => { p.muted = muted; p.addEventListener('error', () => { /* a missing file only means silence */ }); });
 
-  function load(p, d) { if (p.dataset.decade !== DECADES[d].key) { p.dataset.decade = DECADES[d].key; p.src = DECADES[d].src; p.load(); } }
+  function load(p, d) { const t = localOf(d), id = DECADES[d].key + '|' + t.src; if (p.dataset.track !== id) { p.dataset.track = id; p.src = t.src; p.load(); } }
   function tryPlay(p) { const r = p.play(); if (r && r.catch) r.catch(() => { }); }
   function localStart() { load(players[active], cur >= 0 ? cur : decadeOfYear(currentYear())); if (gestured) unlock(); }
-  // switch the local loops to decade d, crossfading from whatever plays now
+  // switch the local audio to decade d (its current entry), crossfading from whatever plays now
   function localGo(d, instant) {
     const from = players[active], to = players[1 - active];
     load(to, d);
@@ -196,7 +201,7 @@
   function setDecade(key) {
     const d = typeof key === 'number' ? key : decadeIndex(String(key));
     if (d < 0) return false;
-    if (d === cur) { nextVideo(d); return true; }
+    if (d === cur) { if (mode === 'local') nextLocal(d); else nextVideo(d); return true; }
     manual = { decade: d };
     store.set(LS_DECADE, DECADES[d].key);
     goTo(d, false);
@@ -206,6 +211,12 @@
     const D = DECADES[d]; if (!D || D.videos.length < 1) return;
     for (let k = 0; k < D.videos.length; k++) { D.vi = (D.vi + 1) % D.videos.length; if (!failed[D.videos[D.vi].id]) break; }   // the next one YouTube will play
     if (d === cur && mode === 'youtube') youtubeGo(d);
+    render();
+  }
+  function nextLocal(d) {
+    const D = DECADES[d]; if (!D || D.local.length < 2) return;
+    D.li = (D.li + 1) % D.local.length;
+    if (d === cur && mode === 'local') localGo(d, false);
     render();
   }
   // the toggle: sound on / off. On YouTube it mutes the player; on a phone muting also hides the MV box and pauses it
@@ -226,17 +237,18 @@
   el.buttons.forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); setDecade(b.dataset.decade); }));
 
   function render() {
-    const di = cur >= 0 ? cur : decadeOfYear(currentYear()), d = DECADES[di], v = videoOf(di);
-    const onYT = mode === 'youtube';
-    if (el.decade) el.decade.textContent = d.label + (onYT && d.videos.length > 1 ? ' · ' + (d.vi + 1) + '/' + d.videos.length : '');
-    if (el.track) el.track.textContent = onYT && v ? v.title + ' · ' + v.artist + ' · ' + v.year : mode === 'local' ? d.title + ' · ' + CREDIT : '';
-    if (el.status) el.status.textContent = onYT ? 'YouTube · ' + (v ? v.channel : '') : mode === 'local' ? (why === 'referrer' ? 'local loops · YouTube needs http' : why === 'refused' ? 'local loops · YouTube refused to embed' : 'offline: local loops') : 'connecting to YouTube…';
+    const di = cur >= 0 ? cur : decadeOfYear(currentYear()), d = DECADES[di], v = videoOf(di), t = localOf(di);
+    const onYT = mode === 'youtube', n = onYT ? d.videos.length : d.local.length, i = onYT ? d.vi : d.li;
+    if (el.decade) el.decade.textContent = d.label + (mode !== 'pending' && n > 1 ? ' · ' + (i + 1) + '/' + n : '');
+    if (el.track) el.track.textContent = onYT && v ? v.title + ' · ' + v.artist + ' · ' + v.year : mode === 'local' ? t.title + ' · ' + t.credit : '';
+    const what = privateOn ? 'your songs' : 'local loops';
+    if (el.status) el.status.textContent = onYT ? 'YouTube · ' + (v ? v.channel : '') : mode === 'local' ? (why === 'referrer' ? what + ' · YouTube needs http' : why === 'refused' ? what + ' · YouTube refused to embed' : 'offline: ' + what) : 'connecting to YouTube…';
     if (el.toggle) {
       const started = onYT ? gestured : unlocked;
       el.toggle.textContent = !started ? (onYT ? 'Click to play' : 'Click for sound') : muted ? 'Sound off' : 'Sound on';
       el.toggle.setAttribute('aria-pressed', started && !muted ? 'true' : 'false');
     }
-    el.buttons.forEach(b => { const on = b.dataset.decade === d.key; b.classList.toggle('on', on); b.title = on && d.videos.length > 1 ? 'Next video' : ''; });
+    el.buttons.forEach(b => { const on = b.dataset.decade === d.key; b.classList.toggle('on', on); b.title = on && n > 1 ? (onYT ? 'Next video' : 'Next song') : ''; });
     if (el.root) { el.root.dataset.mode = mode; el.root.classList.toggle('muted', muted); el.root.classList.toggle('locked', onYT ? !gestured : mode === 'local' && !unlocked); }
   }
 
@@ -259,16 +271,50 @@
   loadYouTube();
   requestAnimationFrame(frame);
 
+  // ── private drop-in ─────────────────────────────────────────────────────────
+  // asset/music/private/manifest.js sets window.__musicPrivate = [{ decade, file, title, artist, year }, …]
+  // (the same decade repeated = that decade's list, in order; .m4a and .mp3). A script tag works from
+  // file://, fetch does not. The folder is git-ignored, so the public page never has it; when it is
+  // there, the entries replace the loops as the local audio. YouTube still plays over http.
+  function applyPrivate(list) {
+    if (!Array.isArray(list)) return;
+    const lists = {};
+    list.forEach(e => { if (e && e.decade && typeof e.file === 'string' && /\.(m4a|mp3)$/i.test(e.file)) (lists[e.decade] = lists[e.decade] || []).push(e); });
+    let n = 0;
+    Object.keys(lists).forEach(k => {
+      const d = decadeIndex(k); if (d < 0) return;
+      DECADES[d].local = lists[k].map(e => ({ src: PRIVATE_DIR + e.file, title: e.title || e.file, credit: [e.artist, e.year].filter(Boolean).join(' · ') || 'your copy' }));
+      DECADES[d].li = 0; n++;
+    });
+    if (!n) return;
+    privateOn = true;
+    players.forEach(p => {                                            // a player already holding a replaced loop reloads from the new file
+      const key = (p.dataset.track || '').split('|')[0], d = decadeIndex(key); if (d < 0 || !lists[key]) return;
+      const wasActive = p === players[active], vol = p.volume;
+      p.dataset.track = ''; load(p, d);
+      if (mode === 'local' && unlocked && wasActive && cur === d) { p.volume = vol; tryPlay(p); } else p.volume = 0;
+    });
+    render();
+  }
+  function loadPrivate() {
+    if (window.__musicPrivate) { applyPrivate(window.__musicPrivate); return; }
+    const s = document.createElement('script'); s.src = PRIVATE_DIR + 'manifest.js'; s.async = true;
+    s.onload = () => applyPrivate(window.__musicPrivate);              // absent: the loops stay, nothing to do
+    document.head.appendChild(s);
+  }
+  loadPrivate();
+
   // ── probe ───────────────────────────────────────────────────────────────────
   window.__music = {
     get mode() { return mode; }, get why() { return why; }, get decade() { return DECADES[cur].key; }, get video() { return videoOf(cur) || null; }, get loadedId() { return ytLoadedId; },
     get index() { return DECADES[cur].vi; }, get count() { return DECADES[cur].videos.length; },
-    get track() { return mode === 'local' ? DECADES[cur].title : (videoOf(cur) || {}).title; },
+    get track() { return mode === 'local' ? localOf(cur).title : (videoOf(cur) || {}).title; }, get src() { return localOf(cur).src; },
+    get private() { return privateOn; }, get localCount() { return DECADES[cur].local.length; }, get localIndex() { return DECADES[cur].li; },
     get playing() { return playing; }, get ytState() { return ytState; }, get muted() { return muted; }, get gestured() { return gestured; },
     get unlocked() { return mode === 'youtube' ? gestured : unlocked; },
     get manual() { return manual ? DECADES[manual.decade].key : null; }, get scrollDecade() { return DECADES[lastScrollDecade < 0 ? 0 : lastScrollDecade].key; },
     get fading() { return !!fade; }, get volumes() { return players.map(p => +p.volume.toFixed(2)); }, get failed() { return failed; },
     get embed() { const f = document.querySelector('#music iframe'); return f ? { src: f.src.slice(0, 60), w: f.clientWidth, h: f.clientHeight } : null; },
-    setDecade, nextVideo, toggle, setMuted, YT_VIDEOS, DECADES,
+    setDecade, nextVideo, nextLocal, toggle, setMuted, YT_VIDEOS, DECADES,
   };
 })();
