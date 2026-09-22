@@ -19,7 +19,6 @@
   // ── geometries, base at y = 0 unless noted ──────────────────────────────────
   const cylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); cylGeo.translate(0, 0.5, 0);
   const sphGeo = new THREE.SphereGeometry(0.5, 8, 6); sphGeo.translate(0, 0.5, 0);
-  const potGeo = new THREE.CylinderGeometry(0.5, 0.36, 1, 12); potGeo.translate(0, 0.5, 0);
   const archGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 12); archGeo.rotateZ(Math.PI / 2); // axis along x, centred: a round window head
   // Baroque gable crest: 1 wide (z), 1 tall (y), extruded 1 along +x. Shoulders, then a round top.
   const crestGeo = (() => {
@@ -33,19 +32,6 @@
     g.rotateY(Math.PI / 2);                                    // width now along z, thickness along +x
     return g;
   })();
-  // swallowtail ridge (燕尾脊): a gently sagging band whose ends sweep up and out. Length along z.
-  const ridgeGeo = (() => {
-    const s = new THREE.Shape();
-    s.moveTo(-0.5, 0.45); s.quadraticCurveTo(0, 0.05, 0.5, 0.45);
-    s.lineTo(0.63, 0.95); s.lineTo(0.53, 1.0); s.lineTo(0.45, 0.66);
-    s.quadraticCurveTo(0, 0.28, -0.45, 0.66);
-    s.lineTo(-0.53, 1.0); s.lineTo(-0.63, 0.95); s.lineTo(-0.5, 0.45);
-    const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false });
-    g.rotateY(Math.PI / 2); g.translate(-0.5, 0, 0);
-    return g;
-  })();
-  // gabled roof: triangular prism, ridge along z, base 1.732 wide at y 0, apex at y 1.5
-  const prismGeo = new THREE.CylinderGeometry(1, 1, 1, 3); prismGeo.rotateX(-Math.PI / 2); prismGeo.translate(0, 0.5, 0);
 
   // ── signage text: characters drawn to a canvas with the system font ────────
   function textTex(str, bg, fg, vertical) {
@@ -216,23 +202,18 @@
   //    front, orange tiles and a swallowtail ridge. Porch over the sidewalk, forecourt in front. ──
   const lant = [];
   (() => {
-    const cz = G.z, hw = 8, depth = 9, WH = 5.0;               // hall z -244 … -236, x -8.8 … -17.8, walls 5 m
-    const xf = -8.8, cx = xf - depth / 2;
-    part(cx - 0.6, 0, cz, depth - 1.2, hw, only(ALL, WH, 'brick'));                  // hall: brick side and back walls
-    part(xf - 0.3, 0, cz, 0.6, hw - 0.4, only(ALL, WH, 'ink'));                        // the carved wooden front wall
-    [-1.3, 1.3].forEach(dz => part(xf + 0.02, 0, cz + dz, 0.1, 1.2, only(ALL, 3.0, 'verm')));   // the doors
-    part(xf + 0.03, 3.1, cz, 0.1, 3.8, only(ALL, 0.7, 'lamp'));                        // the name board over the doors
-    [-3.6, 3.6].forEach(dz => part(-6.5, WALK, cz + dz, 0.7, 0.7, only(ALL, WH - 0.1, 'verm'), 0, cylGeo)); // porch columns at the kerb line
-    part(-6.5, WALK, cz, 0.35, hw - 0.8, only(ALL, 0.5, 'brick'));                     // low step between the columns
-    part(-12.0, WH + 0.1, cz, depth + 3.1, hw + 0.8, only(ALL, 0.4, 'ink'));           // eave beam under the roof, porch included
-    part(-12.0, WH + 0.5, cz, 12.6 / 1.732, hw + 2.6, only(ALL, 4.2 / 1.5, 'brick'), 0, prismGeo);   // the tiled roof, x -18.3 … -5.7
-    part(-12.0, WH + 4.4, cz, 0.6, hw + 3.8, only(ALL, 2.6, 'ink'), 0, ridgeGeo);     // 燕尾脊, tips sweeping out past the gables
-    part(-12.0, WH + 4.45, cz, 0.7, hw + 2.0, only(ALL, 0.45, 'verm'));                // the ridge's painted band
+    const cz = G.z, WH = 5.0, xf = -8.8;                       // hall z -244 … -236, x -8.8 … -17.8, walls 5 m
+    // Issue #5 step 2: the hall, carved front with red doors, porch columns, brackets, tiled
+    // roof, swallowtail ridge, lanterns and incense burner are the glb from asset/blender/temple.py
+    // (8.4k triangles); the name board and the 月老 sign stay canvas text on it.
+    const temple = libGroup(ALL);
+    MODELS.load('temple', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(xf, 0, cz); root.rotation.y = Math.PI / 2;
+      temple.add(root);
+    });
     signPart('霞海城隍廟', 'ink', 'lamp', false, 'x', -5.65, WH - 0.9, cz, 0.85, ALL);   // the name on the eave, facing the road
-    [-2.0, 2.0].forEach(dz => lant.push({ x: -6.3, y: 3.2, z: cz + dz, w: 1.0, d: 1.0, r: 0, c: C('verm'), h: HA(1.0) }));
-    part(-6.9, WALK, cz, 1.0, 1.0, only(ALL, 1.0, 'ink'), 0, potGeo);                  // incense burner on the forecourt
-    part(-6.9, WALK + 0.95, cz, 1.25, 1.25, only(ALL, 0.12, 'ink'), 0, cylGeo);
-    part(-6.9, WALK + 1.05, cz, 0.1, 0.1, only(ALL, 2.4, 'bone'));                     // smoke
+    part(-6.9, WALK + 1.05, cz, 0.1, 0.1, only(ALL, 2.4, 'bone'));                     // smoke off the burner
     part(-6.75, WALK + 1.05, cz - 0.12, 0.07, 0.07, only(ALL, 3.0, 'bone'));
     signPart('月老', 'verm', 'bone', true, 'x', -6.35, WALK, cz + 5.2, 1.8, DT);       // the matchmaker board at the queue head
     G.top = 12.5;
