@@ -7,12 +7,11 @@
 // Everything exists in all three eras (the tower era only ever sees this stretch behind it).
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd, libGroup, asset, lit } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd, libGroup, asset, lam } = window.SCENE;
 
   const ALL = ['red', 'dadao', 'tower'], DT = ['dadao', 'tower'], T = ['tower'];
   const H = (r, d, t) => ({ red: r, dadao: d, tower: t });
   const HA = h => ({ red: h, dadao: h, tower: h });
-  const lam = (col, extra) => lit(Object.assign({ color: C(col) }, extra || {}));   // the engine's lit material (issue #3)
   const D = anchors.dihua, G = anchors.chenghuang;
   const WALK = 0.22;                                          // top of the sidewalk slab
   const lib = libGroup(['red', 'dadao']);                     // library items, there before the flip
@@ -370,18 +369,28 @@
   asset('new-year-market-stall', lib, -4.2, -232.5, Math.PI / 2);
 
   // ── the instanced sets ──
-  instSet(boxGeo, lam('bone'), cols, { colors: true });
-  instSet(boxGeo, lam('bone'), bodies, { colors: true });
+  // (issue #3 step 2) the sets that mix red brick and plaster are split in two so the brick items
+  // carry the brick surface family and the rest plaster; the colour still comes from the instance,
+  // the material stays bone under it
+  const BRICK = C('brick').getHex();
+  const brickSplit = (geo, items) => {
+    const isB = it => it.c && it.c.getHex() === BRICK;
+    const b = items.filter(isB), o = items.filter(it => !isB(it));
+    if (b.length) instSet(geo, lam('bone', { surface: 'brick' }), b, { colors: true });
+    if (o.length) instSet(geo, lam('bone'), o, { colors: true });
+  };
+  brickSplit(boxGeo, cols);
+  brickSplit(boxGeo, bodies);
   instSet(boxGeo, lam('bone'), slabs, { colors: true });
-  instSet(boxGeo, lam('bone'), walls, { colors: true });
+  brickSplit(boxGeo, walls);
   instSet(boxGeo, lam('ink'), wins);
   instSet(archGeo, lam('ink'), arches);
-  instSet(boxGeo, lam('bone'), pils, { colors: true });
+  brickSplit(boxGeo, pils);
   instSet(boxGeo, lam('bone'), caps);
   instSet(crestGeo, lam('bone'), crests, { colors: true });
   instSet(archGeo, lam('lamp'), meds, { colors: true });
   instSet(boxGeo, lam('ink'), roofs);
-  instSet(boxGeo, lam('bone'), rails, { colors: true });
+  brickSplit(boxGeo, rails);
   instSet(boxGeo, lam('bone'), goods, { colors: true });
   instSet(cylGeo, lam('bone'), jars, { colors: true });
   instSet(boxGeo, lam('bone', { emissive: C('lamp'), emissiveIntensity: 0.18 }), signs, { colors: true });

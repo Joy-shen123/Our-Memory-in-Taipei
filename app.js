@@ -77,8 +77,24 @@
   // the environment map lights Standard materials only) and so step 2's normal maps have a
   // material that reads them. Rough and non-metal, so it shades like the Lambert it replaces
   // plus the sky's ambient; every option Lambert took (map, emissive, vertexColors) still works.
+  // (issue #3 step 2) lit() takes a `surface` too: one of the library's five procedural families
+  // (brick, plaster, concrete, wood, asphalt, from NostalgiaCore.surface), whose colour and normal
+  // maps are attached; a caller's own `map` wins and only the normal map is added. lam(col) picks
+  // the family from the palette key so the scene files name nothing: bone is plaster, walk and
+  // haze are concrete, brick is brick. Tile = TILE world units; the engine sets each map's repeat
+  // from the mesh's size where it knows it (part, instSet), so bricks stay brick-sized.
+  const SURFACE_OF = { bone: 'plaster', walk: 'concrete', haze: 'concrete', brick: 'brick', road: 'asphalt' };
+  const TILE = 3;
+  const surface = name => { const Core = window.NostalgiaCore; return name && Core && Core.surface ? Core.surface(name) : null; };
   const litMats = [];   // every material that reads scene.environment, so the era tween can scale it
-  const lit = params => { const m = new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.92, metalness: 0, envMapIntensity: ENV_I }, params)); litMats.push(m); return m; };
+  const lit = params => {
+    const p = Object.assign({ roughness: 0.92, metalness: 0, envMapIntensity: ENV_I }, params);
+    const S = surface(p.surface); delete p.surface;
+    if (S) { if (!p.map) p.map = S.map.clone(); p.normalMap = S.normalMap; }
+    const m = new THREE.MeshStandardMaterial(p); litMats.push(m); return m;
+  };
+  const lam = (col, extra) => lit(Object.assign({ color: C(col), surface: SURFACE_OF[col] || null }, extra || {}));
+  const fitTile = (mat, w, h) => { const m = mat.map; if (m && m.userData.tile) m.repeat.set(Math.max(w, 0.01) / TILE, Math.max(h, 0.01) / TILE); };
 
   // ── renderer, scene, camera ──────────────────────────────────────────────────
   const canvas = document.getElementById('scene');
@@ -189,14 +205,15 @@
   boxGeo.translate(0, 0.5, 0); // origin at the base so scale.y is height
   const parts = [];
   function part(x, y, z, w, d, look, rotY, geo) {
-    const mesh = new THREE.Mesh(geo || boxGeo, withFog(lit({ color: C('bone') })));
+    const first = ERAS.map(e => look[e.key]).find(s => s && s.h > 0);          // the surface family follows the first era's colour
+    const mesh = new THREE.Mesh(geo || boxGeo, withFog(lit({ color: C('bone'), surface: first ? SURFACE_OF[first.col] : null })));
     mesh.position.set(x, y, z);
     mesh.scale.set(w, 1, d);
     if (rotY) mesh.rotation.y = rotY;
     scene.add(mesh);
     const L = {};
     ERAS.forEach(e => { const s = look[e.key]; L[e.key] = s && s.h > 0 ? { h: s.h, c: C(s.col) } : { h: 0, c: C('ink') }; });
-    const p = { mesh, look: L, fromH: 0, fromC: C('ink') };
+    const p = { mesh, look: L, fromH: 0, fromC: C('ink'), tileMap: mesh.material.map && mesh.material.map.userData.tile ? mesh.material.map : null };
     parts.push(p);
     return p;
   }
@@ -273,6 +290,10 @@
   function instSet(geo, mat, items, opts) {
     const mesh = new THREE.InstancedMesh(geo, withFog(mat), items.length);
     mesh.frustumCulled = false;
+    if (mat.map && mat.map.userData.tile && items.length) {           // one repeat for the set: its median footprint and height
+      const med = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
+      fitTile(mat, med(items.map(it => Math.max(it.w, it.d))), med(items.map(it => Math.max(...Object.values(it.h)))));
+    }
     if (opts && opts.colors) {
       items.forEach((it, i) => mesh.setColorAt(i, it.c || C('haze')));
       mesh.instanceColor.needsUpdate = true;
@@ -316,15 +337,27 @@
   // sidewalks and curbs
   const walkX = GRID.roadWidth / 2 + 1.6;
   [-1, 1].forEach(s => {
-    const m = new THREE.Mesh(boxGeo, withFog(lit({ color: C('walk') })));
+    const m = new THREE.Mesh(boxGeo, withFog(lit({ color: C('walk'), surface: 'concrete' })));
     m.position.set(s * walkX, 0, -200); m.scale.set(3.2, 0.22, 620); scene.add(m);
+    fitTile(m.material, 3.2, 620);                                     // the top face is the one seen: u along x, v along z
   });
   // road surface pattern: dirt at first, then a painted centre line — drawn to a canvas, repeated
+  // The canvas is one 12 x 10 unit stretch of road (repeat 1 x 62), so the asphalt family's tile
+  // (TILE units square) is drawn 32 x 77 px here, multiplied over the base colour. Seeded, like the
+  // library's own surfaces, so the speckle is the same every load.
+  const texRnd = (() => { let a = 3; return () => { a = (a + 0x6D2B79F5) | 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t = (t + Math.imul(t ^ (t >>> 7), t | 61)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
   function roadTexture(kind) {
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
     const g = cv.getContext('2d');
     g.fillStyle = PALETTE.road; g.fillRect(0, 0, 128, 256);
-    if (kind === 'dirt') { for (let i = 0; i < 260; i++) { g.fillStyle = 'rgba(10,12,16,0.35)'; g.fillRect(Math.random() * 128, Math.random() * 256, 2, 2); } }
+    const asphalt = surface('asphalt');
+    if (asphalt) {
+      const tw = 128 / (GRID.roadWidth / TILE), th = 256 / (10 / TILE);
+      g.globalCompositeOperation = 'multiply';
+      for (let y = 0; y < 256; y += th) for (let x = 0; x < 128; x += tw) g.drawImage(asphalt.map.image, x, y, tw, th);
+      g.globalCompositeOperation = 'source-over';
+    }
+    if (kind === 'dirt') { for (let i = 0; i < 260; i++) { g.fillStyle = 'rgba(10,12,16,0.35)'; g.fillRect(texRnd() * 128, texRnd() * 256, 2, 2); } }
     if (kind === 'tram') { g.fillStyle = PALETTE.ink; g.fillRect(40, 0, 3, 256); g.fillRect(85, 0, 3, 256); }
     if (kind === 'lines') { g.fillStyle = PALETTE.bone; g.fillRect(62, 20, 4, 90); g.fillRect(6, 0, 3, 256); g.fillRect(119, 0, 3, 256); }
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 62); t.anisotropy = 8;
@@ -492,8 +525,9 @@
   // ── scene API for the per-chapter scene files (scene-*.js), loaded after this file ──
   // part(x, y, z, w, d, lookByEra, rotY?, geo?)  lookByEra: { red:{h,col}, dadao:{h,col}, tower:{h,col} }
   // instSet(geo, material, items, {colors})     items: { x, z, y?, w, d, r?, c?, h:{red,dadao,tower} }
-  // lit(params)                                 the engine's lit material; use it for every wall, roof and road
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
+  // lit(params)                                 the engine's lit material; params.surface = 'brick' | 'plaster' | 'concrete' | 'wood' | 'asphalt'
+  // lam(col, extra?)                            lit() by palette key, surface family chosen from the key
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
 
 
   // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
@@ -673,6 +707,7 @@
       p.mesh.scale.y = Math.max(h, 0.0001);
       p.mesh.visible = h > 0.01;
       p.mesh.material.color.copy(tmpC.copy(p.fromC).lerp(to.c, e));
+      if (p.tileMap && p.mesh.material.map === p.tileMap) fitTile(p.mesh.material, Math.max(p.mesh.scale.x, p.mesh.scale.z), h);
     });
     // sky, fog, light and print level: held flat inside an era, moved in the same 500ms
     const M = ERA_MIX[key];
