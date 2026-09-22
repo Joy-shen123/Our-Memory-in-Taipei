@@ -1,7 +1,7 @@
 // scene-tower.js — chapter scene detail: Taipei 101, 2004–now. Xinyi at night.
 // Region z -290 … -460. Everything modern exists in the tower era only; the same ground
 // carries rice paddies and farmhouses in the two earlier eras, so scrolling back reads
-// "fields, then the tallest building on earth". Primitives only, five colours only.
+// "fields, then the tallest building on earth". Primitives and the palette, plus the 101 glb (issue #5).
 //
 // The tower itself, 新光三越 A11, the 空橋 skywalks and the City Hall silhouette are built here
 // from real references (see HANDOFF.md). This file sets TOWER.h, TOWER.faceX and the label top.
@@ -10,18 +10,13 @@
 // predate the engine hiding absent instances; they still give one draw call per set.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors, lit } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors, lit, libGroup } = window.SCENE;
 
   const tw = h => ({ red: 0, dadao: 0, tower: h });      // instSet heights: tower era only
   const old = h => ({ red: h, dadao: h, tower: 0 });     // instSet heights: fields era only
   const TW = (h, col) => only(['tower'], h, col);        // part look: tower era only
   const OLD = (h, col) => only(['red', 'dadao'], h, col);
   const TZ = TOWER.z, TX = TOWER.x;
-  const SQ2 = Math.SQRT2;
-  // a square frustum, base at y = 0, unit height: half-width hb at the bottom, ht at the top
-  function frustum(hb, ht) {
-    const g = new THREE.CylinderGeometry(ht * SQ2, hb * SQ2, 1, 4, 1); g.rotateY(Math.PI / 4); g.translate(0, 0.5, 0); return g;
-  }
   const cjk = px => `700 ${px}px -apple-system, "PingFang TC", "Heiti TC", "Noto Sans CJK TC", "Helvetica Neue", sans-serif`;
 
   // ── compound geometry: several boxes merged, base at y = 0, height normalised to 1 ──
@@ -90,64 +85,16 @@
   const CROWN_Y0 = SEG_Y0 + SEG_N * SEG_H, CROWN_H = 8, CROWN_HB = 5.5, CROWN_HT = 3.2;
   const CROWN_Y1 = CROWN_Y0 + CROWN_H, MECH_H = 3, MAST_H = 2, SPIRE_H = 18;
   const SPIRE_TOP = CROWN_Y1 + MECH_H + MAST_H + SPIRE_H;
-  function glassTex(cols, rows, lit) {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
-    const g = cv.getContext('2d');
-    g.fillStyle = lit ? '#000' : '#fff'; g.fillRect(0, 0, 256, 256);
-    const cw = 256 / cols, ch = 256 / rows;
-    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-      const on = ((i * 7 + j * 13) % 4) !== 0;
-      g.fillStyle = lit ? (on ? PALETTE.lamp : '#000') : 'rgba(20,40,50,0.5)';
-      g.fillRect(i * cw + cw * 0.22, j * ch + ch * 0.2, cw * 0.56, ch * 0.55);
-    }
-    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
-  }
-  // a 4-segment cylinder's side UV wraps once around, so u repeats cols·4 for cols windows a face
-  function glassify(mat, cols, rows) {
-    mat.map = glassTex(cols, rows, false); mat.map.repeat.set(cols * 4, rows);
-    mat.emissiveMap = glassTex(cols, rows, true); mat.emissiveMap.repeat.set(cols * 4, rows);
-    mat.emissive = C('lamp'); mat.emissiveIntensity = 0.45;
-    // curtain wall (issue #3 step 1): smooth and a little metallic so it reflects the canvas sky
-    // through scene.environment: pale at the top of the frame, warm near the ground band
-    mat.roughness = 0.35; mat.metalness = 0.4; mat.envMapIntensity = 0.7;
-    mat.needsUpdate = true;
-    return mat;
-  }
-  // podium: the mall block at the road side, with the steps in front of it
-  part(TX, 0, TZ + 2, 30, 22, TW(PODIUM_H, 'walk'));
-  // pedestal
-  glassify(part(TX, PED_Y0, TZ, 1, 1, TW(PED_Y1 - PED_Y0, 'glass'), 0, frustum(PED_HB, PED_HT)).mesh.material, 5, 25);
-  // 古錢: a bone disc with an ink square hole, centred on each face just below the pedestal top
-  (() => {
-    const y = PED_Y1 - 2.6, hw = PED_HT + (PED_HB - PED_HT) * (PED_Y1 - y) / (PED_Y1 - PED_Y0) + 0.05;
-    const discX = new THREE.CylinderGeometry(0.5, 0.5, 1, 18); discX.rotateZ(Math.PI / 2); discX.translate(0, 0.5, 0); // axis along x
-    const discZ = new THREE.CylinderGeometry(0.5, 0.5, 1, 18); discZ.rotateX(Math.PI / 2); discZ.translate(0, 0.5, 0); // axis along z
-    [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([sx, sz]) => {
-      const x = TX + sx * hw, z = TZ + sz * hw, geo = sx ? discX : discZ;
-      part(x, y, z, sx ? 0.4 : 3.2, sx ? 3.2 : 0.4, TW(3.2, 'bone'), 0, geo);       // the coin
-      part(x + sx * 0.12, y + 1.1, z + sz * 0.12, sx ? 0.3 : 1.0, sx ? 1.0 : 0.3, TW(1.0, 'ink')); // the square hole
-    });
-  })();
-  // the eight flared segments, one instanced frustum
-  (() => {
-    const items = [];
-    for (let i = 0; i < SEG_N; i++) items.push({ x: TX, z: TZ, y: SEG_Y0 + i * SEG_H, w: 1, d: 1, h: tw(SEG_H) });
-    instSet(frustum(SEG_HB, SEG_HT), glassify(lit({ color: C('glass') }), 4, 8), items);
-  })();
-  // 如意 at the four bottom corners of every segment: bone, a squashed sphere on a little foot
-  (() => {
-    const g = new THREE.SphereGeometry(0.5, 8, 6); g.scale(1, 0.75, 1); g.translate(0, 0.42, 0);
-    const items = [];
-    for (let i = 0; i < SEG_N; i++) [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) =>
-      items.push({ x: TX + sx * (SEG_HB + 0.25), z: TZ + sz * (SEG_HB + 0.25), y: SEG_Y0 + i * SEG_H + 0.15, w: 1.4, d: 1.4, h: tw(1.1) }));
-    instSet(g, lit({ color: C('bone') }), items);
-  })();
-  // crown, mechanical box, mast, spire
-  glassify(part(TX, CROWN_Y0, TZ, 1, 1, TW(CROWN_H, 'glass'), 0, frustum(CROWN_HB, CROWN_HT)).mesh.material, 3, 10);
-  part(TX, CROWN_Y1, TZ, 4.2, 4.2, TW(MECH_H, 'haze'));
-  part(TX, CROWN_Y1 + MECH_H, TZ, 1.4, 1.4, TW(MAST_H, 'bone'));
-  const spireGeo = new THREE.CylinderGeometry(0.12, 0.6, 1, 8); spireGeo.translate(0, 0.5, 0);
-  part(TX, CROWN_Y1 + MECH_H + MAST_H, TZ, 1, 1, TW(SPIRE_H, 'bone'), 0, spireGeo);
+  // Issue #5 step 2: the tower is a glb built by asset/blender/tower101.py from the same profile
+  // constants (podium, pedestal, coins, eight flared segments with 如意, crown, mast, spire), with
+  // per-floor bands and mullions as geometry, loaded here in place of the frusta and the lit-window
+  // canvas. Tower era only; front toward +z, no rotation. TOWER.faceX below is unchanged.
+  const towerGroup = libGroup(['tower']);
+  MODELS.load('tower101', gltf => {
+    const root = MODELS.lambertize(gltf.scene);
+    root.position.set(TX, 0, TZ);
+    towerGroup.add(root);
+  });
   // what the engine needs: the crown top for the climb, the west-face x at any height, the label top
   TOWER.h = CROWN_Y1;
   TOWER.faceX = y => {
