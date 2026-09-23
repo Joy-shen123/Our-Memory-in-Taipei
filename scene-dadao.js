@@ -19,33 +19,6 @@
   // ── geometries, base at y = 0 unless noted ──────────────────────────────────
   const cylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); cylGeo.translate(0, 0.5, 0);
   const sphGeo = new THREE.SphereGeometry(0.5, 8, 6); sphGeo.translate(0, 0.5, 0);
-  const potGeo = new THREE.CylinderGeometry(0.5, 0.36, 1, 12); potGeo.translate(0, 0.5, 0);
-  const archGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 12); archGeo.rotateZ(Math.PI / 2); // axis along x, centred: a round window head
-  // Baroque gable crest: 1 wide (z), 1 tall (y), extruded 1 along +x. Shoulders, then a round top.
-  const crestGeo = (() => {
-    const s = new THREE.Shape();
-    s.moveTo(-0.5, 0); s.lineTo(0.5, 0); s.lineTo(0.5, 0.32);
-    s.quadraticCurveTo(0.42, 0.5, 0.27, 0.52); s.lineTo(0.17, 0.6);
-    s.bezierCurveTo(0.17, 0.92, 0.07, 1, 0, 1);
-    s.bezierCurveTo(-0.07, 1, -0.17, 0.92, -0.17, 0.6); s.lineTo(-0.27, 0.52);
-    s.quadraticCurveTo(-0.42, 0.5, -0.5, 0.32); s.lineTo(-0.5, 0);
-    const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false });
-    g.rotateY(Math.PI / 2);                                    // width now along z, thickness along +x
-    return g;
-  })();
-  // swallowtail ridge (燕尾脊): a gently sagging band whose ends sweep up and out. Length along z.
-  const ridgeGeo = (() => {
-    const s = new THREE.Shape();
-    s.moveTo(-0.5, 0.45); s.quadraticCurveTo(0, 0.05, 0.5, 0.45);
-    s.lineTo(0.63, 0.95); s.lineTo(0.53, 1.0); s.lineTo(0.45, 0.66);
-    s.quadraticCurveTo(0, 0.28, -0.45, 0.66);
-    s.lineTo(-0.53, 1.0); s.lineTo(-0.63, 0.95); s.lineTo(-0.5, 0.45);
-    const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false });
-    g.rotateY(Math.PI / 2); g.translate(-0.5, 0, 0);
-    return g;
-  })();
-  // gabled roof: triangular prism, ridge along z, base 1.732 wide at y 0, apex at y 1.5
-  const prismGeo = new THREE.CylinderGeometry(1, 1, 1, 3); prismGeo.rotateX(-Math.PI / 2); prismGeo.translate(0, 0.5, 0);
 
   // ── signage text: characters drawn to a canvas with the system font ────────
   function textTex(str, bg, fg, vertical) {
@@ -73,50 +46,30 @@
   // (columns at the kerb, ceiling at 3.8 m), the upper floor over the sidewalk with two tall
   // windows between pilasters, and a parapet crest: 閩南 plain brick ('min'), 洋樓 red brick with
   // round-arched windows and a balustrade ('yang'), 巴洛克 plaster with a curved gable ('baroque').
-  const cols = [], bodies = [], slabs = [], walls = [], wins = [], arches = [], pils = [], caps = [], crests = [], meds = [], roofs = [], rails = [];
+  const cols = [], bodies = [];
   const shops = [];                                            // the arcade back walls that get goods
   const KERB = 6.6, FACE = 6.2, BACK = 9.4, DEEP = 18;
-  // bay(side, z0, z1, style, opts): opts.floors (2|3), opts.col (wall colour), opts.libDepth
-  // (a library storefront stands at the arcade back, this deep, so the body starts behind it),
-  // opts.open (no columns/windows/crest: a library facade fills the kerb line), opts.goods.
+  // Issue #5 step 3: a bay is one of three glbs (asset/blender/dihua-{min,yang,baroque}.py, built
+  // on dihua_common.py) instanced through MODELS.instance: column, arcade slab, shop wall with
+  // its lattice door, two floors of framed windows, pilaster, cornice and the crest of its style.
+  // Every bay has two upper floors now (the old floors: 3 and tall: options are ignored); the
+  // width scales to the bay, and a Baroque bay's plaster takes the bay's colour per instance.
+  const bays = { min: [], yang: [], baroque: [] };
+  // bay(side, z0, z1, style, opts): opts.col (wall colour), opts.libDepth (a library storefront
+  // stands at the arcade back, this deep, so the body starts behind it), opts.open (no bay glb: a
+  // library facade fills the kerb line), opts.goods.
   function bay(s, z0, z1, style, o) {
     o = o || {};
-    const d = z0 - z1, zc = (z0 + z1) / 2, floors = o.floors || 2;
+    const d = z0 - z1, zc = (z0 + z1) / 2;
     const col = o.col || (style === 'baroque' ? 'bone' : 'brick');
-    const top = floors === 1 ? 4.2 : 4.2 + floors * 3.4 - 0.2; // roof line
-    if (!o.open) {
-      cols.push({ x: s * KERB, z: z0, w: 0.5, d: 0.5, h: HA(3.8), c: C(col === 'bone' ? 'walk' : col) });
-      slabs.push({ x: s * (FACE + DEEP) / 2, z: zc, y: 3.8, w: DEEP - FACE, d, h: HA(0.4), c: C(col) });
-    }
+    const top = 4.2 + 2 * 3.4 - 0.2;                           // roof line
     const bf = o.open ? 7.2 : (o.libDepth ? BACK + o.libDepth + 0.1 : BACK);   // where the body starts
     bodies.push({ x: s * (bf + DEEP) / 2, z: zc, w: DEEP - bf, d: d - 0.05, h: HA(o.open ? top : 3.8), c: C(o.open ? col : 'haze') });
     if (o.open) return;
-    for (let f = 0; f < floors; f++) {
-      const y = 4.2 + f * 3.4;
-      walls.push({ x: s * (FACE + DEEP) / 2, z: zc, y, w: DEEP - FACE, d: d - 0.05, h: HA(3.2), c: C(col) });
-      if (f < floors - 1) slabs.push({ x: s * (FACE + DEEP) / 2, z: zc, y: y + 3.2, w: DEEP - FACE, d, h: HA(0.2), c: C(col === 'brick' ? 'ink' : 'walk') });
-      [-0.24, 0.24].forEach(k => {
-        wins.push({ x: s * (FACE - 0.05), z: zc + k * d, y: y + 0.5, w: 0.1, d: 1.0, h: HA(2.0), c: C('ink') });
-        if (style === 'yang') arches.push({ x: s * (FACE - 0.05), z: zc + k * d, y: y + 2.5, w: 0.1, d: 1.0, h: HA(1.0), c: C('ink') });
-      });
-    }
-    // pilasters at the bay edges, the full height of the upper floors (+ crest for Baroque)
-    const ph = floors * 3.4 - 0.2 + (style === 'baroque' ? 1.0 : 0);
-    if (floors > 1) pils.push({ x: s * (FACE - 0.15), z: z0 - 0.2, y: 4.2, w: 0.4, d: 0.4, h: HA(ph), c: C(style === 'min' ? 'brick' : 'bone') });
-    if (style === 'baroque' && floors > 1) caps.push({ x: s * (FACE - 0.2), z: z0 - 0.2, y: 4.2 + ph, w: 0.55, d: 0.55, h: HA(0.35), c: C('bone') });
-    roofs.push({ x: s * (FACE + DEEP) / 2 + s * 0.2, z: zc, y: top, w: DEEP - FACE - 0.4, d: d - 0.3, h: HA(0.3), c: C('ink') });
-    if (style === 'min' || floors === 1) {
-      rails.push({ x: s * (FACE + 0.25), z: zc, y: top, w: 0.5, d: d - 0.1, h: HA(0.7), c: C('brick') });
-    } else if (style === 'yang') {
-      rails.push({ x: s * (FACE + 0.25), z: zc, y: top, w: 0.5, d: d - 0.1, h: HA(0.25), c: C('bone') });
-      rails.push({ x: s * (FACE + 0.25), z: zc, y: top + 0.85, w: 0.5, d: d - 0.1, h: HA(0.2), c: C('bone') });
-      for (let k = -0.4; k <= 0.41; k += 0.2) rails.push({ x: s * (FACE + 0.25), z: zc + k * d, y: top + 0.25, w: 0.2, d: 0.2, h: HA(0.6), c: C('bone') });
-    } else {
-      crests.push({ x: s * FACE, z: zc, y: top, w: 0.55, d: d - 0.1, r: s > 0 ? 0 : Math.PI, h: HA(o.tall ? 2.6 : 2.1), c: C(col === 'brick' ? 'bone' : col) });
-      meds.push({ x: s * (FACE - 0.08), z: zc, y: top + 0.95, w: 0.16, d: 0.7, h: HA(0.7), c: C(o.medal || 'lamp') });
-    }
+    bays[style].push({ x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) });
     if (o.goods !== false) shops.push({ fx: s * BACK, z: zc, span: d, s });
   }
+  Object.keys(bays).forEach(style => MODELS.load('dihua-' + style, gltf => MODELS.instance(gltf.scene, bays[style], { colorPrim: style === 'baroque' ? 'walk' : null })));
   // east side: 24 bays from z -150 down to -262, one wider slot for the library's Baroque facade
   const east = [['baroque', { tall: true }], ['yang'], ['min'], ['baroque', { col: 'walk' }], ['baroque', { floors: 3 }], ['yang'],
                 ['lib'], ['baroque'], ['min'], ['baroque', { col: 'walk', medal: 'verm' }], ['yang', { floors: 3 }], ['baroque'],
@@ -186,20 +139,20 @@
 
   // ── goods under the east arcade and in the west fillers: sacks, price boards, crates, jars,
   //    hanging dried goods, tin signs under the arcade lip, acrylic boxes on the facade ──
-  const goods = [], jars = [], signs = [];
+  const goods = [], jars = [], signs = [], sacks = [], crates = [], bikes = [];
   shops.forEach((s, si) => {
     const side = s.s, gx = s.fx - side * 0.3, hz = s.span / 2 - 0.5;
-    for (let i = 0; i < 4; i++) {                              // sacks, some two high
+    for (let i = 0; i < 4; i++) {                              // sacks, some two high (props.glb, issue #5)
       const z = s.z - hz + 0.35 + i * 0.72 + (rnd() - 0.5) * 0.15;
-      goods.push({ x: gx, y: WALK, z, w: 0.5, d: 0.6, r: (rnd() - 0.5) * 0.3, c: C(i === 1 ? 'haze' : 'bone'), h: HA(0.5) });
-      if (i % 2 === 0) goods.push({ x: gx, y: WALK + 0.5, z, w: 0.46, d: 0.55, r: (rnd() - 0.5) * 0.4, c: C('bone'), h: HA(0.42) });
+      sacks.push({ x: gx, y: WALK, z, w: 1, d: 1, r: (rnd() - 0.5) * 0.3, h: HA(1) });
+      if (i % 2 === 0) sacks.push({ x: gx, y: WALK + 0.58, z, w: 0.92, d: 0.92, r: (rnd() - 0.5) * 0.4, h: HA(0.85) });
     }
     for (let b = 0; b < 3; b++) {                              // hand-written price boards stuck in the piles, red paper
       const z = s.z - hz + 0.45 + b * 0.72;
       goods.push({ x: gx - side * 0.3, y: WALK + (b % 2 ? 0.5 : 0.92), z, w: 0.04, d: 0.36, r: (rnd() - 0.5) * 0.3, c: C(b === 1 ? 'bone' : 'verm'), h: HA(0.44) });
     }
     const z = s.z + hz - 0.5;                                  // a crate with jars, the far end of the front
-    goods.push({ x: gx, y: WALK, z, w: 0.5, d: 0.95, r: 0, c: C('haze'), h: HA(0.5) });
+    crates.push({ x: gx, y: WALK, z, w: 1, d: 1.6, r: 0, h: HA(1) });
     for (let k = 0; k < 3; k++) jars.push({ x: gx, y: WALK + 0.5, z: z - 0.32 + k * 0.32, w: 0.27, d: 0.27, c: C(k === 1 ? 'lamp' : (k === 2 ? 'haze' : 'bone')), h: HA(0.36) });
     goods.push({ x: s.fx - side * 0.25, y: 3.0, z: s.z, w: 0.06, d: s.span - 1.2, r: 0, c: C('ink'), h: HA(0.06) });   // the rod
     for (let i = 0; i < 6; i++) {
@@ -216,23 +169,18 @@
   //    front, orange tiles and a swallowtail ridge. Porch over the sidewalk, forecourt in front. ──
   const lant = [];
   (() => {
-    const cz = G.z, hw = 8, depth = 9, WH = 5.0;               // hall z -244 … -236, x -8.8 … -17.8, walls 5 m
-    const xf = -8.8, cx = xf - depth / 2;
-    part(cx - 0.6, 0, cz, depth - 1.2, hw, only(ALL, WH, 'brick'));                  // hall: brick side and back walls
-    part(xf - 0.3, 0, cz, 0.6, hw - 0.4, only(ALL, WH, 'ink'));                        // the carved wooden front wall
-    [-1.3, 1.3].forEach(dz => part(xf + 0.02, 0, cz + dz, 0.1, 1.2, only(ALL, 3.0, 'verm')));   // the doors
-    part(xf + 0.03, 3.1, cz, 0.1, 3.8, only(ALL, 0.7, 'lamp'));                        // the name board over the doors
-    [-3.6, 3.6].forEach(dz => part(-6.5, WALK, cz + dz, 0.7, 0.7, only(ALL, WH - 0.1, 'verm'), 0, cylGeo)); // porch columns at the kerb line
-    part(-6.5, WALK, cz, 0.35, hw - 0.8, only(ALL, 0.5, 'brick'));                     // low step between the columns
-    part(-12.0, WH + 0.1, cz, depth + 3.1, hw + 0.8, only(ALL, 0.4, 'ink'));           // eave beam under the roof, porch included
-    part(-12.0, WH + 0.5, cz, 12.6 / 1.732, hw + 2.6, only(ALL, 4.2 / 1.5, 'brick'), 0, prismGeo);   // the tiled roof, x -18.3 … -5.7
-    part(-12.0, WH + 4.4, cz, 0.6, hw + 3.8, only(ALL, 2.6, 'ink'), 0, ridgeGeo);     // 燕尾脊, tips sweeping out past the gables
-    part(-12.0, WH + 4.45, cz, 0.7, hw + 2.0, only(ALL, 0.45, 'verm'));                // the ridge's painted band
+    const cz = G.z, WH = 5.0, xf = -8.8;                       // hall z -244 … -236, x -8.8 … -17.8, walls 5 m
+    // Issue #5 step 2: the hall, carved front with red doors, porch columns, brackets, tiled
+    // roof, swallowtail ridge, lanterns and incense burner are the glb from asset/blender/temple.py
+    // (8.4k triangles); the name board and the 月老 sign stay canvas text on it.
+    const temple = libGroup(ALL);
+    MODELS.load('temple', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(xf, 0, cz); root.rotation.y = Math.PI / 2;
+      temple.add(root);
+    });
     signPart('霞海城隍廟', 'ink', 'lamp', false, 'x', -5.65, WH - 0.9, cz, 0.85, ALL);   // the name on the eave, facing the road
-    [-2.0, 2.0].forEach(dz => lant.push({ x: -6.3, y: 3.2, z: cz + dz, w: 1.0, d: 1.0, r: 0, c: C('verm'), h: HA(1.0) }));
-    part(-6.9, WALK, cz, 1.0, 1.0, only(ALL, 1.0, 'ink'), 0, potGeo);                  // incense burner on the forecourt
-    part(-6.9, WALK + 0.95, cz, 1.25, 1.25, only(ALL, 0.12, 'ink'), 0, cylGeo);
-    part(-6.9, WALK + 1.05, cz, 0.1, 0.1, only(ALL, 2.4, 'bone'));                     // smoke
+    part(-6.9, WALK + 1.05, cz, 0.1, 0.1, only(ALL, 2.4, 'bone'));                     // smoke off the burner
     part(-6.75, WALK + 1.05, cz - 0.12, 0.07, 0.07, only(ALL, 3.0, 'bone'));
     signPart('月老', 'verm', 'bone', true, 'x', -6.35, WALK, cz + 5.2, 1.8, DT);       // the matchmaker board at the queue head
     G.top = 12.5;
@@ -243,26 +191,16 @@
   // ── 永樂市場 — the 1982 concrete market: a big pale block, upper floors stepped back, cloth
   //    market on the upper floors, wet market open at the ground floor, red vertical sign. ──
   (() => {
-    const z0 = -263, z1 = -285, zc = (z0 + z1) / 2, d = z0 - z1, xf = -9.3;
-    const winTex = (() => {                                    // horizontal window bands
-      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
-      const g = cv.getContext('2d');
-      g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
-      g.fillStyle = 'rgba(0,0,0,0.5)'; for (let i = 0; i < 4; i++) g.fillRect(i * 16 + 3, 20, 10, 24);
-      const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
-    })();
-    const block = (x, y, w, dd, h, rep) => {
-      const p = part(x, y, zc, w, dd, only(ALL, h, 'walk'));
-      p.mesh.material.map = winTex.clone(); p.mesh.material.map.repeat.set(rep, h / 3.4); p.mesh.material.map.needsUpdate = true; p.mesh.material.needsUpdate = true;
-      return p;
-    };
-    block(xf - 8, 4.0, 16, d, 13.6, 6);                        // floors 2–5 over the open ground floor
-    block(xf - 10, 17.6, 12, d - 6, 6.8, 4);                   // floors 6–7 stepped back
-    part(xf - 8, 17.6, zc, 16.2, d + 0.2, only(ALL, 0.25, 'ink'));   // roof lines
-    part(xf - 10, 24.4, zc, 12.2, d - 5.8, only(ALL, 0.25, 'ink'));
-    part(xf - 8.5, 0, zc, 15, d - 0.4, only(ALL, 4.0, 'haze'));      // the ground-floor hall, in shade
-    for (let z = z0 - 0.4; z > z1; z -= 3.6) goods.push({ x: xf + 0.3, z, w: 0.6, d: 0.6, h: HA(4.0), c: C('walk') });   // columns
-    goods.push({ x: xf - 8, y: 3.7, z: zc, w: 16, d: d, h: HA(0.3), c: C('walk') });                                       // ceiling edge
+    const z0 = -263, z1 = -285, zc = (z0 + z1) / 2, xf = -9.3;
+    // Issue #5 step 2: the open hall on its columns, floors 2–5 with cut window bands, the
+    // stepped floors 6–7, roof slabs, sign frame, plant room, tank and stair tower are the glb
+    // from asset/blender/yongle.py (9.1k triangles); the three text signs stay canvas boards.
+    const market = libGroup(ALL);
+    MODELS.load('yongle', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(xf, 0, zc); root.rotation.y = Math.PI / 2;
+      market.add(root);
+    });
     signPart('永樂市場', 'verm', 'bone', true, 'z', xf + 0.6, 6.0, z0 - 1.6, 7.0, ALL);
     signPart('永樂布業商場', 'bone', 'verm', false, 'x', xf + 0.15, 4.5, zc, 1.3, ALL);
     signPart('永樂市場', 'verm', 'bone', false, 'x', xf - 4.0, 24.6, zc, 1.8, ALL);   // rooftop
@@ -332,17 +270,17 @@
     for (let z = k.z0; z > k.z1; z -= 1.8) {
       if (k.x < 0 && (Math.abs(z + 168) < 2.2 || Math.abs(z + 186) < 2.6)) continue;   // the tricycle and the truck
       const r = rnd();
-      if (r < 0.35) veh.push({ x: k.x, y: 0, z, w: 0.18, d: 1.6, r: (rnd() - 0.5) * 0.3, c: C(rnd() < 0.8 ? 'haze' : 'ink'), h: HA(0.9) });
+      if (r < 0.35) { rnd(); bikes.push({ x: k.x, y: 0, z, w: 1, d: 1, r: (rnd() - 0.5) * 0.3 + (k.x > 0 ? Math.PI : 0), h: HA(1) }); }   // a bicycle (props.glb)
       else if (r < 0.75) veh.push({ x: k.x, y: 0, z, w: 0.5, d: 1.7, r: (rnd() - 0.5) * 0.2, c: C(rnd() < 0.85 ? 'haze' : 'bone'), h: HA(0.85) });
     }
   });
-  for (let i = 0; i < 8; i++) veh.push({ x: -21.6 + (rnd() - 0.5) * 0.8, y: 0.8, z: -232 + i * 6, w: 0.18, d: 1.5, r: 0.35 + rnd() * 0.3, c: C('haze'), h: HA(0.85) });   // bicycles on the promenade
+  for (let i = 0; i < 8; i++) bikes.push({ x: -21.6 + (rnd() - 0.5) * 0.8, y: 0.8, z: -232 + i * 6, w: 1, d: 1, r: 0.35 + rnd() * 0.3, h: HA(1) });   // bicycles on the promenade
   asset('sanlunche', lib, -5.7, -168, 0);
   asset('blue-mini-truck', lib, -5.6, -186, Math.PI);
 
   // ── 年貨大街: the entrance archway, lantern strings over the road, banners, stalls both
   //    sides with red price boards, the two library stalls ──
-  const fest = [];
+  const fest = [], stalls = [];
   asset('nianhuo-archway', lib, 0, -150, 0, 1.6);
   for (let k = 0; k < 8; k++) {
     const z = -198 - k * 12;
@@ -353,11 +291,7 @@
   let boardN = 0;
   [-1, 1].forEach(side => { for (let k = 0; k < 15; k++) {
     const z = -199 - k * 6 + (rnd() - 0.5) * 1.5, x = side * 5.0;
-    fest.push({ x, z, w: 1.6, d: 3.0, r: 0, c: C('haze'), h: HA(0.9) });                            // table
-    fest.push({ x, y: 0.9, z, w: 1.2, d: 2.4, r: 0, c: C(k % 2 ? 'lamp' : 'bone'), h: HA(0.35) });   // the goods
-    fest.push({ x, y: 2.25, z, w: 2.2, d: 3.6, r: 0, c: C(k % 3 === 0 ? 'verm' : 'bone'), h: HA(0.12) }); // canopy
-    fest.push({ x: x - side * 0.9, z: z - 1.6, w: 0.07, d: 0.07, r: 0, c: C('ink'), h: HA(2.25) });
-    fest.push({ x: x - side * 0.9, z: z + 1.6, w: 0.07, d: 0.07, r: 0, c: C('ink'), h: HA(2.25) });
+    stalls.push({ x, z, r: side > 0 ? -Math.PI / 2 : Math.PI / 2, w: 1, d: 1, h: HA(1) });          // table, goods, canopy, posts: stall.glb (issue #5)
     if (k < 4) signPart(priceTexts[boardN++ % 8], 'verm', 'bone', false, 'x', x - side * 0.85, 0.95, z + 0.4, 0.42, ALL);   // red paper, written
     else fest.push({ x: x - side * 0.85, y: 0.95, z: z + 0.4, w: 0.05, d: 0.9, r: 0, c: C('verm'), h: HA(0.42) });         // red paper, plain
     fest.push({ x: x - side * 0.85, y: 0.95, z: z - 0.9, w: 0.05, d: 0.6, r: 0, c: C(k % 2 ? 'verm' : 'bone'), h: HA(0.36) });
@@ -381,21 +315,17 @@
   };
   brickSplit(boxGeo, cols);
   brickSplit(boxGeo, bodies);
-  instSet(boxGeo, lam('bone'), slabs, { colors: true });
-  brickSplit(boxGeo, walls);
-  instSet(boxGeo, lam('ink'), wins);
-  instSet(archGeo, lam('ink'), arches);
-  brickSplit(boxGeo, pils);
-  instSet(boxGeo, lam('bone'), caps);
-  instSet(crestGeo, lam('bone'), crests, { colors: true });
-  instSet(archGeo, lam('lamp'), meds, { colors: true });
-  instSet(boxGeo, lam('ink'), roofs);
-  brickSplit(boxGeo, rails);
   instSet(boxGeo, lam('bone'), goods, { colors: true });
   instSet(cylGeo, lam('bone'), jars, { colors: true });
   instSet(boxGeo, lam('bone', { emissive: C('lamp'), emissiveIntensity: 0.18 }), signs, { colors: true });
   instSet(sphGeo, lam('verm', { emissive: C('verm'), emissiveIntensity: 0.4 }), lant, { colors: true });
   instSet(boxGeo, lam('bone'), fest, { colors: true });
+  MODELS.load('stall', gltf => MODELS.instance(gltf.scene, stalls, { emissive: 0.5 }));
+  MODELS.load('props', gltf => {
+    MODELS.instance(MODELS.node(gltf.scene, 'sack'), sacks);
+    MODELS.instance(MODELS.node(gltf.scene, 'crate'), crates);
+    MODELS.instance(MODELS.node(gltf.scene, 'bicycle'), bikes);
+  });
   instSet(boxGeo, lam('bone'), figs, { colors: true });
   instSet(boxGeo, lam('haze'), veh, { colors: true });
 })();

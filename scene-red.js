@@ -2,10 +2,10 @@
 // real building: the Red House octagon and its cross-shaped market wing, the eight blocks of
 // 中華商場 with their rooftop neon, 樂聲戲院 with hand-painted billboards, 萬年大樓, and the
 // 1999 pedestrian zone. The teammate's Ximending asset library fills the shopfronts between.
-// Primitives, canvas textures and the palette only. References are listed in HANDOFF.md.
+// Primitives, canvas textures and the palette, plus the Red House glb (issue #5). References are listed in HANDOFF.md.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam, withFog } = window.SCENE;
   const RED = ['red'], ALL = ['red', 'dadao', 'tower'];
   const RH = anchors.redhouse;                                                  // { x: 11, z: -70 }
   const hOf = (h, eras) => { const o = {}; (eras || RED).forEach(k => o[k] = h); return o; };
@@ -13,22 +13,13 @@
 
   // ── shared geometry (base at y = 0) ─────────────────────────────────────────
   const pyr = new THREE.CylinderGeometry(0, 1, 1, 4); pyr.translate(0, 0.5, 0);
-  const oct = new THREE.CylinderGeometry(1, 1, 1, 8); oct.translate(0, 0.5, 0);
-  const octCone = new THREE.CylinderGeometry(0.06, 1, 1, 8); octCone.translate(0, 0.5, 0);
   const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.15, 10); wheelGeo.rotateZ(Math.PI / 2); wheelGeo.translate(0, 0.5, 0);
   const basketGeo = new THREE.CylinderGeometry(0.5, 0.38, 1, 8); basketGeo.translate(0, 0.5, 0);
   const planeGeo = new THREE.PlaneGeometry(1, 1); planeGeo.translate(0, 0.5, 0);           // faces +z
-  // gable roof: unit triangular prism. wedgeZ has its ridge along z, wedgeX along x.
-  function wedge(alongX) {
-    const sh = new THREE.Shape(); sh.moveTo(-0.5, 0); sh.lineTo(0.5, 0); sh.lineTo(0, 1); sh.closePath();
-    const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.translate(0, 0, -0.5);
-    if (alongX) g.rotateY(Math.PI / 2);
-    return g;
-  }
-  const wedgeZ = wedge(false), wedgeX = wedge(true);
 
   // ── item buckets, one InstancedMesh each ────────────────────────────────────
-  const furn = [], crowd = [], wheels = [], baskets = [], bodies = [], columns = [], winBoxes = [];
+  const furn = [], crowd = [], wheels = [], baskets = [];
+  const bollards = [], aboards = [], plants = [], boxes = [];                     // issue #5 glb instances
   const F = (x, z, y, w, d, h, col, eras, r) => furn.push({ x, z, y: y || 0, w, d, r: r || 0, h: hOf(h, eras), c: C(col) });
 
   // ── canvas text helpers ─────────────────────────────────────────────────────
@@ -81,51 +72,20 @@
   // arched openings at street level, paired windows above, pale horizontal bands and quoins,
   // an eight-sided slate roof with a small lantern) and, behind it, the one-storey cross-shaped
   // hall with gable roofs. Octagon centred east of the road; the cross wing runs away from it.
+  // Issue #5 step 1: the building is a glb built by asset/blender/red-house.py (bevelled edges,
+  // boolean-cut openings, flat palette materials, 30.7k triangles) and loaded here in place of
+  // the canvas-textured primitives. The glb keeps the primitive build's sizes: circumradius
+  // 7.2, eave 8.8, the long arm 30 x 8.4 centred 21 m behind the octagon, the cross arm 23 m.
+  // Its front faces +Z before rotation, like the library assets, so -π/2 turns it to the road.
   (() => {
-    const R = 7.2, EAVE = 8.8, cx = 16.6, cz = RH.z, S = 58;                    // S = px per metre on the wall texture
-    // the wall: one texture for all eight facets. Canvas y runs top→bottom, metres bottom→top.
-    const { cv, g } = canvas(2048, Math.round(EAVE * S), 'brick');
-    const Y = m => cv.height - m * S;
-    g.fillStyle = PALETTE.bone;
-    g.fillRect(0, Y(4.55), 2048, 0.35 * S);                                        // string course between floors
-    g.fillRect(0, Y(EAVE), 2048, 0.55 * S);                                        // cornice
-    g.fillRect(0, Y(0.5), 2048, 0.5 * S);                                          // plinth
-    for (let f = 0; f < 8; f++) {
-      const x0 = f * 256;
-      for (let q = 0; q < 14; q++) { g.fillStyle = q % 2 ? PALETTE.brick : PALETTE.bone; g.fillRect(x0 - 10, Y(0.6 * q + 0.6), 20, 0.6 * S); } // quoins on each corner
-      g.fillStyle = PALETTE.bone; g.fillRect(x0 + 82, Y(3.9), 92, 3.4 * S);         // ground floor: pale arch surround
-      g.beginPath(); g.arc(x0 + 128, Y(3.9) + 46, 46, 0, Math.PI * 2); g.fill();
-      g.fillStyle = PALETTE.ink; g.fillRect(x0 + 92, Y(3.6), 72, 3.1 * S);          // the arched opening, dark inside
-      g.beginPath(); g.arc(x0 + 128, Y(3.6) + 36, 36, 0, Math.PI * 2); g.fill();
-      [x0 + 60, x0 + 150].forEach(wx => {                                          // upper floor: two tall windows with pale frames
-        g.fillStyle = PALETTE.bone; g.fillRect(wx - 6, Y(7.6), 58, 2.5 * S);
-        g.fillStyle = PALETTE.ink; g.fillRect(wx, Y(7.45), 46, 2.2 * S);
-        g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(wx, Y(7.45), 46, 14);
-      });
-    }
-    const wall = part(cx, 0, cz, R, R, only(ALL, EAVE, 'bone'), Math.PI / 8, oct);
-    wall.mesh.material.map = tex(cv); wall.mesh.material.needsUpdate = true;
-    part(cx, EAVE, cz, R + 0.7, R + 0.7, only(ALL, 0.35, 'ink'), Math.PI / 8, oct);                  // eave slab
-    part(cx, EAVE + 0.35, cz, R + 0.6, R + 0.6, only(ALL, 3.4, 'ink'), Math.PI / 8, octCone);         // slate roof
-    part(cx, EAVE + 3.55, cz, 1.3, 1.3, only(ALL, 1.3, 'bone'), Math.PI / 8, oct);                    // the lantern
-    part(cx, EAVE + 4.85, cz, 1.6, 1.6, only(ALL, 0.9, 'ink'), Math.PI / 8, octCone);
-    part(cx, EAVE + 5.7, cz, 0.12, 0.12, only(ALL, 1.2, 'ink'));                                      // finial
-    // the cross-shaped hall behind the octagon: two gabled arms crossing, brick with pale bands
-    const H = 4.6, AX = 22.6 + 15, AZ = cz;                                                           // the long arm starts inside the octagon's rear face (x 23.25)
-    const arm = (x, z, w, d, alongX) => {
-      part(x, 0, z, w, d, only(ALL, H, 'brick'));
-      part(x, H - 0.4, z, w + 0.3, d + 0.3, only(ALL, 0.35, 'bone'));                                 // cornice band
-      part(x, H - 0.05, z, w + 0.6, d + 0.6, only(ALL, 2.6, 'ink'), 0, alongX ? wedgeX : wedgeZ);     // gable roof
-      // windows: ink boxes on both long sides
-      const n = Math.floor((alongX ? w : d) / 2.4);
-      for (let i = 0; i < n; i++) {
-        const u = -(alongX ? w : d) / 2 + 1.2 + i * 2.4 + 0.6;
-        [-1, 1].forEach(s => winBoxes.push(alongX ? { x: x + u, z: z + s * (d / 2 + 0.03), y: 1.2, w: 1.0, d: 0.06, h: hOf(2.2, ALL) }
-                                                    : { x: x + s * (w / 2 + 0.03), z: z + u, y: 1.2, w: 0.06, d: 1.0, h: hOf(2.2, ALL) }));
-      }
-    };
-    arm(AX, AZ, 30, 8.4, true);                                                                       // the long arm, away from the road
-    arm(AX + 2, AZ, 8.4, 30, false);                                                                  // the cross arm
+    const cx = 16.6, cz = RH.z, EAVE = 8.8;
+    const house = libGroup(ALL);                                                  // there in every era
+    MODELS.load('red-house', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(cx, 0, cz);
+      root.rotation.y = -Math.PI / 2;
+      house.add(root);
+    });
     // the plaza in front: packed earth in the 80s, the 2002 paving after
     part(cx - 2, 0, cz + 11, 18, 10, { red: { h: 0.06, col: 'haze' }, dadao: { h: 0.08, col: 'walk' }, tower: { h: 0.08, col: 'walk' } });
     RH.top = EAVE + 7.5;
@@ -142,20 +102,17 @@
     const NAMES = ['忠', '孝', '仁', '愛', '信', '義', '和', '平'];
     const NEON = [['國際牌', 'verm'], ['黑松汽水', 'lamp'], ['三洋', 'verm'], ['聲寶', 'lamp'], ['歌林', 'verm'], ['大同', 'lamp'], ['味全', 'verm'], ['SONY', 'lamp']];
     const L = 10, GAP = 1.6, FLOOR = 3.3, XF = -6.2, DEPTH = 10;                 // block length, gap, storey height, arcade line, depth
-    const upper = [], plates = [];
-    const upperTex = facadeTex(3, 2, 'bone', 'haze');
+    // Issue #5 step 2: one block is the glb from asset/blender/chunghwa.py (arcade columns, shop
+    // wall with dark doorways and sign boards, the balcony-window storey, parapet, roof tank),
+    // cloned eight times. The name plates and the rooftop neon stay canvas text on it.
+    const blocks = libGroup(RED), blockZ = NAMES.map((nm, i) => 46 - L / 2 - i * (L + GAP));
+    MODELS.load('chunghwa', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      blockZ.forEach(z => { const b = root.clone(); b.position.set(XF, 0, z); b.rotation.y = Math.PI / 2; blocks.add(b); });
+    });
+    const plates = [];
     NAMES.forEach((nm, i) => {
-      const z = 46 - L / 2 - i * (L + GAP), x0 = XF - DEPTH / 2;
-      // arcade: columns at the kerb line, the shop wall behind, a sign band on it
-      for (let k = 0; k < 4; k++) columns.push({ x: XF - 0.25, z: z - L / 2 + 0.45 + k * (L - 0.9) / 3, w: 0.5, d: 0.5, h: hOf(FLOOR), c: C('walk') });
-      part(XF - 1.7, 0, z, 3.0, L, only(RED, FLOOR, 'haze'));                    // the ground-floor shop wall (x -7.7 … -10.7)
-      for (let k = 0; k < 3; k++) {
-        F(XF - 0.15, z - L / 2 + 1.7 + k * 3.3, 2.2, 0.1, 2.6, 0.7, k % 2 ? 'verm' : 'lamp');      // shop signs under the arcade
-        F(XF - 1.6 + 1.5 - 0.02, z - L / 2 + 1.7 + k * 3.3, 0, 0.06, 2.0, 2.2, 'ink');            // the open shop doorway, dark
-      }
-      // upper two storeys, over the arcade, with balcony windows (instanced, one shared texture)
-      upper.push({ x: x0, z, y: FLOOR, w: DEPTH, d: L, h: hOf(FLOOR), c: C('bone') });
-      part(x0, FLOOR * 2, z, DEPTH + 0.3, L + 0.3, only(RED, 0.5, 'haze'));      // parapet / roof slab
+      const z = blockZ[i], x0 = XF - DEPTH / 2;
       // block name: a pale plate on the road-facing corner
       const v = vertTex(nm + '棟', 'bone', 'ink', 'verm');
       board(XF + 0.02, FLOOR + 0.3, z + L / 2 - 1.2, 3.0 * v.aspect, 3.0, v.t, RED, 'x');
@@ -169,7 +126,6 @@
       const p = board(sx + 0.15, y + 0.5, sz, 4.4, 2.5, t, RED, 'x', 0.7); p.mesh.rotation.y = -0.35; // faces the road, turned toward the camera
       plates.push(p);
     });
-    instSet(boxGeo, lam('bone', { map: upperTex }), upper, { colors: true }).mesh.material.map.repeat.set(6, 1);
   })();
 
   // ═══ 3. 樂聲戲院 — the cinema on 武昌街 with hand-painted billboards ═══════════════════
@@ -178,11 +134,15 @@
   // a marquee canopy over the doors and poster cases at the pavement. West side, opposite the
   // Red House, so it is in frame with the octagon from the second keyframe.
   (() => {
-    const z = -66, W = 15, D = 12, Hh = 10, XF = -9.3;                              // three storeys: the childhood street stays low
-    part(XF - D / 2, 0, z, D, W, only(ALL, Hh, 'bone'));
-    part(XF - D / 2, Hh, z, D + 0.4, W + 0.4, only(ALL, 0.5, 'haze'));
-    part(XF - 0.6, 4.2, z, 3.2, W - 2, only(ALL, 0.35, 'ink'));                   // marquee canopy over the entrance
-    [-1, 1].forEach(s => part(XF + 0.02, 0, z + s * (W / 2 - 0.5), 0.05, 0.05, only(ALL, 4.2, 'ink')));
+    const z = -66, W = 15, XF = -9.3;                                              // three storeys: the childhood street stays low
+    // Issue #5 step 2: the block, marquee, lobby, ticket booth, poster cases and roof lattice are
+    // the glb from asset/blender/lux.py; the painted billboards below stay canvas text on it.
+    const lux = libGroup(ALL);
+    MODELS.load('lux', gltf => {
+      const root = MODELS.lambertize(gltf.scene);
+      root.position.set(XF, 0, z); root.rotation.y = Math.PI / 2;
+      lux.add(root);
+    });
     // two painted billboards filling the upper facade
     function poster(title, sub, bg, blob) {
       const { cv, g } = canvas(1024, 768, bg);
@@ -201,7 +161,6 @@
     const v = vertTex('樂聲戲院', 'verm', 'bone', 'bone');
     board(XF + 0.9, 3.6, z + W / 2 + 0.36, 6 * v.aspect, 6, v.t, ALL, 'z', 0.6);      // corner neon, read from the street
     F(XF + 0.6, z + W / 2 + 0.12, 3.4, 2.2, 0.3, 6.4, 'ink', ALL);                    // its dark backing, behind the board
-    for (let k = 0; k < 6; k++) F(XF + 0.06, z - 5 + k * 2, 0.9, 0.06, 1.2, 1.6, k % 2 ? 'lamp' : 'haze', ALL);  // poster cases
   })();
 
   // ═══ 4. 萬年大樓 — the 1973 commercial tower, the tall landmark at the end of the chapter ═
@@ -234,7 +193,7 @@
     const t = tex(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 16);
     const pv = part(0, 0, (z0 + z1) / 2, 12.4, z0 - z1, only(ALL, 0.08, 'haze'));
     pv.mesh.material.map = t; pv.mesh.material.needsUpdate = true;
-    [-5.4, -3.2, 3.2, 5.4].forEach(x => F(x, z0 + 0.6, 0, 0.3, 0.3, 0.9, 'haze', ALL));   // bollards, the centre kept clear for the girl
+    [-5.4, -3.2, 3.2, 5.4].forEach(x => [z0 + 0.6, z1 - 0.6].forEach(z => bollards.push({ x, z, w: 1, d: 1, h: hOf(1, ALL) })));   // bollards (bollard.glb), the centre kept clear for the girl
     // the gateway: two posts, a flat arch, the sign
     [-6.4, 6.4].forEach(x => part(x, 0, z0, 0.5, 0.5, only(ALL, 6.2, 'verm')));
     const sh = new THREE.Shape(); sh.absarc(0, 0, 1, 0, Math.PI, false); sh.absarc(0, 0, 0.82, Math.PI, 0, true);
@@ -245,7 +204,6 @@
 
   // ═══ the shopfronts between: the teammate's Ximending library, with building bodies behind ═
   const lib = libGroup(['red']);
-  const bodyTex = facadeTex(4, 3, 'bone'); bodyTex.needsUpdate = true;
   // place a library storefront with its front on the sidewalk's outer edge (|x| = 9.2)
   function front(id, side, z, scale) {
     const a = findAsset(id); if (!a) return null;
@@ -253,8 +211,20 @@
     const b = new THREE.Box3().setFromObject(probe), maxz = b.max.z * (scale || 1);
     return asset(id, lib, side * (9.2 + maxz), z, side > 0 ? -Math.PI / 2 : Math.PI / 2, scale);
   }
-  // a plain building body, x 9.4 outward, with a window texture on the road face
-  const body = (side, z, len, h, col) => bodies.push({ x: side * (9.4 + 4.6), z, w: 9.2, d: len, h: hOf(h), c: C(col) });
+  // a building body behind the storefront, x 9.4 outward. Issue #5: tiled from shopfront.glb
+  // (asset/blender/shopfront.py): a ground module, one storey module per floor, a roof module,
+  // each 6 m wide and scaled to the body's length; the body's colour goes on the walls.
+  const tiles = { ground: [], storey: [], roof: [] };
+  const body = (side, z, len, h, col) => {
+    const nx = Math.max(1, Math.round(len / 6)), tw = len / nx, ny = Math.max(1, Math.round((h - 0.6) / 3.3));
+    const r = side > 0 ? -Math.PI / 2 : Math.PI / 2, c = C(col);
+    for (let i = 0; i < nx; i++) {
+      const zz = z + len / 2 - tw * (i + 0.5);
+      tiles.ground.push({ x: side * 9.4, z: zz, y: 0, r, w: tw / 6, d: 1, h: hOf(1), c });
+      for (let f = 1; f < ny; f++) tiles.storey.push({ x: side * 9.4, z: zz, y: f * 3.3, r, w: tw / 6, d: 1, h: hOf(1), c });
+      tiles.roof.push({ x: side * 9.4, z: zz, y: ny * 3.3, r, w: tw / 6, d: 1, h: hOf(1), c });
+    }
+  };
   // east side, from the street start: the 1980s row, then the Red House, then the 1990s
   // CJ, 2026-09-21: 「我希望一開始的兩邊不要太多大建築」— the opening stays open: two-storey
   // bodies only until the Red House plaza; the tall blocks start further down the street.
@@ -376,6 +346,17 @@
   // kerb stalls under the arcades, facing the road, clear of the library props and the camera
   [[1, 32], [1, 21.5], [1, -19.5], [1, -33], [-1, -52], [-1, -76], [-1, -114], [1, -74], [1, -86], [1, -100]].forEach(([s, z], i) => stall(s * 7.9, z, -s, 0, i + 5, [1.3, 2.0]));
 
+  // ── small props along the sidewalks (props.glb): A-board signs at the kerb, potted plants and
+  //    box stacks by the shop walls; kept off the camera keyframe (-3, 3.5, -34) and the gateway ──
+  for (let z = 30, i = 0; z > -132; z -= 9, i++) {
+    const s = i % 2 ? 1 : -1;
+    if (s < 0 && z < -27 && z > -41) continue;
+    if (Math.abs(z + 96) < 3) continue;
+    aboards.push({ x: s * 7.3, z: z + 1.5, w: 1, d: 1, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, h: hOf(1) });
+    plants.push({ x: s * 8.9, z: z - 2.2, w: 1, d: 1, r: rnd() * 6.28, h: hOf(1) });
+    if (i % 3 === 0) boxes.push({ x: s * 8.6, z: z + 3.8, w: 1, d: 1, r: (rnd() - 0.5) * 0.4, h: hOf(1) });
+  }
+
   // ── the street crowd along both kerbs, thick at the pedestrian zone ──
   (() => {
     let n = 0;
@@ -407,12 +388,9 @@
 
   // ── build the instanced sets ────────────────────────────────────────────────
   instSet(boxGeo, lam('bone'), furn, { colors: true });
-  instSet(boxGeo, lam('walk'), columns, { colors: true });
-  instSet(boxGeo, lam('ink'), winBoxes);
-  // window rows scale with height: three rows on the low bodies, six on the tall ones
-  instSet(boxGeo, lam('bone', { map: bodyTex }), bodies.filter(b => b.h.red <= 4.5), { colors: true }).mesh.material.map.repeat.set(2, 0.34);
-  instSet(boxGeo, lam('bone', { map: bodyTex.clone() }), bodies.filter(b => b.h.red > 4.5 && b.h.red <= 8), { colors: true }).mesh.material.map.repeat.set(2, 0.67);
-  instSet(boxGeo, lam('bone', { map: bodyTex.clone() }), bodies.filter(b => b.h.red > 8), { colors: true }).mesh.material.map.repeat.set(2, 1);
+  MODELS.load('shopfront', gltf => Object.keys(tiles).forEach(k => MODELS.instance(MODELS.node(gltf.scene, k), tiles[k], { colorPrim: 'bone' })));
+  MODELS.load('bollard', gltf => MODELS.instance(gltf.scene, bollards));
+  MODELS.load('props', gltf => { MODELS.instance(MODELS.node(gltf.scene, 'aboard'), aboards); MODELS.instance(MODELS.node(gltf.scene, 'plant'), plants); MODELS.instance(MODELS.node(gltf.scene, 'boxes'), boxes); });
   instSet(basketGeo, lam('bone'), baskets, { colors: true });
   instSet(boxGeo, lam('bone'), crowd, { colors: true });
 })();

@@ -353,7 +353,7 @@
       const med = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
       fitTile(mat, med(items.map(it => Math.max(it.w, it.d))), med(items.map(it => Math.max(...Object.values(it.h)))));
     }
-    if (opts && opts.colors) {
+    if (opts && opts.colors && items.length) {                 // an empty set has no instanceColor buffer
       items.forEach((it, i) => mesh.setColorAt(i, it.c || C('haze')));
       mesh.instanceColor.needsUpdate = true;
     }
@@ -471,30 +471,27 @@
     });
   }
 
-  // lampposts on both sidewalks: gas lamps sparse, then dense
+  // lampposts on both sidewalks: sparse at first, then dense. Issue #5: the lamp is a glb
+  // (asset/blender/lamp.py) instanced through MODELS.instance; the height per era scales it, the
+  // curved arm turns toward the road, the lantern head glows a little.
   (() => {
-    const posts = [], heads = [];
+    const items = [];
     for (let z = 40; z > -460; z -= 12) [-1, 1].forEach(s => {
       const k = Math.round(z / 12) % 3 === 0;
-      const h = { red: k ? 4 : 0, dadao: 5, tower: 6 };
-      posts.push({ x: s * (walkX + 0.9), z, w: 0.22, d: 0.22, h });
-      heads.push({ x: s * (walkX + 0.9), z, y: 0, w: 0.7, d: 0.7, h: { red: k ? 0.5 : 0, dadao: 0.5, tower: 0.5 }, lift: true });
+      items.push({ x: s * (walkX + 0.9), z, w: 1, d: 1, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, h: { red: k ? 0.75 : 0, dadao: 0.9, tower: 1 } });
     });
-    instSet(boxGeo, lit({ color: C('haze') }), posts);
-    const headSet = instSet(boxGeo, lit({ color: C('lamp'), emissive: C('lamp'), emissiveIntensity: 0.6 }), heads);
-    headSet.items.forEach((it, i) => { it.yOf = posts[i]; });
+    if (window.MODELS) MODELS.load('lamp', gltf => MODELS.instance(gltf.scene, items, { emissive: 0.6 }));
   })();
-  // trees along the sidewalks from the 1930s
+  // trees along the sidewalks from the 1930s (asset/blender/tree.py, a rounded canopy on a trunk)
   (() => {
-    const trunks = [], crowns = [];
+    const items = [];
     for (let z = 34; z > -460; z -= 15) [-1, 1].forEach(s => {
       if (Math.abs(z + 405) < 45) return;                       // the 101 plaza and the base shot
       if (z < -138 && z > -292) return;                          // Dihua Street has no street trees
-      trunks.push({ x: s * (walkX - 0.8), z, w: 0.35, d: 0.35, h: { red: 0, dadao: 2.6, tower: 3.2 } });
-      crowns.push({ x: s * (walkX - 0.8), z, w: 2.8 + rnd(), d: 2.8 + rnd(), h: { red: 0, dadao: 2.4, tower: 3 }, yOf: trunks[trunks.length - 1] });
+      const sc = 0.85 + rnd() * 0.3;
+      items.push({ x: s * (walkX - 0.8), z, w: sc, d: sc, r: rnd() * 6.28, h: { red: 0, dadao: 0.8, tower: 1 } });
     });
-    instSet(boxGeo, lit({ color: C('haze') }), trunks);
-    instSet(boxGeo, lit({ color: C('leaf') }), crowns);
+    if (window.MODELS) MODELS.load('tree', gltf => MODELS.instance(gltf.scene, items));
   })();
   // people on the sidewalks: more each era
   (() => {
@@ -568,7 +565,9 @@
   // Library materials are unfogged: the mist is off and its shader chunk is not theirs.
   const libGroups = [];
   function libGroup(eras) {
-    const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g); return g;
+    const g = new THREE.Group(); g.userData.eras = eras; scene.add(g); libGroups.push(g);
+    g.visible = eras.indexOf(ERAS[eraIdx].key) >= 0;   // the scene files run after the first setEra, so start in the right state
+    return g;
   }
   const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; if (m.isMeshStandardMaterial) { m.envMapIntensity = ENV_I; litMats.push(m); } m.needsUpdate = true; }); } });
   const libBox = new THREE.Box3(), libSize = new THREE.Vector3();
@@ -677,6 +676,21 @@
   bowl.position.set(0, 1.78, 0.5); girl.add(bowl);
   girl.scale.setScalar(1.15);
   scene.add(girl);
+  // Issue #5 step 4: the girl is a glb (asset/blender/girl.py) with two run frames, runA (left
+  // leg forward) and runB (right leg forward), swapped by stride phase. The primitive build above
+  // stays until the glb arrives; the same group carries position, bob and scale.
+  let frameA = null, frameB = null;
+  if (window.MODELS) MODELS.load('girl', gltf => {
+    const root = MODELS.lambertize(gltf.scene);
+    const a = MODELS.node(root, 'runA'), b = MODELS.node(root, 'runB');
+    if (!a || !b) return;
+    girl.children.slice().forEach(c => girl.remove(c));
+    // the glb faces +z (the library convention) and she runs down -z ahead of the camera, so
+    // turn the frames once here and the camera sees her back (CJ, 2026-09-23: 「人物可以不要倒著走嗎」)
+    a.rotation.y = b.rotation.y = Math.PI;
+    girl.add(a, b);
+    frameA = a; frameB = b;
+  });
   let stride = 0, lastProg = 0, run = 0;
   function updateGirl(u, camZ, dt) {
     const speed = Math.abs(u - lastProg) / Math.max(dt, 1e-3); lastProg = u;      // scroll speed drives the run
@@ -686,6 +700,7 @@
     girl.position.set(Math.sin(stride * 0.15) * 0.6, Math.abs(Math.sin(stride)) * 0.12 * run, z);
     const sw = Math.sin(stride) * (0.25 + run * 0.9);
     legL.rotation.x = Math.PI + sw; legR.rotation.x = Math.PI - sw;
+    if (frameA) { const fwd = Math.sin(stride) >= 0; frameA.visible = fwd; frameB.visible = !fwd; }   // the two-frame run
     const carry = Math.sin(stride * 2) * 0.04 * run;                                 // the bowl bobs a little as she runs; the arms stay on it
     bowl.position.y = 1.78 + carry; gArmL.position.y = gArmR.position.y = 1.95 + carry;
     hair.position.z = -0.2 - run * 0.06; fringe.position.y = 2.42 + Math.sin(stride * 2) * 0.01 * run;
