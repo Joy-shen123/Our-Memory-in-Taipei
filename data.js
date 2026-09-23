@@ -126,7 +126,7 @@
     // 5 · closing — high beside the tower, level with the crown, the man standing on its rim
     //     (issue #12). The fov opens from 62 to 82 over the climb so the world widens as he nears
     //     the crown (IVRESS borrow e). z still decreasing: the rig's uAtZ bisection needs it.
-    { p: [-22, 86, -392],  t: [-3, 103, -420], fov: 82 },
+    { p: [-19, 90, -395],  t: [-3, 104, -420], fov: 82 },
   ];
 
   const root = document.documentElement;
