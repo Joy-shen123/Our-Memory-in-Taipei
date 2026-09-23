@@ -8,7 +8,7 @@
   // ── tunables ──────────────────────────────────────────────────────────────────
   const FOG_LEAD = 44;        // how far ahead of the camera the fog frontier sits
   const FOG_SOFT = 28;        // width of the soft edge, in world units
-  const HAZE_DENSITY = 0.0022; // gentle distance haze so looking back still has depth
+  const HAZE_DENSITY = 0.0012; // faint distance haze on the far skyline only (issue #13: was 0.0022; CJ, 2026-09-20: "CLOSE THE MIST")
   const DAMP = 5.5;           // scroll damping. higher = snappier
   const ERA_MS = 500;         // the world re-renders into the next era over this long
   const LABEL_NEAR = 70;      // anchor labels fade in inside this distance
@@ -1038,19 +1038,23 @@
   // from IVRESS's section cuts (research/ivress/README.md).
   const FLASH_W = 0.012, FLASH_HOLD = 500, FLASH_FADE = 1200;
   const FLASH_COL = [null, new THREE.Color(1, 1, 1), C('lamp').lerp(new THREE.Color(1, 1, 1), 0.45)];
-  let flashIn = false, flashT0 = 0;
+  // Issue #13: it fires as the progress crosses a marking, not on coming near one. Keyed on nearness
+  // it also lit while the page sat within FLASH_W of a marking (the blind score's dadao-0.58 frame,
+  // 0.0015 short of the 2020 marking, was the gold flash mid-fade, read as haze), and a stop inside
+  // the band used up the hold so the real crossing then showed nothing. The amplitude still follows
+  // the distance to the marking, so it dies as the camera leaves the band.
+  let flashT0 = -1e9, flashCol = FLASH_COL[1], flashPrev = null;
   function updateFlash(now) {
-    let a = 0, col = null;
-    for (let i = 1; i < ERAS.length; i++) {
-      const k = 1 - Math.min(1, Math.abs(progress - BOUNDS[i]) / FLASH_W);
-      if (k > a) { a = k; col = FLASH_COL[i]; }
+    if (flashPrev != null && flashPrev !== progress) for (let i = 1; i < ERAS.length; i++) {
+      if ((flashPrev - BOUNDS[i]) * (progress - BOUNDS[i]) <= 0) { flashT0 = now; flashCol = FLASH_COL[i]; }
     }
-    if (a > 0 && !flashIn) { flashIn = true; flashT0 = now; }
-    if (a === 0) flashIn = false;
+    flashPrev = progress;
+    let a = 0;
+    for (let i = 1; i < ERAS.length; i++) a = Math.max(a, 1 - Math.min(1, Math.abs(progress - BOUNDS[i]) / FLASH_W));
     const t = now - flashT0;
     const fade = t < FLASH_HOLD ? 1 : Math.max(0, 1 - (t - FLASH_HOLD) / FLASH_FADE);
     post.uniforms.uFlash.value = a * a * (3 - 2 * a) * fade;
-    if (col) post.uniforms.uFlashCol.value.copy(col);
+    post.uniforms.uFlashCol.value.copy(flashCol);
   }
 
   // ── HUD: era label, year, anchor labels ──────────────────────────────────────
