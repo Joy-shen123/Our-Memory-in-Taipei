@@ -51,10 +51,17 @@
   const KERB = 6.6, FACE = 6.2, BACK = 9.4, DEEP = 18;
   // Issue #5 step 3: a bay is one of three glbs (asset/blender/dihua-{min,yang,baroque}.py, built
   // on dihua_common.py) instanced through MODELS.instance: column, arcade slab, shop wall with
-  // its lattice door, two floors of framed windows, pilaster, cornice and the crest of its style.
-  // Every bay has two upper floors now (the old floors: 3 and tall: options are ignored); the
-  // width scales to the bay, and a Baroque bay's plaster takes the bay's colour per instance.
+  // its lattice door, framed windows, pilaster, cornice and the crest of its style. The width
+  // scales to the bay, and a Baroque bay's plaster takes the bay's colour per instance.
+  // Issue #15 step 3 restored the floor variety: each glb carries three groups — 'main' (arcade,
+  // shop wall, one upper floor), 'storey' (one more upper floor, built where the second sits) and
+  // 'crest' (roof slab and parapet). A bay instances main once, storey floors-1 times at
+  // y = (k-1)*FH, and crest once at y = (floors-2)*FH, so opts.floors 1/2/3 and opts.tall (three
+  // floors) mean something again instead of being ignored.
+  const FH = 3.4;                                              // storey height, dihua_common.FH
   const bays = { min: [], yang: [], baroque: [] };
+  const storeys = { min: [], yang: [], baroque: [] };
+  const crests = { min: [], yang: [], baroque: [] };
   // bay(side, z0, z1, style, opts): opts.col (wall colour), opts.libDepth (a library storefront
   // stands at the arcade back, this deep, so the body starts behind it), opts.open (no bay glb: a
   // library facade fills the kerb line), opts.goods.
@@ -66,10 +73,21 @@
     const bf = o.open ? 7.2 : (o.libDepth ? BACK + o.libDepth + 0.1 : BACK);   // where the body starts
     bodies.push({ x: s * (bf + DEEP) / 2, z: zc, w: DEEP - bf, d: d - 0.05, h: HA(o.open ? top : 3.8), c: C(o.open ? col : 'haze') });
     if (o.open) return;
-    bays[style].push({ x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) });
+    const floors = Math.min(3, Math.max(1, o.floors || (o.tall ? 3 : 2)));
+    const it = { x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) };
+    bays[style].push(it);
+    for (let k = 1; k < floors; k++) storeys[style].push(Object.assign({}, it, { y: (k - 1) * FH }));
+    crests[style].push(Object.assign({}, it, { y: (floors - 2) * FH }));
     if (o.goods !== false) shops.push({ fx: s * BACK, z: zc, span: d, s });
   }
-  Object.keys(bays).forEach(style => MODELS.load('dihua-' + style, gltf => MODELS.instance(gltf.scene, bays[style], { colorPrim: style === 'baroque' ? 'walk' : null })));
+  Object.keys(bays).forEach(style => MODELS.load('dihua-' + style, gltf => {
+    const opts = { colorPrim: style === 'baroque' ? 'walk' : null };
+    [['main', bays], ['storey', storeys], ['crest', crests]].forEach(([g, list]) => {
+      const n = MODELS.node(gltf.scene, g);
+      if (n) MODELS.instance(n, list[style], opts);
+      else console.error('dihua-' + style + '.glb has no ' + g + ' group');
+    });
+  }));
   // east side: 24 bays from z -150 down to -262, one wider slot for the library's Baroque facade
   const east = [['baroque', { tall: true }], ['yang'], ['min'], ['baroque', { col: 'walk' }], ['baroque', { floors: 3 }], ['yang'],
                 ['lib'], ['baroque'], ['min'], ['baroque', { col: 'walk', medal: 'verm' }], ['yang', { floors: 3 }], ['baroque'],

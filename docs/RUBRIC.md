@@ -114,3 +114,57 @@ The pass shows up under Palette and light in every chapter (sun, shade, material
 1. Chapter 01 period (3) — CJ decision, unchanged from scoring 1: gate the Ximending sets by scroll year or keep all three on.
 2. Chapter 01 composition (3) — agent, in `scene-red.js`: the 中華商場 rooftop slab at 0.02 is the first frame everyone sees; moving the slab back from the road edge (not the camera, `CAM` stays) clears the title.
 3. Chapter 02 density and life (3) — agent, in `scene-dadao.js`: dress the 2020 stretch at 0.58 (the last frame of the chapter) so the chapter does not end on an empty road.
+
+## Scoring 3 — 2026-09-24, branch `issue-15-detail` at step 7 (after issue #15, the model detail pass)
+
+Fourteen fresh headless screenshots at 1440x900 in `~/Desktop/issue15-detail/rubric-3/` (the twelve fractions above, plus `cut-0.347.png` and `cut-0.582.png` taken 45 frames after landing on each boundary). Fps headed and alone, 2.5 s of `requestAnimationFrame`, at 0.2 / 0.44 / 0.78. Issue #15 changed six models and the Dihua bay instancing and nothing else: no light, no copy, no camera, no placement except the per-bay floor count.
+
+**This machine's display caps at 60 Hz, not the 100 Hz the first two scorings were measured on.** 60.4 fps is the cap here; a baseline run with the pre-#15 models on the same machine, same recipe, measured 60.4 / 60.4 / 60.4 as well. Read the number against the cap, not against 100.
+
+| Chapter | Recognition | Period | Composition | Density and life | Palette and light | Story beat | Performance |
+|---|---|---|---|---|---|---|---|
+| 01 When We Were Young (Ximending) | 4 | 3 | 3 | 3 | 4 | 3 | 5 |
+| 02 Spring Festival (Dadaocheng) | 4 | 3 | 3 | 3 | 4 | 3 | 5 |
+| 03 The Future (Xinyi) | 4 | 3 | 4 | 3 | 4 | 4 | 5 |
+
+**No cell moved.** That is the honest result and it is worth saying plainly: the pass put a great deal more building on the screen and none of it crossed a threshold, because every cell that was already 4 is held there by its named weak spot, and none of those weak spots is a model. Recognition is held by the plain window-grid blocks at 0.30, by the temple that no keyframe frames, and by the generic lit boxes around the 101 — a street-furniture problem, a camera problem and a scene problem. Density is held by people and goods. Period is a CJ decision. The evidence inside the cells is much stronger than it was; the scores are the same.
+
+### 01 When We Were Young — evidence
+
+- Recognition 4: at 0.20 the Red House octagon now shows real fanlights in its eight arches, a banded string course over a corbel row, a dentil row under the cornice and a louvred lantern on the roof, and it is nameable without the label; at 0.30 the right side is still plain window-grid blocks that could be any city.
+- Period 3: unchanged, and a CJ decision. 0.10 still shows 小虎隊 and a NOKIA · Sony Ericsson sign in the same 1989 frame.
+- Composition 3: 0.20 is the composed shot (樂聲 neon cage foreground, Red House subject, 西門町 gate background); at 0.02 the 中華商場 rooftop sign slab still fills the top third and the title sits on it.
+- Density and life 3: unchanged. The crowd is dark-headed boxes; the 0.02 slab still blocks the camera.
+- Palette and light 4: unchanged mix, more of it. The Red House's pale trim now catches the sun against its brick at 0.20 where the wall was flatter before. The yellow-green 淘兒 front at 0.20 is still the one off-palette block.
+- Story beat 3: unchanged.
+- Performance 5: 60.4 fps headed at 0.20 (the display cap), console empty on a fresh session, all three scene files re-run clean.
+
+### 02 Spring Festival — evidence
+
+- Recognition 4: at 0.36 the 騎樓 columns have plinths, chamfered shafts and capitals, the bays run two and three floors, and each crest style has its own parapet — the row reads as Dihua Street rather than as one bay repeated. 霞海城隍廟 has its carved 堵 panels, its 斗拱 and its ridge dragons now, and is still known only from its label, because no keyframe frames it.
+- Period 3: unchanged. The 三輪車 and blue 小貨車 at 0.36 in a 2001 frame.
+- Composition 3: 0.44 has stalls in the foreground under the lantern strings; at 0.52 the nearest lantern string still covers the top quarter of the frame.
+- Density and life 3: the varied roof line at 0.36 and 0.44 reads as more street, but the goods are still white boxes and 0.58 is still the chapter ending on an empty road.
+- Palette and light 4: unchanged. The deeper arcade columns throw a longer shadow line down the east row at 0.36, which is the clearest the two sides of the street have looked.
+- Story beat 3: unchanged. `cut-0.347.png` fires the white flash on the 2000 marking.
+- Performance 5: 60.4 fps headed at 0.44, console empty.
+
+### 03 The Future — evidence
+
+- Recognition 4: the 101 now carries a mullion grid standing proud of the glass on all eight segments, a two-ring floor edge, and 32 modelled 如意 at the segment corners; at 0.90 and 0.97 the grid is what makes it read as the real curtain wall. Every other tower is still a generic lit box and City Hall is still in none of the four frames.
+- Period 3: unchanged. Nothing separates 2020 from 2039.
+- Composition 4: 0.66 and 0.97 are composed; at 0.78 the near blocks still warp under the 62° fov and the podium is still below the frame (`HANDOFF.md` open item 6).
+- Density and life 3: unchanged. At 0.66 the road has only the girl and the plaza has no people. The podium's new fin grid fills the face the camera looks straight at, but a wall is not life.
+- Palette and light 4: unchanged. Lit windows in daylight remain the one mixed signal.
+- Story beat 4: unchanged.
+- Performance 5: 60.4 fps headed at 0.78, console empty.
+
+### The three lowest, and who takes each
+
+Unchanged from scoring 2, because issue #15 could not touch any of them:
+
+1. Chapter 01 period (3) — CJ decision, open since scoring 1: gate the Ximending sets by scroll year or keep all three on.
+2. Chapter 01 composition (3) — agent, in `scene-red.js`: move the 中華商場 rooftop slab back from the road edge so it clears the title at 0.02.
+3. Chapter 02 density and life (3) — agent, in `scene-dadao.js`: dress the 2020 stretch at 0.58 so the chapter does not end on an empty road.
+
+Next after those, and new from this pass: nothing on the rubric will move again from model work until a keyframe frames 霞海城隍廟 and 樂聲戲院. Both are now the most detailed things in their chapters and the camera passes both hard against the frame edge.

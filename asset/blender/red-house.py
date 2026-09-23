@@ -73,11 +73,32 @@ def octagon_walls():
 
 
 def octagon_trim():
-    """Plinth, string course, cornice: pale octagonal bands standing proud of the brick."""
+    """Plinth, a banded string course over a corbel row, and a cornice over a dentil row. The
+    first pass flattened each of these into one plate, which is what reads as a low-poly box."""
     solid('oct_plinth', 'walk', lambda bm: bm_prism(bm, 8, R + 0.14, R + 0.14, 0.0, 0.5))
-    solid('oct_course', 'bone', lambda bm: bm_prism(bm, 8, R + 0.12, R + 0.12, FLOOR, FLOOR + 0.32))
+
+    def course(bm):
+        bm_prism(bm, 8, R + 0.10, R + 0.10, FLOOR - 0.12, FLOOR)          # lower band
+        bm_prism(bm, 8, R + 0.24, R + 0.24, FLOOR, FLOOR + 0.22)          # the proud main band
+        bm_prism(bm, 8, R + 0.10, R + 0.10, FLOOR + 0.22, FLOOR + 0.36)   # upper band
+    solid('oct_course', 'bone', course, bevel=0.03)
+
+    def corbels(bm):
+        for k in range(8):
+            F = face_frame(k * math.pi / 4, APO)
+            for i in range(5):
+                bm_box(bm, (0.28, 0.22, 0.18), (-2.0 + i * 1.0, 0.0, FLOOR - 0.23), F)
+    solid('oct_corbels', 'bone', corbels, bevel=0.0, smooth=False)
+
     solid('oct_cornice_a', 'bone', lambda bm: bm_prism(bm, 8, R + 0.22, R + 0.22, EAVE - 0.55, EAVE - 0.25))
     solid('oct_cornice_b', 'bone', lambda bm: bm_prism(bm, 8, R + 0.36, R + 0.36, EAVE - 0.25, EAVE))
+
+    def dentils(bm):
+        for k in range(8):
+            F = face_frame(k * math.pi / 4, APO)
+            for i in range(7):
+                bm_box(bm, (0.28, 0.26, 0.26), (-2.1 + i * 0.7, -0.02, EAVE - 0.72), F)
+    solid('oct_dentils', 'bone', dentils, bevel=0.0, smooth=False)
 
 
 def octagon_quoins():
@@ -95,19 +116,45 @@ def octagon_quoins():
 
 
 def octagon_openings_detail():
-    """What sits inside and around the cut openings: keystones, transoms, sills, lintels, mullions."""
+    """What sits inside and around the cut openings: keystones, transoms, moulded sills, lintels
+    with their own keystone, and a two-bar-by-one-mullion sash in every upper window."""
     def bone(bm):
         for k in range(8):
             F = face_frame(k * math.pi / 4, APO)
             top = ARCH_Z + ARCH_STRAIGHT + ARCH_W / 2
-            bm_box(bm, (0.36, 0.2, 0.5), (0, 0.02, top - 0.1), F)                     # keystone
-            bm_box(bm, (OPEN_W, 0.12, 0.08), (0, 0.32, ARCH_Z + OPEN_STRAIGHT), F)       # transom under the fanlight
+            bm_box(bm, (0.36, 0.2, 0.5), (0, 0.02, top - 0.1), F)                          # keystone
+            bm_box(bm, (OPEN_W, 0.12, 0.08), (0, 0.32, ARCH_Z + OPEN_STRAIGHT), F)          # transom
             for dx in (-WIN_DX, WIN_DX):
-                bm_box(bm, (WIN_W + 0.3, 0.22, 0.16), (dx, 0.02, WIN_Z - 0.08), F)     # sill
+                bm_box(bm, (WIN_W + 0.3, 0.22, 0.16), (dx, 0.02, WIN_Z - 0.08), F)          # sill
+                bm_box(bm, (WIN_W + 0.54, 0.3, 0.1), (dx, -0.01, WIN_Z - 0.22), F)          # sill moulding
                 bm_box(bm, (WIN_W + 0.3, 0.16, 0.22), (dx, 0.02, WIN_Z + WIN_H + 0.11), F)  # lintel
+                bm_box(bm, (0.3, 0.22, 0.34), (dx, -0.01, WIN_Z + WIN_H + 0.14), F)         # lintel keystone
                 bm_box(bm, (0.07, 0.08, GLASS_H), (dx, 0.24, WIN_Z + 0.15 + GLASS_H / 2), F)   # mullion
-                bm_box(bm, (GLASS_W, 0.08, 0.07), (dx, 0.24, WIN_Z + 0.15 + GLASS_H * 0.62), F)  # transom bar
+                for f in (0.36, 0.68):
+                    bm_box(bm, (GLASS_W, 0.08, 0.07), (dx, 0.24, WIN_Z + 0.15 + GLASS_H * f), F)
     solid('oct_openings', 'bone', bone, bevel=0.02)
+
+
+def octagon_fanlights():
+    """Real fanlights in the eight arched openings: five glazing bars radiating from the transom's
+    centre plus one concentric arc, and a pair of bars in the square part below. Issue #5 left the
+    arches as plain dark recesses, which is the flat stand-in surface CJ keeps pointing at."""
+    cz = ARCH_Z + OPEN_STRAIGHT                # the springing line, 2.65
+    rr = OPEN_W / 2 - 0.06                     # the fanlight's radius inside the reveal
+
+    def bars(bm):
+        for k in range(8):
+            F = face_frame(k * math.pi / 4, APO)
+            for i in range(1, 6):
+                a = i * math.pi / 6
+                bm_bar(bm, (0, 0.30, cz), (rr * math.cos(a), 0.30, cz + rr * math.sin(a)), 0.07, xform=F)
+            arc = [(0.52 * math.cos(t * math.pi / 6), 0.30, cz + 0.52 * math.sin(t * math.pi / 6)) for t in range(7)]
+            for q0, q1 in zip(arc, arc[1:]):
+                bm_bar(bm, q0, q1, 0.06, xform=F)
+            for dx in (-0.62, 0.0, 0.62):                                   # the sash below the transom
+                bm_bar(bm, (dx, 0.30, ARCH_Z + 0.12), (dx, 0.30, cz - 0.05), 0.07, xform=F)
+            bm_bar(bm, (-rr, 0.30, ARCH_Z + 1.15), (rr, 0.30, ARCH_Z + 1.15), 0.06, xform=F)
+    solid('oct_fanlights', 'bone', bars, bevel=0.0)
 
 
 def entrance():
@@ -173,12 +220,35 @@ def lantern():
             for z in (0.45, 0.62, 0.79, 0.96):
                 bm_box(bm, (0.34, 0.08, 0.05), (0, 0.05, z), F)
     solid('lantern_bars', 'bone', louvre_bars, bevel=0.0)
+    def frames(bm):
+        for k in range(8):
+            F = face_frame(k * math.pi / 4, LR * math.cos(math.pi / 8), (0, 0, z0))
+            for dx in (-0.22, 0.22):
+                bm_box(bm, (0.1, 0.16, 0.86), (dx, -0.02, 0.73), F)
+            for dz in (0.24, 1.09):
+                bm_box(bm, (0.54, 0.16, 0.1), (0, -0.02, dz), F)
+    solid('lantern_frames', 'bone', frames, bevel=0.0, smooth=False)
+
+    def piers(bm):
+        for k in range(8):
+            a = math.pi / 8 + k * math.pi / 4
+            x, y = LR * 0.97 * math.cos(a), LR * 0.97 * math.sin(a)
+            bm_bar(bm, (x, y, z0), (x, y, z0 + 1.32), 0.15)
+    solid('lantern_piers', 'bone', piers, bevel=0.0)
+
     solid('lantern_cornice', 'bone', lambda bm: bm_prism(bm, 8, LR + 0.16, LR + 0.16, z0 + 1.3, z0 + 1.45), bevel=0.03)
     solid('lantern_cap', 'ink', lambda bm: bm_prism(bm, 8, LR + 0.22, 0.08, z0 + 1.45, z0 + 2.35), bevel=0.03)
+    def ribs(bm):
+        for k in range(8):
+            a = math.pi / 8 + k * math.pi / 4
+            bm_bar(bm, ((LR + 0.2) * math.cos(a), (LR + 0.2) * math.sin(a), z0 + 1.47),
+                   (0.09 * math.cos(a), 0.09 * math.sin(a), z0 + 2.32), 0.11)
+    solid('lantern_ribs', 'haze', ribs, bevel=0.0)
+
     def finial(bm):
         bm_prism(bm, 8, 0.05, 0.05, z0 + 2.3, z0 + 3.2, rot=0)
-        S.bm_sphere(bm, 0.2, (0, 0, z0 + 3.25), 14, 8)
-        S.bm_sphere(bm, 0.11, (0, 0, z0 + 2.75), 10, 6)
+        S.bm_sphere(bm, 0.2, (0, 0, z0 + 3.25), 10, 6)
+        S.bm_sphere(bm, 0.11, (0, 0, z0 + 2.75), 8, 5)
     solid('finial', 'bone', finial, bevel=0.0)
 
 
@@ -277,12 +347,12 @@ def arm(name, center, along_x):
     def oculus(bm):
         for th in ends:
             F = face_frame(th, L / 2, (cx, cy, 0))
-            bm_solid(bm, circle_pts(0.62, 20), -0.12, 0.1, F @ Matrix.Translation((0, 0, ARM_H + 1.0)))
+            bm_solid(bm, circle_pts(0.62, 14), -0.12, 0.1, F @ Matrix.Translation((0, 0, ARM_H + 1.0)))
     solid(name + '_oculus_ring', 'bone', oculus, bevel=0.03)
     def oculus_glass(bm):
         for th in ends:
             F = face_frame(th, L / 2, (cx, cy, 0))
-            bm_solid(bm, circle_pts(0.44, 20), -0.05, 0.12, F @ Matrix.Translation((0, 0, ARM_H + 1.0)))
+            bm_solid(bm, circle_pts(0.44, 14), -0.05, 0.12, F @ Matrix.Translation((0, 0, ARM_H + 1.0)))
     solid(name + '_oculus', 'ink', oculus_glass, bevel=0.0)
 
 
@@ -296,6 +366,7 @@ def build():
     octagon_trim()
     octagon_quoins()
     octagon_openings_detail()
+    octagon_fanlights()
     entrance()
     roof()
     lantern()
