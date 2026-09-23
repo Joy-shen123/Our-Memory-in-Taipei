@@ -21,11 +21,30 @@
   const ENV_I = 0.35;
   const HEMI = 0.65;
   const KEY = 1.3;
-  // per-era mix of the five colours: sky/fog darkens, lamp light grows, print fades
-  // (hemi is the hemisphere light only; the canvas-sky environment adds its own ambient on top)
-  // (hemi is the hemisphere light, env scales the canvas-sky environment; both fall toward the future)
-  const ERA_MIX = { red: { night: 0.0, lamp: KEY, hemi: HEMI, env: 1.0 }, dadao: { night: 0.05, lamp: KEY * 1.09, hemi: HEMI * 0.91, env: 0.95 },
-                    tower: { night: 0.45, lamp: KEY, hemi: HEMI * 0.68, env: 0.7 } };
+  // per-era light mix: lamp is the sun, hemi the hemisphere light, env scales the canvas-sky
+  // environment. No night axis: the sky is daylight in every chapter, at every fraction (CJ,
+  // 2026-09-20: "CLOSE THE MIST I WANT THE WEBSITE BE BRIGHT AND PRETTY"). Issue #9 removed the
+  // `night` term that used to pull the dome, the mountains and a moon toward dusk by chapter 3.
+  const ERA_MIX = { red: { lamp: KEY, hemi: HEMI, env: 1.0 }, dadao: { lamp: KEY * 1.09, hemi: HEMI * 0.91, env: 0.95 },
+                    tower: { lamp: KEY, hemi: HEMI * 0.68, env: 0.7 } };
+  // per-era sky (issue #9): the gradient dome is shown, and its horizon takes a bright tint from
+  // the chapter's accent, keyed to the scroll year through the era. All three are daylight:
+  // childhood a rose morning (verm at the horizon), Spring Festival gold (lamp), the future a
+  // clear, cooler blue. `horizon`/`top` are the dome's two stops, `mount` the mountains; the
+  // fog colour follows the horizon so the distance haze blends into the dome. Tinted from the
+  // same daylight base (bone→sky for the horizon, sky→ink 0.1 for the top) so no chapter drops
+  // below chapter 1's brightness.
+  const SKY = (() => {
+    const base = () => new THREE.Color(PALETTE.bone).lerp(new THREE.Color(PALETTE.sky), 0.35);
+    const top = () => new THREE.Color(PALETTE.sky).lerp(new THREE.Color(PALETTE.ink), 0.1);
+    const mount = () => new THREE.Color(PALETTE.haze).lerp(new THREE.Color(PALETTE.sky), 0.35);
+    const verm = new THREE.Color(PALETTE.verm), lamp = new THREE.Color(PALETTE.lamp), sky = new THREE.Color(PALETTE.sky);
+    return {
+      red:   { horizon: base().lerp(verm, 0.16), top: top().lerp(verm, 0.06), mount: mount().lerp(verm, 0.10) },
+      dadao: { horizon: base().lerp(lamp, 0.26), top: top().lerp(lamp, 0.08), mount: mount().lerp(lamp, 0.14) },
+      tower: { horizon: base().lerp(sky, 0.18),  top: top().lerp(sky, 0.25),  mount: mount().lerp(sky, 0.20) }
+    };
+  })();
 
   // ── fog: directional, permanent, and cheap ───────────────────────────────────
   // three.js fog is distance-from-camera. The brief's fog is "the part of the century you
@@ -155,7 +174,15 @@
 
   // hemisphere: pale blue sky above, a warm pavement bounce below, so a roof and an underside are
   // never the same colour; its intensity is ERA_MIX.hemi, tweened per era
-  const hemi = new THREE.HemisphereLight(C('bone').lerp(C('sky'), 0.2), C('walk').lerp(C('ink'), 0.5), 0.55);
+  // coloured shadow (issue #11, research/bruno-simon/README.md section 4 and 6b): a shadowed
+  // surface receives only the hemisphere light and the environment, so tinting the hemisphere
+  // toward violet makes every shadow read as colour instead of grey while the sun stays warm.
+  // The tint keeps each colour's luminance, so nothing gets darker (CJ, 2026-09-20: bright).
+  // No day cycle: one tint, every chapter.
+  const SHADOW_TINT = new THREE.Color('#7b5cff'), SHADOW_MIX = 0.3;
+  const lumOf = c => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+  const tinted = c => { const y = lumOf(c); c.lerp(SHADOW_TINT, SHADOW_MIX); return c.multiplyScalar(y / lumOf(c)); };
+  const hemi = new THREE.HemisphereLight(tinted(C('bone').lerp(C('sky'), 0.2)), tinted(C('walk').lerp(C('ink'), 0.5)), 0.55);
   scene.add(hemi);
   const key = new THREE.DirectionalLight(C('lamp'), 0.9);
   key.position.set(18, 26, 12);
@@ -315,7 +342,7 @@
     armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
   }
 
-  // ── BACKGROUND: sky dome, moon, mountains, distant city ──────────────────────
+  // ── BACKGROUND: sky dome, mountains, distant city ────────────────────────────
   const skyMat = new THREE.ShaderMaterial({
     uniforms: { top: { value: C('ink') }, horizon: { value: C('haze') } },
     vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
@@ -325,9 +352,6 @@
   const sky = new THREE.Mesh(new THREE.SphereGeometry(520, 24, 12), skyMat);
   scene.add(sky);
   scene.background = null;
-
-  const moon = new THREE.Mesh(new THREE.CircleGeometry(9, 24), new THREE.MeshBasicMaterial({ color: C('bone'), fog: false, transparent: true, opacity: 0 }));
-  scene.add(moon);
 
   const mountainMat = new THREE.MeshBasicMaterial({ color: C('haze'), fog: false });
   const coneGeo = new THREE.ConeGeometry(1, 1, 7); coneGeo.translate(0, 0.5, 0);
@@ -349,6 +373,11 @@
   function instSet(geo, mat, items, opts) {
     const mesh = new THREE.InstancedMesh(aoBake(geo), withFog(mat), items.length);
     mesh.frustumCulled = false;
+    // shadow flags set here, not in enableShadows(): the glb street elements (MODELS.instance:
+    // lamps, trees, Dihua bays, stalls, shopfront modules, bollards, props) arrive after the
+    // first frame's pass has run, and their Lambert materials sat outside its Standard gate.
+    // Issue #11's runtime check: 47 instanced sets cast nothing before this line.
+    if (mat.isMeshStandardMaterial || mat.isMeshLambertMaterial) { mesh.receiveShadow = true; mesh.castShadow = !mat.transparent; }
     if (mat.map && mat.map.userData.tile && items.length) {           // one repeat for the set: its median footprint and height
       const med = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
       fitTile(mat, med(items.map(it => Math.max(it.w, it.d))), med(items.map(it => Math.max(...Object.values(it.h)))));
@@ -866,14 +895,17 @@
     parts.forEach(p => { p.fromH = p.mesh.scale.y; p.fromC = p.mesh.material.color.clone(); });
     instSnapshot();
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
-    mixFrom = { night: mixCur.night, lamp: mixCur.lamp, hemi: mixCur.hemi, env: mixCur.env, print: mixCur.print };
+    mixFrom = { lamp: mixCur.lamp, hemi: mixCur.hemi, env: mixCur.env, print: mixCur.print };
+    skyFrom.horizon.copy(skyCur.horizon); skyFrom.top.copy(skyCur.top); skyFrom.mount.copy(skyCur.mount);
     eraFrom = eraIdx; eraIdx = i;
     libGroups.forEach(g => { g.visible = g.userData.eras.indexOf(ERAS[i].key) >= 0; });
     eraT0 = instant ? now - ERA_MS : now;
     swapEraLabel(ERAS[i], instant);
   }
-  const tmpC = new THREE.Color(), skyC = new THREE.Color();
-  let mixCur = { night: 0, lamp: KEY * 0.5, hemi: HEMI * 0.65, env: 0.7, print: 1 }, mixFrom = { ...mixCur };
+  const tmpC = new THREE.Color();
+  let mixCur = { lamp: KEY * 0.5, hemi: HEMI * 0.65, env: 0.7, print: 1 }, mixFrom = { ...mixCur };
+  const skyCur = { horizon: SKY.red.horizon.clone(), top: SKY.red.top.clone(), mount: SKY.red.mount.clone() };
+  const skyFrom = { horizon: skyCur.horizon.clone(), top: skyCur.top.clone(), mount: skyCur.mount.clone() };
   let envCur = -1;
   function updateWorld(now) {
     const k = Math.min(1, (now - eraT0) / ERA_MS);
@@ -890,22 +922,20 @@
     });
     // sky, fog, light and print level: held flat inside an era, moved in the same 500ms
     const M = ERA_MIX[key];
-    mixCur.night = mixFrom.night + (M.night - mixFrom.night) * e;
     mixCur.lamp = mixFrom.lamp + (M.lamp - mixFrom.lamp) * e;
     mixCur.hemi = mixFrom.hemi + (M.hemi - mixFrom.hemi) * e;
     mixCur.env = mixFrom.env + (M.env - mixFrom.env) * e;
     mixCur.print = mixFrom.print + (era.uPrint - mixFrom.print) * e;
-    // photograph: the sky darkens toward ink. print: unreached fog is blank paper.
-    // horizon: pale day → warm dusk. top: blue → deep blue.
-    skyC.copy(C('bone')).lerp(C('sky'), 0.35).lerp(C('lamp'), mixCur.night * 0.7);
-    scene.fog.color.copy(skyC);
-    skyMat.uniforms.horizon.value.copy(skyC);
-    skyMat.uniforms.top.value.copy(C('sky')).lerp(C('ink'), 0.1 + mixCur.night * 0.7);
-    mountainMat.color.copy(C('haze')).lerp(C('sky'), 0.35).lerp(C('ink'), mixCur.night * 0.4);
-    moon.material.opacity = Math.max(0, mixCur.night - 0.3) * 1.3;
+    // daylight sky, tinted per chapter (SKY above), moved in the same 500 ms as everything else.
+    const S = SKY[key];
+    skyCur.horizon.copy(skyFrom.horizon).lerp(S.horizon, e);
+    skyCur.top.copy(skyFrom.top).lerp(S.top, e);
+    skyCur.mount.copy(skyFrom.mount).lerp(S.mount, e);
+    scene.fog.color.copy(skyCur.horizon);
+    skyMat.uniforms.horizon.value.copy(skyCur.horizon);
+    skyMat.uniforms.top.value.copy(skyCur.top);
+    mountainMat.color.copy(skyCur.mount);
     sky.position.copy(camera.position);
-    moon.position.set(camera.position.x + 160, camera.position.y + 190, camera.position.z - 330);
-    moon.lookAt(camera.position);
     liftTops();
     instUpdate(e, key);
     updateWindows(key);
