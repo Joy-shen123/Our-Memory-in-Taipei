@@ -51,8 +51,11 @@
   ];
 
   // ── THE CLOSING LINE ──────────────────────────────────────────────────────────
+  // Issue #12, CJ 2026-09-23: 「最後出現的字想要 Just like the man on Taipei 101」. Replaces the
+  // old line ("Where we go, we don't know. We only know we need to climb higher."), per
+  // research/plan-6 §6; CJ has not said replace-or-follow, so this stays a one-line revert.
   const CLOSING = {
-    line: 'Where we go, we don’t know. We only know we need to climb higher.',
+    line: 'Just like the man on Taipei 101',
     showFrom: 0.9,   // scroll progress at which the line fades in
   };
 
