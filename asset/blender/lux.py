@@ -37,7 +37,10 @@ MARQ_HW = 6.5       # half width
 LOBBY_DEPTH = 1.2
 # where the scene's text boards sit on the front: (centre x, z bottom, width, height)
 BOARDS = [(-3.7, 4.6, 6.8, 3.9), (3.7, 4.6, 6.8, 3.9), (0.0, 8.55, 13.8, 1.4)]
-CASE_XS = [-5 + 2 * k for k in range(6)]
+# six poster cases, three on each pier beside the lobby. The old row ran across the lobby mouth,
+# so the recess ate four of the six (HANDOFF: "the Lux has two poster cases, not six").
+CASE_W = 0.86
+CASE_XS = [s * x for s in (-1, 1) for x in (5.0, 6.05, 7.05)]
 
 FRONT = face_frame(0, 0)
 
@@ -94,15 +97,47 @@ def board_frames():
 
 
 def marquee():
-    """The canopy over the doors: an ink slab, a warm lit band along its front edge, two thin
-    posts to the pavement, and a row of bulbs under the lip."""
+    """The canopy over the doors: the slab, a three-step fascia round its front and ends, a
+    coffered underside with a lit trough down the middle, a row of bulbs under the lip, two thin
+    posts to the pavement and four tie rods back up to the wall. The underside is what a person
+    standing at the doors looks straight up into, and it was one flat face."""
     y_out = -MARQ_OUT
-    solid('marquee', 'ink', lambda bm: bm_box(bm, (MARQ_HW * 2, MARQ_OUT + 0.3, 0.35), (0, y_out / 2 + 0.15, MARQ_Z + 0.175)))
-    solid('marquee_lip', 'lamp', lambda bm: bm_box(bm, (MARQ_HW * 2 + 0.1, 0.12, 0.25), (0, y_out - 0.03, MARQ_Z + 0.5)), bevel=0.03)
+    HWM = MARQ_HW
+    solid('marquee', 'ink', lambda bm: bm_box(bm, (HWM * 2, MARQ_OUT + 0.3, 0.35), (0, y_out / 2 + 0.15, MARQ_Z + 0.175)))
+
+    def fascia(bm):
+        for w, dy, dz, t in ((HWM * 2 + 0.16, 0.0, 0.0, 0.16), (HWM * 2 + 0.28, -0.06, 0.16, 0.12),
+                             (HWM * 2 + 0.2, -0.02, 0.28, 0.1)):
+            bm_box(bm, (w, 0.22, t), (0, y_out + dy, MARQ_Z + 0.1 + dz), None)          # the front band
+        for sx in (-1, 1):                                                              # the end returns
+            bm_box(bm, (0.22, MARQ_OUT + 0.3, 0.16), (sx * (HWM + 0.06), y_out / 2 + 0.15, MARQ_Z + 0.1), None)
+            bm_box(bm, (0.26, MARQ_OUT + 0.3, 0.12), (sx * (HWM + 0.1), y_out / 2 + 0.15, MARQ_Z + 0.26), None)
+    solid('marquee_fascia', 'ink', fascia, bevel=0.03)
+
+    def coffers(bm):
+        """Ribs on the underside: five across, two along, so it reads as a coffered soffit."""
+        for x in (-5.2, -2.6, 0.0, 2.6, 5.2):
+            bm_box(bm, (0.16, MARQ_OUT + 0.1, 0.1), (x, y_out / 2 + 0.05, MARQ_Z - 0.05), None)
+        for y in (y_out + 0.5, y_out + 1.15):
+            bm_box(bm, (HWM * 2 - 0.3, 0.16, 0.1), (0, y, MARQ_Z - 0.05), None)
+    solid('marquee_coffers', 'ink', coffers, bevel=0.0, smooth=False)
+    solid('marquee_trough', 'lamp', lambda bm: bm_box(bm, (HWM * 2 - 0.5, 0.34, 0.06), (0, y_out + 0.82, MARQ_Z - 0.03)), bevel=0.0, smooth=False)
+
+    solid('marquee_lip', 'lamp', lambda bm: bm_box(bm, (HWM * 2 + 0.1, 0.12, 0.25), (0, y_out - 0.03, MARQ_Z + 0.5)), bevel=0.03)
+
     def posts(bm):
-        for x in (-MARQ_HW, MARQ_HW):
+        for x in (-HWM, HWM):
             bm_box(bm, (0.08, 0.08, MARQ_Z), (x, y_out + 0.1, MARQ_Z / 2))
     solid('marquee_posts', 'ink', posts, bevel=0.0)
+
+    def rods(bm):
+        # short, and only at the ends: a long rod would cross the hand-painted billboards, which
+        # are this building's whole street face
+        for x in (-HWM + 0.4, HWM - 0.4):
+            bm_bar(bm, (x, y_out + 0.15, MARQ_Z + 0.5), (x, 0.0, MARQ_Z + 1.05), 0.07)
+            bm_bar(bm, (x, y_out + 0.15, MARQ_Z + 0.5), (x, 0.0, MARQ_Z + 0.55), 0.06)
+    solid('marquee_rods', 'ink', rods, bevel=0.0)
+
     def bulbs(bm):
         for i in range(13):
             bm_sphere(bm, 0.09, (-6 + i * 1.0, y_out + 0.35, MARQ_Z - 0.06), 8, 5)
@@ -129,22 +164,53 @@ def entrance():
 
 
 def poster_cases():
-    """Six glazed poster cases along the pavement wall, either side of the entrance."""
+    """Six glazed poster cases, three on each pier beside the lobby: a frame, the glass, a header
+    board over it and a small hood shading it. The first pass laid them across the lobby mouth and
+    the recess ate four."""
     def frames(bm):
         for x in CASE_XS:
-            if abs(x) < 4.6:
-                continue                                                     # not across the lobby
-            bm_box(bm, (0.1, 0.06, 1.8), (x - 0.65, -0.03, 1.8), FRONT)
-            bm_box(bm, (0.1, 0.06, 1.8), (x + 0.65, -0.03, 1.8), FRONT)
-            bm_box(bm, (1.4, 0.06, 0.1), (x, -0.03, 0.95), FRONT)
-            bm_box(bm, (1.4, 0.06, 0.1), (x, -0.03, 2.65), FRONT)
+            bm_box(bm, (0.1, 0.07, 1.8), (x - CASE_W / 2, -0.035, 1.8), FRONT)
+            bm_box(bm, (0.1, 0.07, 1.8), (x + CASE_W / 2, -0.035, 1.8), FRONT)
+            bm_box(bm, (CASE_W + 0.1, 0.07, 0.1), (x, -0.035, 0.95), FRONT)
+            bm_box(bm, (CASE_W + 0.1, 0.07, 0.1), (x, -0.035, 2.65), FRONT)
+            bm_box(bm, (CASE_W + 0.24, 0.1, 0.26), (x, -0.05, 2.87), FRONT)          # header board
+            bm_box(bm, (CASE_W + 0.32, 0.26, 0.08), (x, -0.13, 3.05), FRONT)         # hood
     solid('case_frames', 'bone', frames, bevel=0.02)
+
     def glass(bm):
         for x in CASE_XS:
-            if abs(x) < 4.6:
-                continue
-            bm_box(bm, (1.2, 0.04, 1.6), (x, -0.02, 1.8), FRONT)
+            bm_box(bm, (CASE_W - 0.06, 0.04, 1.6), (x, -0.02, 1.8), FRONT)
     solid('case_glass', 'ink', glass, bevel=0.0)
+
+
+def neon_frame():
+    """The steel cage the vertical 樂聲戲院 neon hangs in, at the block's -X corner: two channel
+    posts, a ladder of rungs and diagonals between them, a crown box, and three outrigger arms
+    with stays back to the end wall. The lettering stays a canvas board on top of it (the
+    pipeline draws no text); this is the frame HANDOFF listed as still a primitive.
+
+    Placed from scene-red.js: the board sits at world x -8.4, z -58.14, which is Blender
+    x -7.86, y -0.15..-1.65, z 3.6..9.6 — 0.36 past the block's -X end and 0.9 proud of the
+    front, so the cage straddles the corner and reads from down the street."""
+    bx, z0, z1 = -7.86, 3.3, 10.0
+    y_in, y_out = -0.08, -1.72
+
+    def cage(bm):
+        for y in (y_in, y_out):
+            bm_bar(bm, (bx, y, z0), (bx, y, z1), 0.13)                                # channel posts
+        n = 7
+        for i in range(n):
+            z = z0 + i * (z1 - z0) / (n - 1)
+            bm_bar(bm, (bx, y_in, z), (bx, y_out, z), 0.09)                           # rungs
+            if i < n - 1:
+                z2 = z0 + (i + 1) * (z1 - z0) / (n - 1)
+                a, b = (y_in, y_out) if i % 2 else (y_out, y_in)
+                bm_bar(bm, (bx, a, z), (bx, b, z2), 0.07)                             # diagonals
+        for z in (4.2, 6.6, 9.0):                                                     # outriggers to the wall
+            bm_bar(bm, (-W / 2 + 0.1, (y_in + y_out) / 2, z), (bx, (y_in + y_out) / 2, z), 0.1)
+            bm_bar(bm, (-W / 2 + 0.1, (y_in + y_out) / 2, z - 0.7), (bx, y_out, z), 0.07)
+    solid('neon_cage', 'ink', cage, bevel=0.0)
+    solid('neon_crown', 'ink', lambda bm: bm_box(bm, (0.34, y_in - y_out + 0.3, 0.42), (bx, (y_in + y_out) / 2, z1 + 0.21)), bevel=0.03)
 
 
 def build():
@@ -154,6 +220,7 @@ def build():
     marquee()
     entrance()
     poster_cases()
+    neon_frame()
 
 
 if __name__ == '__main__':
