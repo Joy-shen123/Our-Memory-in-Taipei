@@ -51,8 +51,11 @@
   ];
 
   // ── THE CLOSING LINE ──────────────────────────────────────────────────────────
+  // Issue #12, CJ 2026-09-23: 「最後出現的字想要 Just like the man on Taipei 101」. Replaces the
+  // old line ("Where we go, we don't know. We only know we need to climb higher."), per
+  // research/plan-6 §6; CJ has not said replace-or-follow, so this stays a one-line revert.
   const CLOSING = {
-    line: 'Where we go, we don’t know. We only know we need to climb higher.',
+    line: 'Just like the man on Taipei 101',
     showFrom: 0.9,   // scroll progress at which the line fades in
   };
 
@@ -120,9 +123,10 @@
     { p: [2, 5, -300],     t: [0, 40, -420],   fov: 55 },
     // 4 · the base — looking straight up the west face
     { p: [-3, 3, -372],    t: [-4, 50, -420],  fov: 62 },
-    // 5 · closing — high beside the tower, the man near the top. The fov opens from 62 to 82
-    //     over the climb so the world widens as he nears the crown (IVRESS borrow e).
-    { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 82 },
+    // 5 · closing — high beside the tower, level with the crown, the man standing on its rim
+    //     (issue #12). The fov opens from 62 to 82 over the climb so the world widens as he nears
+    //     the crown (IVRESS borrow e). z still decreasing: the rig's uAtZ bisection needs it.
+    { p: [-19, 90, -395],  t: [-3, 104, -420], fov: 82 },
   ];
 
   const root = document.documentElement;
