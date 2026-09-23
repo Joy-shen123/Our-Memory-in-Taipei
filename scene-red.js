@@ -5,7 +5,7 @@
 // Primitives, canvas textures and the palette, plus the Red House glb (issue #5). References are listed in HANDOFF.md.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam, withFog } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, anchors, libGroup, asset, findAsset, walkX, lam, withFog, people } = window.SCENE;
   const RED = ['red'], ALL = ['red', 'dadao', 'tower'];
   const RH = anchors.redhouse;                                                  // { x: 11, z: -70 }
   const hOf = (h, eras) => { const o = {}; (eras || RED).forEach(k => o[k] = h); return o; };
@@ -319,6 +319,7 @@
 
   // ── one street stall: post-and-awning, counter, goods, crates, basket, seller and shoppers ──
   const stallEra = { red: 1, dadao: 0 };
+  const PY = 0.08;                                                                // the plaza paving and the 1999 pavers; kerb stalls sit on the sidewalk slab
   function stall(sx, sz, fx, fz, i, front) {
     const H = k => ({ red: k });
     const along = (u, v) => [sx + fx * u - fz * v, sz + fz * u + fx * v];
@@ -334,11 +335,11 @@
     const [bx, bz] = along(1.2 + rnd() * 0.3, -cv * 0.93);
     baskets.push({ x: bx, z: bz, w: 0.7, d: 0.7, h: H(0.4), c: C(i % 3 ? 'bone' : 'haze') });
     const [ex, ez] = along(-0.3, 0.3);
-    crowd.push({ x: ex, z: ez, w: 0.5, d: 0.4, r: fz ? 3.1 : (fx > 0 ? 1.57 : -1.57), c: C('haze'), h: H(1.6) });
+    crowd.push({ x: ex, z: ez, y: PY, r: fz ? 3.1 : (fx > 0 ? 1.57 : -1.57), v: 1, h: H(1.6) });     // the seller, behind the counter
     const n = 1 + Math.floor(rnd() * 2), [u0, u1] = front || [1.8, 3.2];
     for (let k = 0; k < n; k++) {
       const [px, pz] = along(u0 + rnd() * (u1 - u0), -1 + rnd() * 2);
-      crowd.push({ x: px, z: pz, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(rnd() < 0.12 ? 'verm' : rnd() < 0.5 ? 'bone' : 'haze'), h: H(1.5 + rnd() * 0.3) });
+      crowd.push({ x: px, z: pz, y: PY, r: rnd() * 6.28, h: H(1.5 + rnd() * 0.3) });   // shoppers at the stall
     }
   }
   // the plaza in front of the Red House: two rows of stalls facing the camera
@@ -357,19 +358,20 @@
     if (i % 3 === 0) boxes.push({ x: s * 8.6, z: z + 3.8, w: 1, d: 1, r: (rnd() - 0.5) * 0.4, h: hOf(1) });
   }
 
-  // ── the street crowd along both kerbs, thick at the pedestrian zone ──
+  // ── the street crowd (issue #13, the engine's people() figures): along both sidewalks, under the
+  //    中華商場 arcade on the west, thick in the 1999 pedestrian zone; the road itself stays empty ──
   (() => {
     let n = 0;
     while (n < 70) {
-      const s = n % 2 ? 1 : -1, z = 40 - rnd() * 180, x = s * (5.3 + rnd() * 1.1);
+      const s = n % 2 ? 1 : -1, z = 40 - rnd() * 180, x = s * (6.2 + rnd() * 1.1);
       if (s < 0 && z < -29 && z > -39) continue;                                   // camera keyframe (-3, 3.5, -34)
       if (z < -94 && z > -98) continue;                                            // the gateway posts
       n++;
-      const c = n % 8 === 0 ? 'verm' : n % 3 === 0 ? 'haze' : 'bone';
-      crowd.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(c), h: { red: 1.5 + rnd() * 0.3 } });
+      const rr = rnd();
+      crowd.push({ x, z, y: 0.22, r: (rr < 0.5 ? 0 : Math.PI) + ((rr * 4) % 1 - 0.5) * 0.9, h: { red: 1.5 + rnd() * 0.3 } });   // walking along the street
     }
-    for (let i = 0; i < 30; i++) crowd.push({ x: (rnd() - 0.5) * 9, z: -100 - rnd() * 40, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(i % 6 === 0 ? 'verm' : i % 3 ? 'bone' : 'haze'), h: { red: 1.5 + rnd() * 0.3 } });
-    for (let i = 0; i < 12; i++) crowd.push({ x: -8.5 - rnd() * 4, z: -101 - rnd() * 4, w: 0.5, d: 0.4, r: 1.57, c: C(i % 4 === 0 ? 'verm' : 'bone'), h: { red: 1.5 + rnd() * 0.3 } }); // in front of the concert stage
+    for (let i = 0; i < 30; i++) crowd.push({ x: (rnd() - 0.5) * 9, z: -100 - rnd() * 40, y: PY, r: rnd() * 6.28, h: { red: 1.5 + rnd() * 0.3 } });   // the 1999 pedestrian zone: pavers, no traffic
+    for (let i = 0; i < 12; i++) crowd.push({ x: -8.5 - rnd() * 4, z: -101 - rnd() * 4, y: 0.22, r: 1.57, h: { red: 1.5 + rnd() * 0.3 } }); // in front of the concert stage
   })();
   // parked scooters at the kerb, every era
   for (let i = 0; i < 16; i++) {
@@ -377,20 +379,11 @@
     furn.push({ x, z, y: 0.25, w: 0.55, d: 1.6, h: hOf(0.55, ALL), c: C('haze'), r: (rnd() - 0.5) * 0.3 });
     furn.push({ x, z: z - 0.1, y: 0.8, w: 0.5, d: 0.7, h: hOf(0.16, ALL), c: C(i % 4 === 0 ? 'verm' : 'ink'), r: (rnd() - 0.5) * 0.3 });
   }
-  // every figure gets a head: body to 78%, a small cube on top (ink hair on a bone body, bone skin on the rest)
-  const BONE = C('bone').getHex();
-  crowd.slice().forEach(it => {
-    const hb = {}, hh = {}; let top = 0;
-    Object.keys(it.h).forEach(k => { const v = it.h[k] || 0; hb[k] = v * 0.78; hh[k] = v > 0 ? 0.34 : 0; top = Math.max(top, v * 0.78); });
-    it.h = hb;
-    crowd.push({ x: it.x, z: it.z, y: top + 0.02, w: 0.34, d: 0.34, r: it.r, c: C(it.c.getHex() === BONE ? 'ink' : 'bone'), h: hh });
-  });
-
   // ── build the instanced sets ────────────────────────────────────────────────
   instSet(boxGeo, lam('bone'), furn, { colors: true });
   MODELS.load('shopfront', gltf => Object.keys(tiles).forEach(k => MODELS.instance(MODELS.node(gltf.scene, k), tiles[k], { colorPrim: 'bone' })));
   MODELS.load('bollard', gltf => MODELS.instance(gltf.scene, bollards));
   MODELS.load('props', gltf => { MODELS.instance(MODELS.node(gltf.scene, 'aboard'), aboards); MODELS.instance(MODELS.node(gltf.scene, 'plant'), plants); MODELS.instance(MODELS.node(gltf.scene, 'boxes'), boxes); });
   instSet(basketGeo, lam('bone'), baskets, { colors: true });
-  instSet(boxGeo, lam('bone'), crowd, { colors: true });
+  people(crowd);
 })();

@@ -10,7 +10,7 @@
 // predate the engine hiding absent instances; they still give one draw call per set.
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors, lit, libGroup } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, PALETTE, rnd, TOWER, withFog, anchors, lit, libGroup, people } = window.SCENE;
 
   const tw = h => ({ red: 0, dadao: 0, tower: h });      // instSet heights: tower era only
   const old = h => ({ red: h, dadao: h, tower: 0 });     // instSet heights: fields era only
@@ -44,7 +44,7 @@
   // place a compound: w/d scale the footprint (1 = as drawn), h is the era-height map
   const at = (x, z, hMap, w, d, r) => ({ x, z, y: -LIFT, w: w || 1, d: d || 1, r: r || 0, h: hMap });
   // a plain box whose base sits half its height above its origin: item y = -h/2 puts the base on the
-  // ground and the collapsed plate at -h/2, under it. For thin ground things and the crowd.
+  // ground and the collapsed plate at -h/2, under it. For thin ground things.
   const liftGeo = new THREE.BoxGeometry(1, 1, 1); liftGeo.translate(0, 1, 0);
   const flat = (x, z, w, d, h, hMap, c, r) => ({ x, z, y: -h / 2, w, d, r: r || 0, c, h: hMap });
 
@@ -315,16 +315,26 @@
     { y: 1.0, w: 0.5, h: 0.9, d: 0.5, col: 'bone' }], 1.9);
   instSet(scooterGeo, vcMat(), [-5.3, -4.5, 4.1, 4.9, 5.6].map((x, i) => at(x, -335.4 - (i % 2) * 0.8, tw(1.9))));
 
-  // ── the crowd on the plaza, plus a few at the shelter and the crossing corners ──
+  // ── the crowd (issue #13, the engine's people() figures): the plaza, the sidewalks of the
+  //    approach, the shelter and crossing corners, the skywalk deck and the mall-front deck.
+  //    Sidewalks and plazas only; the road stays the girl's (CJ, 2026-09-20). ──
   const crowd = [];
-  for (let i = 0; i < 52; i++) {
+  const WALK = 0.22;                                                              // top of the sidewalk and plaza slabs
+  for (let i = 0; i < 52; i++) {                                                  // the plaza in front of the podium
     const s = i % 2 ? 1 : -1, x = s * (9.6 + rnd() * 7.2), z = -388.5 - rnd() * 17, h = 1.5 + rnd() * 0.3;
-    const c = i % 9 === 0 ? C('verm') : (i % 3 === 0 ? C('haze') : C('bone'));
-    crowd.push(flat(x, z, 0.5, 0.4, h, tw(h), c, rnd() * 6.28));
+    crowd.push({ x, z, y: WALK, r: rnd() * 6.28, h: tw(h) });
   }
-  [[8.4, -341.5], [8.6, -339.2], [7.9, -338.4], [7.4, -324.5], [-7.4, -324.3], [-7.6, -335.4], [7.6, -335.8]].forEach(([x, z], i) =>
-    crowd.push(flat(x, z, 0.5, 0.4, 1.6, tw(1.6), i % 4 === 0 ? C('haze') : C('bone'), rnd() * 6.28)));
-  instSet(liftGeo, lit({ color: C('bone') }), crowd, { colors: true });
+  [[8.4, -341.5], [8.6, -339.2], [7.9, -338.4], [7.4, -324.5], [-7.4, -324.3], [-7.6, -335.4], [7.6, -335.8]].forEach(([x, z]) =>
+    crowd.push({ x, z, y: WALK, r: rnd() * 6.28, h: tw(1.6) }));                 // the shelter queue and the crossing corners
+  for (let i = 0; i < 60; i++) {                                                  // walkers on both sidewalks from the crossing to the plaza (the 0.66 approach frame)
+    const s = i % 2 ? 1 : -1, z = -328 - rnd() * 76, x = s * (6.3 + rnd() * 2.3), h = 1.5 + rnd() * 0.3;
+    if (Math.abs(x) < 7 && Math.abs(z + 340) < 2.4 && s > 0) continue;            // the bus shelter
+    const fwd = rnd() < 0.5;
+    crowd.push({ x, z, y: WALK, r: (fwd ? 0 : Math.PI) + (rnd() - 0.5) * 0.8, h: tw(h) });
+  }
+  for (let i = 0; i < 12; i++) crowd.push({ x: -7.6 + i * 1.4 + (rnd() - 0.5) * 0.6, z: -392 + (i % 2 ? 0.8 : -0.8), y: 6.7, r: (i % 3 ? Math.PI / 2 : -Math.PI / 2) + (rnd() - 0.5) * 0.6, h: tw(1.5 + rnd() * 0.3) });   // crossing the skywalk deck (the 0.78 base frame)
+  [[-404, 1], [-406.5, 1], [-408, 0]].forEach(([z, fwd]) => crowd.push({ x: A11.x0 + 1.6 + 0.5, z, y: 6.7, r: fwd ? 0 : Math.PI, h: tw(1.6) }));   // on the mall-front deck
+  people(crowd);
 
   // ── aircraft-warning lights on the spire top and crown corners: tiny verm cubes, no glow ──
   part(TX, SPIRE_TOP, TZ, 0.4, 0.4, TW(0.5, 'verm'));

@@ -493,15 +493,69 @@
     });
     if (window.MODELS) MODELS.load('tree', gltf => MODELS.instance(gltf.scene, items));
   })();
-  // people on the sidewalks: more each era
+  // ── pedestrians (issue #13): one figure, seven wardrobes, placed here and by every chapter ──
+  // A figure is a few boxes coloured per vertex (bone skin, ink hair, a shirt and trousers or a
+  // skirt in the palette), base at y 0 and height normalised to 1, so an item's h is the figure's
+  // real height per era and the engine's per-era tween grows and drops it like everything else.
+  // people(items) splits the items by wardrobe into one instSet per wardrobe, seven draw calls a
+  // call, so a chapter calls it once with its whole crowd. Never on the road (CJ, 2026-09-20):
+  // sidewalks, plazas, the 1999 pedestrian zone, the 年貨大街 market and the skywalk deck only.
+  //   items: { x, z, y?, r?, v?, h:{red,dadao,tower} }   v: wardrobe 0..6, seeded pick when absent
+  const WARDROBE = [
+    { top: 'bone', legs: 'ink' }, { top: 'haze', legs: 'ink' }, { top: 'lamp', legs: 'haze' }, { top: 'sky', legs: 'walk' },
+    { top: 'bone', skirt: 'verm' }, { top: 'haze', skirt: 'ink' }, { top: 'verm', skirt: 'ink' },
+  ];
+  const FIG_H = 1.6;
+  function figureGeo(w) {
+    const P = [];
+    const box = (x, y, z, wd, h, d, col) => P.push({ x, y, z, w: wd, h, d, col });
+    if (w.skirt) {
+      [-0.09, 0.09].forEach(x => box(x, 0, 0, 0.14, 0.5, 0.16, 'bone'));        // legs under the skirt
+      box(0, 0.48, 0, 0.44, 0.36, 0.3, w.skirt);
+      box(0, 0.82, 0, 0.4, 0.46, 0.24, w.top);
+      [-0.26, 0.26].forEach(x => box(x, 0.84, 0, 0.11, 0.44, 0.12, w.top));
+      box(0, 1.1, -0.12, 0.3, 0.44, 0.12, 'ink');                                // long hair down the back
+    } else {
+      [-0.1, 0.1].forEach(x => box(x, 0, 0, 0.16, 0.74, 0.18, w.legs));
+      box(0, 0.74, 0, 0.44, 0.52, 0.26, w.top);
+      [-0.28, 0.28].forEach(x => box(x, 0.76, 0, 0.11, 0.48, 0.12, w.top));
+      box(0, 1.36, -0.1, 0.28, 0.16, 0.1, 'ink');                                 // the back of the hair
+    }
+    box(0, 1.28, 0, 0.26, 0.26, 0.26, 'bone');                                    // head
+    box(0, 1.5, 0, 0.28, 0.1, 0.28, 'ink');                                       // hair cap, top at FIG_H
+    const pos = [], nor = [], uv = [], col = [];
+    P.forEach(p => {
+      const g = new THREE.BoxGeometry(p.w, p.h, p.d).toNonIndexed();
+      g.translate(p.x, p.y + p.h / 2, p.z);
+      const A = g.attributes.position.array, N = g.attributes.normal.array, U = g.attributes.uv.array, c = C(p.col);
+      for (let i = 0; i < A.length; i += 3) { pos.push(A[i], A[i + 1] / FIG_H, A[i + 2]); nor.push(N[i], N[i + 1], N[i + 2]); col.push(c.r, c.g, c.b); }
+      for (let i = 0; i < U.length; i++) uv.push(U[i]);
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return geo;
+  }
+  const FIG_GEO = WARDROBE.map(figureGeo);
+  const figMat = lit({ vertexColors: true });
+  const figRnd = (() => { let s = 11; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();   // its own seed: the shared rnd sequence stays as it was
+  const peopleCalls = [];                                                       // items per people() call, in load order: engine, red, dadao, tower
+  function people(items) {
+    const byV = FIG_GEO.map(() => []);
+    items.forEach(it => byV[it.v == null ? Math.floor(figRnd() * FIG_GEO.length) : it.v].push(Object.assign({ w: 1, d: 1 }, it)));
+    peopleCalls.push(items.length);
+    return byV.map((its, v) => its.length ? instSet(FIG_GEO[v], figMat, its) : null).filter(Boolean);
+  }
+  // people on the sidewalks the whole street long: more each era, facing along the street
   (() => {
     const items = [];
     for (let i = 0; i < 90; i++) {
-      const s = i % 2 ? 1 : -1, z = 40 - rnd() * 500, x = s * (walkX - 1.2 + rnd() * 2.4);
-      const c = i % 7 === 0 ? C('verm') : (i % 3 === 0 ? C('haze') : C('bone'));
-      items.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c, h: { red: i < 12 ? 1.6 : 0, dadao: i < 36 ? 1.6 : 0, tower: 1.6 } });
+      const s = i % 2 ? 1 : -1, z = 40 - rnd() * 500, x = s * (walkX - 1.2 + rnd() * 2.4), rr = rnd();
+      items.push({ x, z, y: 0.22, r: (rr < 0.5 ? 0 : Math.PI) + ((rr * 4) % 1 - 0.5) * 0.9, h: { red: i < 12 ? 1.6 : 0, dadao: i < 36 ? 1.6 : 0, tower: 1.6 } });
     }
-    instSet(boxGeo, lit({ color: C('bone') }), items, { colors: true });
+    people(items);
   })();
   // shop signs hanging off the facades: a few painted boards, then a wall of neon
   (() => {
@@ -635,7 +689,8 @@
   // lit(params)                                 the engine's lit material; params.surface = 'brick' | 'plaster' | 'concrete' | 'wood' | 'asphalt'
   // lam(col, extra?)                            lit() by palette key, surface family chosen from the key
   // aoBake(geo)                                 bakes the height-rule occlusion into a geometry's vertex colours (part and instSet do it)
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset };
+  // people(items)                               pedestrians through instSet: { x, z, y?, r?, v?, h:{red,dadao,tower} }, h = figure height
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset, people };
 
 
   // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
@@ -1170,7 +1225,7 @@
   if (!isNaN(wantYear)) jumpToYear(wantYear); else { window.scrollTo(0, 0); setEra(0, true); }
 
   // a tiny probe for testing; harmless in the demo
-  window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; },
+  window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; }, people: peopleCalls,
                    get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
                    get shadow() { let c = 0, r = 0, t = 0, black = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m && m.vertexColors && o.geometry && !o.geometry.attributes.color) black++; } });
                      return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, uncoloured: black, map: !!key.shadow.map, size: key.shadow.mapSize.x,
