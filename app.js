@@ -27,6 +27,24 @@
   // `night` term that used to pull the dome, the mountains and a moon toward dusk by chapter 3.
   const ERA_MIX = { red: { lamp: KEY, hemi: HEMI, env: 1.0 }, dadao: { lamp: KEY * 1.09, hemi: HEMI * 0.91, env: 0.95 },
                     tower: { lamp: KEY, hemi: HEMI * 0.68, env: 0.7 } };
+  // per-era sky (issue #9): the gradient dome is shown, and its horizon takes a bright tint from
+  // the chapter's accent, keyed to the scroll year through the era. All three are daylight:
+  // childhood a rose morning (verm at the horizon), Spring Festival gold (lamp), the future a
+  // clear, cooler blue. `horizon`/`top` are the dome's two stops, `mount` the mountains; the
+  // fog colour follows the horizon so the distance haze blends into the dome. Tinted from the
+  // same daylight base (bone→sky for the horizon, sky→ink 0.1 for the top) so no chapter drops
+  // below chapter 1's brightness.
+  const SKY = (() => {
+    const base = () => new THREE.Color(PALETTE.bone).lerp(new THREE.Color(PALETTE.sky), 0.35);
+    const top = () => new THREE.Color(PALETTE.sky).lerp(new THREE.Color(PALETTE.ink), 0.1);
+    const mount = () => new THREE.Color(PALETTE.haze).lerp(new THREE.Color(PALETTE.sky), 0.35);
+    const verm = new THREE.Color(PALETTE.verm), lamp = new THREE.Color(PALETTE.lamp), sky = new THREE.Color(PALETTE.sky);
+    return {
+      red:   { horizon: base().lerp(verm, 0.16), top: top().lerp(verm, 0.06), mount: mount().lerp(verm, 0.10) },
+      dadao: { horizon: base().lerp(lamp, 0.26), top: top().lerp(lamp, 0.08), mount: mount().lerp(lamp, 0.14) },
+      tower: { horizon: base().lerp(sky, 0.18),  top: top().lerp(sky, 0.25),  mount: mount().lerp(sky, 0.20) }
+    };
+  })();
 
   // ── fog: directional, permanent, and cheap ───────────────────────────────────
   // three.js fog is distance-from-camera. The brief's fog is "the part of the century you
@@ -865,13 +883,16 @@
     instSnapshot();
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
     mixFrom = { lamp: mixCur.lamp, hemi: mixCur.hemi, env: mixCur.env, print: mixCur.print };
+    skyFrom.horizon.copy(skyCur.horizon); skyFrom.top.copy(skyCur.top); skyFrom.mount.copy(skyCur.mount);
     eraFrom = eraIdx; eraIdx = i;
     libGroups.forEach(g => { g.visible = g.userData.eras.indexOf(ERAS[i].key) >= 0; });
     eraT0 = instant ? now - ERA_MS : now;
     swapEraLabel(ERAS[i], instant);
   }
-  const tmpC = new THREE.Color(), skyC = new THREE.Color();
+  const tmpC = new THREE.Color();
   let mixCur = { lamp: KEY * 0.5, hemi: HEMI * 0.65, env: 0.7, print: 1 }, mixFrom = { ...mixCur };
+  const skyCur = { horizon: SKY.red.horizon.clone(), top: SKY.red.top.clone(), mount: SKY.red.mount.clone() };
+  const skyFrom = { horizon: skyCur.horizon.clone(), top: skyCur.top.clone(), mount: skyCur.mount.clone() };
   let envCur = -1;
   function updateWorld(now) {
     const k = Math.min(1, (now - eraT0) / ERA_MS);
@@ -892,13 +913,15 @@
     mixCur.hemi = mixFrom.hemi + (M.hemi - mixFrom.hemi) * e;
     mixCur.env = mixFrom.env + (M.env - mixFrom.env) * e;
     mixCur.print = mixFrom.print + (era.uPrint - mixFrom.print) * e;
-    // daylight sky, the same in every chapter: pale horizon, blue top, hazy blue mountains.
-    // The fog colour follows the horizon so the distance haze blends into the dome.
-    skyC.copy(C('bone')).lerp(C('sky'), 0.35);
-    scene.fog.color.copy(skyC);
-    skyMat.uniforms.horizon.value.copy(skyC);
-    skyMat.uniforms.top.value.copy(C('sky')).lerp(C('ink'), 0.1);
-    mountainMat.color.copy(C('haze')).lerp(C('sky'), 0.35);
+    // daylight sky, tinted per chapter (SKY above), moved in the same 500 ms as everything else.
+    const S = SKY[key];
+    skyCur.horizon.copy(skyFrom.horizon).lerp(S.horizon, e);
+    skyCur.top.copy(skyFrom.top).lerp(S.top, e);
+    skyCur.mount.copy(skyFrom.mount).lerp(S.mount, e);
+    scene.fog.color.copy(skyCur.horizon);
+    skyMat.uniforms.horizon.value.copy(skyCur.horizon);
+    skyMat.uniforms.top.value.copy(skyCur.top);
+    mountainMat.color.copy(skyCur.mount);
     sky.position.copy(camera.position);
     liftTops();
     instUpdate(e, key);
