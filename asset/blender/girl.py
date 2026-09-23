@@ -25,7 +25,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stylized as S
-from stylized import bm_box, bm_bar, bm_lathe, bm_sphere, solid
+from stylized import bm_box, bm_bar, bm_solid, bm_lathe, bm_sphere, quad, solid, cutter
 
 SWING = math.radians(25)        # leg swing, forward and back
 HIP_Z = 0.85
@@ -46,25 +46,48 @@ def head(g):
     solid('cheeks', 'verm', cheeks, bevel=0, group=g)
 
 
+def rrect(w, h, r, cz, n=4):
+    """A rounded rectangle in the X-Z plane, centred at (0, cz): four quarter-circle corners."""
+    hw, hh = w / 2 - r, h / 2 - r
+    pts = []
+    for cx, cy, a0 in ((hw, -hh, -90), (hw, hh, 0), (-hw, hh, 90), (-hw, -hh, 180)):
+        for i in range(n + 1):
+            a = math.radians(a0 + 90 * i / n)
+            pts.append((cx + r * math.cos(a), cz + cy + r * math.sin(a)))
+    return pts
+
+
 def hair(g):
-    """Bowl cut: a lathe cap over the top of the head that comes down past the ears, the back of
-    the bowl filled in behind, a straight fringe across the forehead."""
-    def cap(bm):
-        r, cz, n = 0.305, 2.47, 8
-        prof = [(0.0, cz + r)]
-        for i in range(1, n + 1):
-            a = i / n * math.pi * 0.44                    # the top of the head, stopping above the eyes
-            prof.append((r * math.sin(a), cz + r * math.cos(a)))
-        prof.append((0.0, prof[-1][1]))                    # flat underside
-        bm_lathe(bm, prof, n=16)
-    solid('hair_cap', 'ink', cap, bevel=0, group=g)
-    # the bowl's rim: the back and the two sides come down to the ears, the front is the fringe
-    solid('hair_back', 'ink', lambda bm: bm_box(bm, (0.58, 0.22, 0.34), (0, 0.15, 2.36)), bevel=0.05, group=g)
-    def sides(bm):
-        for x in (-0.25, 0.25):
-            bm_box(bm, (0.1, 0.3, 0.28), (x, 0.04, 2.4))
-    solid('hair_sides', 'ink', sides, bevel=0.04, group=g)
-    solid('fringe', 'ink', lambda bm: bm_box(bm, (0.5, 0.15, 0.16), (0, -0.21, 2.47)), bevel=0.04, group=g)
+    """The bowl cut as ONE solid of revolution with the face cut out of it, not a cap plus a back
+    block plus two side flaps plus a fringe bar. HANDOFF: "the girl's bowl cut is a cap, a back
+    block, side flaps and a fringe (seams up close)" — four parts meeting at four hard seams, and
+    the fringe bar read like a visor. The lathe runs from the crown down past the ears to a rolled
+    hem; the boolean takes out a rounded face window whose straight top edge is the fringe line."""
+    # max radius 0.298 against the head's 0.27: a thicker shell leaves a black rim all round the
+    # face and the whole head reads as a helmet whatever the window does
+    prof = [(0.00, 2.775), (0.095, 2.770), (0.172, 2.745), (0.234, 2.690), (0.276, 2.606),
+            (0.294, 2.500), (0.298, 2.410), (0.292, 2.345), (0.272, 2.308), (0.235, 2.296),
+            (0.00, 2.296)]
+
+    def face_window(bm):
+        # the window widens toward the chin: a straight-sided one leaves flaps 0.22 deep at the
+        # cheeks and the whole thing reads as a crash helmet
+        pts = [(-0.285, 2.02), (0.285, 2.02), (0.252, 2.40)]
+        pts += quad((0.252, 2.40), (0.252, 2.464), (0.182, 2.464), 3)
+        pts.append((-0.182, 2.464))
+        pts += quad((-0.182, 2.464), (-0.252, 2.464), (-0.252, 2.40), 3)
+        bm_solid(bm, pts, -0.45, -0.04)
+
+    def ear_notches(bm):
+        # lift the hair above the ears on both sides while the back stays long down to the nape.
+        # A lathe alone is the same height all round, which is what read as a crash helmet. Its
+        # own cutter object, not merged into the face window: two overlapping solids in one cutter
+        # mesh make it self-intersecting and the EXACT solver then removes the whole hair.
+        for sx in (-1, 1):
+            bm_box(bm, (0.30, 0.34, 0.3), (sx * 0.31, -0.02, 2.17))
+    c1 = cutter('face_window', 'ink', face_window)
+    c2 = cutter('ear_notches', 'ink', ear_notches)
+    solid('hair', 'ink', lambda bm: bm_lathe(bm, prof, n=20), bevel=0.03, cutters=(c1, c2), group=g)
 
 
 def torso(g):
@@ -120,13 +143,16 @@ def arms_and_bowl(g, dz):
             bm_sphere(bm, 0.08, hand, 8, 6)                                     # the hand on the rim
     solid('arms', 'bone', arms, bevel=0.03, group=g)
     T = Matrix.Translation(bowl_c)
-    prof = [(0.0, 0.0), (0.2, 0.0), (0.3, 0.2), (0.3, 0.24), (0.0, 0.24)]
-    solid('bowl', 'bone', lambda bm: bm_lathe(bm, prof, n=14, xform=T), bevel=0.03, group=g)
-    solid('noodles', 'lamp', lambda bm: bm_sphere(bm, 0.24, bowl_c + Vector((0, 0, 0.17)), 12, 8, scale_z=0.5), bevel=0, group=g)
-    solid('egg', 'verm', lambda bm: bm_sphere(bm, 0.07, bowl_c + Vector((0.09, -0.06, 0.34)), 8, 6), bevel=0, group=g)
+    # a curved wall on a foot ring with a rolled rim, instead of a straight-sided cone
+    prof = [(0.0, 0.015), (0.115, 0.015), (0.125, 0.0), (0.155, 0.0), (0.178, 0.035),
+            (0.228, 0.105), (0.276, 0.185), (0.300, 0.245), (0.310, 0.276),
+            (0.294, 0.296), (0.252, 0.290), (0.0, 0.290)]
+    solid('bowl', 'bone', lambda bm: bm_lathe(bm, prof, n=18, xform=T), bevel=0.02, group=g)
+    solid('noodles', 'lamp', lambda bm: bm_sphere(bm, 0.25, bowl_c + Vector((0, 0, 0.23)), 14, 9, scale_z=0.42), bevel=0, group=g)
+    solid('egg', 'verm', lambda bm: bm_sphere(bm, 0.07, bowl_c + Vector((0.09, -0.06, 0.38)), 10, 7), bevel=0, group=g)
     def chopsticks(bm):
         for i, x in enumerate((-0.05, 0.03)):
-            p0 = bowl_c + Vector((x, 0.02 + i * 0.03, 0.2))
+            p0 = bowl_c + Vector((x, 0.02 + i * 0.03, 0.24))
             p1 = p0 + Vector((0.24 + i * 0.03, 0.06, 0.26))                   # leaning out to her left
             bm_bar(bm, p0, p1, 0.025)
     solid('chopsticks', 'ink', chopsticks, bevel=0, group=g)
@@ -134,17 +160,22 @@ def arms_and_bowl(g, dz):
 
 # ─────────────────────────────────────────────────────────────────────────────
 def backpack(g):
-    """書包, the school backpack (CJ, 2026-09-23: 「後面背個書包好了」): a rounded red box on her
-    back, a flap over its top with a mustard buckle, two straps over the shoulders down to the
-    chest. The shirt's back face is at y +0.16."""
-    solid('pack', 'verm', lambda bm: bm_box(bm, (0.42, 0.2, 0.46), (0, 0.27, 1.86)), bevel=0.05, group=g)
-    solid('pack_flap', 'verm', lambda bm: bm_box(bm, (0.44, 0.24, 0.16), (0, 0.28, 2.05)), bevel=0.04, group=g)
-    solid('pack_buckle', 'lamp', lambda bm: bm_box(bm, (0.1, 0.04, 0.08), (0, 0.39, 1.98)), bevel=0.0, group=g)
+    """書包, the school backpack (CJ, 2026-09-23: 「後面背個書包好了」): a soft red bag on her back
+    with a flap over its top and a mustard buckle, and two straps curving over the shoulders down
+    to the chest. Body and flap are extruded rounded rectangles rather than boxes, so the vertical
+    corners are actually round instead of chamfered, and the straps follow a curve instead of
+    turning a hard corner at the shoulder. The shirt's back face is at y +0.16."""
+    solid('pack', 'verm', lambda bm: bm_solid(bm, rrect(0.44, 0.5, 0.13, 1.86), 0.17, 0.38), bevel=0.06, group=g)
+    solid('pack_flap', 'verm', lambda bm: bm_solid(bm, rrect(0.47, 0.2, 0.08, 2.05), 0.15, 0.41), bevel=0.05, group=g)
+    solid('pack_buckle', 'lamp', lambda bm: bm_box(bm, (0.11, 0.05, 0.09), (0, 0.40, 1.97)), bevel=0.02, group=g)
+
     def straps(bm):
         for x in (-0.15, 0.15):
-            bm_bar(bm, (x, 0.2, 2.04), (x, 0.0, 2.2), 0.07, t2=0.04)      # over the shoulder
-            bm_bar(bm, (x, 0.0, 2.2), (x, -0.19, 2.02), 0.07, t2=0.04)    # down the chest
-            bm_bar(bm, (x, -0.19, 2.02), (x, -0.185, 1.7), 0.07, t2=0.04)
+            path = quad((0.22, 2.02), (0.20, 2.24), (0.0, 2.21), 3, include_start=True)      # over the shoulder
+            path += quad((0.0, 2.21), (-0.20, 2.18), (-0.19, 2.00), 3)                       # down the chest
+            path += [(-0.185, 1.70)]
+            for (y0, z0), (y1, z1) in zip(path, path[1:]):
+                bm_bar(bm, (x, y0, z0), (x, y1, z1), 0.075, t2=0.045)
     solid('pack_straps', 'verm', straps, bevel=0.0, group=g)
 
 
