@@ -139,6 +139,8 @@ CJ, 2026-09-22: 「i want music for different section can you find 1980s 1990s 2
 
 ## Open items
 
+0. **Issue #8, the next pass, research first** (CJ, 2026-09-23: 「下次要執行之前要先做研究 先搞清楚完整的plan 有必要分開issue 也可以」): sky, font, light and shadow, the man climbing to the top of the 101, polish, and the closing words "Just like the man on Taipei 101". A Sonnet research dispatch writes `research/plan-6/README.md` with options and costs per item; CJ picks; items with their own done-when split into separate issues. Issue #5 (models, branch `issue-5-models`) is done and waits for CJ's merge; merging it changes "Open it" to a local http server. Undecided, not filed: a painted sky dome (needs a reference picture from CJ), offline Blender renders for the ship kit, exporting the JS-built parts to glb for hand editing.
+
 1. ~~Issue #3, surface texture pass~~ — done above, on `issue-3-texture`, not pushed; CJ decides the push.
 2. **Ship kit** (not filed yet; proposed as #4): README first line carries the Pages link (the current link still points at the old repo name and 404s); a `submission/` folder with a one-paragraph pitch, five screenshots (one per chapter, the 101 base, the climb) and a 60-second scroll recording.
 3. **Waiting on CJ, from the rubric:** gate the 1980s / 1990s / 2000s Ximending sets by scroll year (about an hour in `scene-red.js`, thins the 1985 street) or keep all three on for density. A 1989 frame currently shows a NOKIA sign.
