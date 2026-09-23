@@ -1,6 +1,6 @@
 # HANDOFF — Our Memory in Taipei
 
-Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/Our-Memory-in-Taipei` (renamed from `shidaimiwu-proto` 2026-09-22 to match the repo). Worktrees go in `~/Documents/CJ-project-vault/_worktrees/Our-Memory-in-Taipei/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; its worktree is removed. Last updated 2026-09-24 (issue #13 the polish pass merged into main; issues #9 and #11, the sky and light and shadow, branch `issue-9-11-light`, not pushed).
+Scroll-driven three.js page for Claude Code Build Day. Repo: https://github.com/Joy-shen123/Our-Memory-in-Taipei (formerly claude_code_build_day, branch `main`). Live: https://joy-shen123.github.io/Our-Memory-in-Taipei/ (GitHub Pages, deploys from `main` on every push). Local clone: `~/Documents/CJ-project-vault/Our-Memory-in-Taipei` (renamed from `shidaimiwu-proto` 2026-09-22 to match the repo). Worktrees go in `~/Documents/CJ-project-vault/_worktrees/Our-Memory-in-Taipei/<branch>`. Issue #1 merged as PR #2 on 2026-09-22; its worktree is removed. Last updated 2026-09-24 (issue #13 the polish pass merged into main; issues #9 and #11, the sky and light and shadow, branch `issue-9-11-light`, not pushed; issue #15, the model detail pass, branch `issue-15-detail`).
 
 ## What it is
 
@@ -53,7 +53,7 @@ agent-browser screenshot /tmp/f.png; agent-browser console; agent-browser close
 
 Chapter fractions: red 0.02–0.347, dadao 0.347–0.582, tower 0.582–1.0 (the exact boundaries are `window.__fog.BOUNDS`; the flash and the parallax fade key on them). `window.__fog` exposes `progress`, `year`, `era`, `camZ`, `BOUNDS`, `jumpToYear(y)`, `drift` (parallax x, y, fade), `warm` (warm-up ms, programs, textures) and `hitch` (longest frame gap since load, for measuring). `index.html?nowarm=1` skips the warm-up. Syntax-check any file with `node -e "new Function(require('fs').readFileSync('app.js','utf8'))"`. Last measured 2026-09-24 after issues #9 and #11: 100.6 / 100.6 / 100.6 fps; after issue #13 (660 pedestrian figures in): 100.5 / 100.6 / 100.5 fps headed at 0.2 / 0.44 / 0.78 (display cap), 1440x900 pixel ratio 1, console empty, the three scene files re-run clean. Before that, 2026-09-23 after issue #5 (every model in): 100.4 / 100.4 / 100.4, 1264 meshes + 84 instanced sets + 2 Points. Before issue #5 (2026-09-21): 100.8 / 100.9 / 100.8, 1269 meshes + 59 sets.
 
-A frame within 0.012 of a chapter boundary (0.347, 0.582) is inside the chapter-cut flash's band: since issue #13 the flash only fires when the progress crosses the marking, so a scroll that lands short of it shows no flash, and one that crosses it shows the flash fading over 1.7 s; shoot such a frame 120+ frames after landing, or read it knowing that. The blind score's `dadao-0.58.png` (2026-09-24) was the gold flash mid-fade, not haze.
+A frame within 0.012 of a chapter boundary (0.347, 0.582) is inside the chapter-cut flash's band: since issue #13 the flash only fires when the progress crosses the marking, so a scroll that lands short of it shows no flash, and one that crosses it shows the flash fading over 1.7 s; shoot such a frame 120+ frames after landing, or read it knowing that. The blind score's `dadao-0.58.png` (2026-09-24) was the gold flash mid-fade, not haze. Issue #15 (2026-09-24) measured 60.4 / 60.4 / 60.4 on a 60 Hz display — the cap, not a regression; 115,008 triangles, asset/models/ 2.80 MB.
 
 A page-load exception is NOT captured by the session (it fires before the session attaches): after the screenshots, re-run each scene file in the page inside try/catch (`fetch('scene-red.js').then(t => t.text()).then(src => { try { new Function(src)(); return 'ok' } catch (e) { return e.message } })`) — issue #5 found scene-red.js silently dead for four commits this way. Other agents' servers may sit on port 8000; use your own port and never `pkill` by pattern.
 
@@ -157,22 +157,26 @@ Blender 5.2 LTS. `stylized.py` holds the shared mechanics; `dihua_common.py` the
 
 | glb | script | what | triangles | KB | where |
 |---|---|---|---|---|---|
-| `red-house` | `red-house.py` | 西門紅樓 octagon + 十字樓 | 30,700 | 842 | `scene-red.js`, every era |
-| `tower101` | `tower101.py` | 台北101, same profile constants as `TOWER.faceX` | 13,144 | 279 | `scene-tower.js`, tower era |
-| `temple` | `temple.py` | 霞海城隍廟 | 8,352 | 179 | `scene-dadao.js`, every era |
-| `yongle` | `yongle.py` | 永樂市場 | 9,052 | 232 | `scene-dadao.js`, every era |
+| `red-house` | `red-house.py` | 西門紅樓 octagon + 十字樓 | 34,152 | 963 | `scene-red.js`, every era |
+| `tower101` | `tower101.py` | 台北101, same profile constants as `TOWER.faceX` | 17,512 | 412 | `scene-tower.js`, tower era |
+| `temple` | `temple.py` | 霞海城隍廟 | 14,800 | 321 | `scene-dadao.js`, every era |
+| `yongle` | `yongle.py` | 永樂市場 | 9,052 | 231 | `scene-dadao.js`, every era |
 | `chunghwa` | `chunghwa.py` | one 中華商場 block, cloned 8× | 3,148 | 71 | `scene-red.js`, red era |
-| `lux` | `lux.py` | 樂聲戲院 | 4,296 | 96 | `scene-red.js`, every era |
-| `dihua-min` / `-yang` / `-baroque` | `dihua-*.py` | one shophouse bay per crest style, instanced (9 / 10 / 19 bays) | 3,052 / 3,700 / 3,624 | 70 / 90 / 82 | `scene-dadao.js` |
+| `lux` | `lux.py` | 樂聲戲院 | 5,428 | 122 | `scene-red.js`, every era |
+| `dihua-min` / `-yang` / `-baroque` | `dihua-*.py` | one shophouse bay per crest style, in three groups (`main` / `storey` / `crest`), instanced (9 / 10 / 19 bays) | 4,260 / 5,188 / 4,952 | 105 / 131 / 115 | `scene-dadao.js` |
 | `stall` | `stall.py` | 年貨大街 stall, instanced ×30 | 2,464 | 53 | `scene-dadao.js` |
 | `shopfront` | `shopfront.py` | ground / storey / roof modules tiled into every Ximending body | 1,984 | 50 | `scene-red.js` |
-| `lamp` / `bollard` / `tree` | same names | street lamp ×84, bollard ×8, street tree | 436 / 164 / 1,332 | 10 / 5 / 26 | `app.js`, `scene-red.js` |
+| `lamp` / `bollard` / `tree` | same names | street lamp ×84, bollard ×8, street tree | 436 / 164 / 1,332 | 9 / 4 / 25 | `app.js`, `scene-red.js` |
 | `props` | `props.py` | crate, sack, bicycle, aboard, plant, boxes | 2,420 | 58 | `scene-dadao.js`, `scene-red.js` |
-| `girl` | `girl.py` | 張君雅小妹妹, runA / runB frames | 2 × 2,968 | 117 | `app.js` |
+| `girl` | `girl.py` | 張君雅小妹妹, runA / runB frames | 7,716 both frames | 160 | `app.js` |
 
-Total `asset/models/`: 2.3 MB (cap 6 MB). Canvas-text boards stay on top of the models (posters, name boards, price boards, neon): text is the one thing the pipeline does not draw.
+Total: 115,008 triangles (cap 120,000) in 2.80 MB (cap 6 MB), after issue #15. Canvas-text boards stay on top of the models (posters, name boards, price boards, neon): text is the one thing the pipeline does not draw.
 
-What the models dropped or could not do, so nobody hunts for it: Dihua bays are all two upper floors (the old `floors: 3` and `tall:` options are ignored); the 101 lost its lit-window emissive grid (geometry mullions instead, daylight anyway); the Red House fanlights are plain recesses; the temple's carved relief and ridge dragons are not there; the girl's bowl cut is a cap, a back block, side flaps and a fringe (seams up close); the Lux has two poster cases, not six, because the lobby recess took the wall; the tree canopy silhouette is faintly polygonal up close. The 中華商場 neon frames, the name plates, and every text sign are still primitives.
+Issue #15 (2026-09-24, branch `issue-15-detail`, seven commits, not pushed) closed the six gaps that list named. Fixed: the Dihua bays have their floor variety back (the glb is three groups — `main` = arcade + one upper floor, `storey` = one more, `crest` = roof and parapet — and `scene-dadao.js` instances `storey` `floors - 1` times at `y = (k-1)*3.4` and `crest` at `y = (floors-2)*3.4`, so `opts.floors` 1/2/3 and `opts.tall` mean something again); the Red House has real fanlights, sashes, a banded string course over a corbel row and a dentil row; the temple has its carved 堵 panels, a 竹節窗, 石鼓, 雙龍搶珠 ridge dragons, 0.30 m door recesses and eleven 斗拱 stacks; the girl's bowl cut is one solid of revolution with the face and the ears cut out of it, no seams; the Lux has six poster cases, a coffered marquee soffit and the neon's steel cage; the 101 has a mullion grid standing proud of the glass, two-ring floor edges, 32 modelled 如意 and a lattice mast.
+
+What is still dropped, so nobody hunts for it: the 101 has no lit-window emissive grid (geometry mullions instead, daylight anyway); the tree canopy silhouette is faintly polygonal up close; the 中華商場 neon frames, the name plates and every text sign are still primitives. `yongle`, `chunghwa`, `shopfront`, `stall`, `props`, `lamp`, `bollard` and `tree` were not touched by #15 and are the next candidates — `yongle` at 9,052 triangles is the biggest untouched model and it fills the west side at 0.52. Two of the six detailed buildings are never framed head-on by the camera: 霞海城隍廟 (z -240, west) and 樂聲戲院 (z -66, west) both pass hard against the left frame edge, so their new detail reads only in passing; a keyframe that glances west is worth more to them than more geometry.
+
+Two traps this pass hit, both now commented in the scripts. `bm_bar` tracks a bar's axis but not its roll, so a rectangular section lands at whatever angle the track quaternion picks — a deep narrow fin on the 101 showed up as wide diagonal ribbons across the glass. Use a square section for anything whose orientation matters. And two overlapping solids in one cutter bmesh make it self-intersecting: the EXACT solver then removes the whole target, which is how the girl's first ear-notch attempt deleted all her hair. Give each overlapping cut its own cutter object.
 
 Engine changes made for this: `libGroup()` sets the group's initial visibility from the current era (the first tower-only group showed the 101 in 1994); `instSet()` no longer throws on an empty coloured set; `models.js` loads before `app.js`. The girl in `app.js` swaps her primitive build for the glb frames when they arrive and flips `runA`/`runB` on the stride's sign.
 
@@ -201,6 +205,7 @@ The painted sky dome is still `(unknown — needs CJ: a reference image)`; nothi
 0. **Issue #8, the next pass, research first** (CJ, 2026-09-23: 「下次要執行之前要先做研究 先搞清楚完整的plan 有必要分開issue 也可以」): sky, font, light and shadow, the man climbing to the top of the 101, polish, and the closing words "Just like the man on Taipei 101". A Sonnet research dispatch writes `research/plan-6/README.md` with options and costs per item; CJ picks; items with their own done-when split into separate issues. Issue #5 (models, branch `issue-5-models`) is done and waits for CJ's merge; merging it changes "Open it" to a local http server. Undecided, not filed: a painted sky dome (needs a reference picture from CJ), offline Blender renders for the ship kit, exporting the JS-built parts to glb for hand editing.
 
 1. ~~Issue #3, surface texture pass~~ — done above, on `issue-3-texture`, not pushed; CJ decides the push.
+1b. **Issue #15, the model detail pass** — done, branch `issue-15-detail`, seven commits, **not pushed**. Screenshots in `~/Desktop/issue15-detail/`, blind scoring 3 in `docs/RUBRIC.md`. It moved no rubric cell: every 4 is held by its named weak spot and none of those weak spots is a model (window-grid blocks at 0.30, the temple no keyframe frames, the generic lit boxes round the 101, people and goods). CJ decides the push.
 2. **Ship kit** (not filed yet; proposed as #4): README first line carries the Pages link (the current link still points at the old repo name and 404s); a `submission/` folder with a one-paragraph pitch, five screenshots (one per chapter, the 101 base, the climb) and a 60-second scroll recording.
 3. **Waiting on CJ, from the rubric:** gate the 1980s / 1990s / 2000s Ximending sets by scroll year (about an hour in `scene-red.js`, thins the 1985 street) or keep all three on for density. A 1989 frame currently shows a NOKIA sign.
 4. Blender: decided, done as issue #5 on branch `issue-5-models` (see Models). The page now needs a static server; the double-click rule is gone. Not merged yet.
