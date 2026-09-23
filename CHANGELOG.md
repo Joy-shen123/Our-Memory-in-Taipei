@@ -4,6 +4,7 @@ One line per merged pull request, newest first. Dates are Taipei time.
 
 ## 2026-09-23
 
+- **#14** Detailed stylized models: Blender-scripted glb for six hero buildings, instanced street elements and the girl with her school bag; GLTFLoader and models.js; the page now runs from an http server, double-click retired. Closes #5.
 - **#7** Decade music player: a YouTube player per decade, a gitignored private folder with chorus loops for CJ's own songs, four synthesised CC0 loops as the offline fallback, HUD control bottom-left. Closes #4.
 - **#6** Surface texture pass: ACES tone curve on luminance, canvas sky environment, procedural brick, plaster, concrete, wood and asphalt maps with one strength knob, a shadow sun that follows the scroll camera, per-vertex ambient occlusion. Closes #3.
 
