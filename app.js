@@ -365,6 +365,11 @@
   function instSet(geo, mat, items, opts) {
     const mesh = new THREE.InstancedMesh(aoBake(geo), withFog(mat), items.length);
     mesh.frustumCulled = false;
+    // shadow flags set here, not in enableShadows(): the glb street elements (MODELS.instance:
+    // lamps, trees, Dihua bays, stalls, shopfront modules, bollards, props) arrive after the
+    // first frame's pass has run, and their Lambert materials sat outside its Standard gate.
+    // Issue #11's runtime check: 47 instanced sets cast nothing before this line.
+    if (mat.isMeshStandardMaterial || mat.isMeshLambertMaterial) { mesh.receiveShadow = true; mesh.castShadow = !mat.transparent; }
     if (mat.map && mat.map.userData.tile && items.length) {           // one repeat for the set: its median footprint and height
       const med = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
       fitTile(mat, med(items.map(it => Math.max(it.w, it.d))), med(items.map(it => Math.max(...Object.values(it.h)))));
