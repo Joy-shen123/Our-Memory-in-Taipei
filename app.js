@@ -323,7 +323,10 @@
   // reference. They set anchors[id].top for the label and, for the tower, TOWER.h / TOWER.faceX.
   const TOWER = { x: anchors.tower101.x, z: anchors.tower101.z, h: 100, faceX: null };
 
-  // the man climbing the west face: a small figure whose height follows the scroll in the last chapter
+  // the man climbing the west face: a small figure whose height follows the scroll in the last
+  // chapter. Issue #12 (CJ, 2026-09-23: 「101上的人要爬到頂端」): he climbs the glass on TOWER.faceX
+  // until his hands reach the crown rim (TOWER.h), pulls himself over it and stands on the crown
+  // roof. The crown, not the spire: the spire is a mast nobody stands on (research/plan-6 §4).
   const man = new THREE.Group();
   const manMat = withFog(lit({ color: C('verm') }));
   const manBody = new THREE.Mesh(boxGeo, manMat); manBody.scale.set(0.7, 1.4, 0.5); man.add(manBody);
@@ -332,14 +335,35 @@
   const armR = new THREE.Mesh(boxGeo, manMat); armR.scale.set(0.25, 1.1, 0.25); armR.position.set(0.55, 0.7, 0); man.add(armR);
   man.scale.setScalar(1.6);
   scene.add(man);
+  const MAN_SOLES = 0.7 * 1.6;      // origin (body centre) to the soles, world units
+  const CLIMB_TOP = 0.93;           // chapter fraction at which his hands reach the crown rim
+  const RIM_Y = () => TOWER.h + 0.05;                       // the crown rim's top face (tower101.py crown_rim)
+  const STAND = { dx: -2.85, dz: 1.4 };                     // on the roof ledge between the rim (hw 3.4) and the mechanical box (hw 2.1)
+  const manState = { f: 0, phase: 'off' };
   function updateMan(u) {
     const i = ERAS.length - 1, f = Math.min(1, Math.max(0, (u - BOUNDS[i]) / (BOUNDS[i + 1] - BOUNDS[i])));
     man.visible = ERAS[eraIdx].key === 'tower';
-    const climb = 6 + Math.pow(f, 1.4) * (TOWER.h - 20);
-    const fx = TOWER.faceX ? TOWER.faceX(climb) : TOWER.x - 6.1;
-    man.position.set(fx, climb, TOWER.z + 1.5);
     const t = performance.now() / 1000;
-    armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
+    manState.f = f;
+    if (f < CLIMB_TOP) {
+      // climbing: origin 6 → just under the rim, x on the face at that height so the flare per segment keeps him on the glass
+      const climb = 6 + Math.pow(f / CLIMB_TOP, 1.4) * (RIM_Y() - 0.65 - 6);
+      const fx = TOWER.faceX ? TOWER.faceX(climb) : TOWER.x - 6.1;
+      man.position.set(fx, climb, TOWER.z + 1.5);
+      man.rotation.y = 0;
+      armL.position.y = 1.0 + Math.sin(t * 3) * 0.2; armR.position.y = 0.7 - Math.sin(t * 3) * 0.2;
+      manState.phase = 'climb';
+    } else {
+      // the mantle: hanging at the rim → standing on the crown roof. Height first, then the step in.
+      const k = (f - CLIMB_TOP) / (1 - CLIMB_TOP), ss = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+      const ky = ss(k * 1.4), kx = ss((k - 0.3) / 0.7);
+      const y0 = RIM_Y() - 0.65, y1 = RIM_Y() + MAN_SOLES;
+      const x0 = TOWER.faceX ? TOWER.faceX(RIM_Y() - 0.2) : TOWER.x - 3.8, x1 = TOWER.x + STAND.dx;
+      man.position.set(x0 + (x1 - x0) * kx, y0 + (y1 - y0) * ky, TOWER.z + 1.5 + (STAND.dz - 1.5) * kx);
+      man.rotation.y = 0;
+      armL.position.y = 1.0; armR.position.y = 0.7;
+      manState.phase = k >= 1 ? 'top' : 'mantle';
+    }
   }
 
   // ── BACKGROUND: sky dome, mountains, distant city ────────────────────────────
@@ -1260,7 +1284,7 @@
 
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; }, people: peopleCalls,
-                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
+                   get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get man() { return Object.assign({ x: +man.position.x.toFixed(2), y: +man.position.y.toFixed(2), z: +man.position.z.toFixed(2), soles: +(man.position.y - MAN_SOLES).toFixed(2), faceX: TOWER.faceX ? +TOWER.faceX(man.position.y).toFixed(2) : null }, manState); }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
                    get shadow() { let c = 0, r = 0, t = 0, black = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m && m.vertexColors && o.geometry && !o.geometry.attributes.color) black++; } });
                      return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, uncoloured: black, map: !!key.shadow.map, size: key.shadow.mapSize.x,
                               box: [key.shadow.camera.left, key.shadow.camera.right], pos: key.position.toArray().map(v => +v.toFixed(1)), target: key.target.position.toArray().map(v => +v.toFixed(1)), camZ: +camera.position.z.toFixed(1) }; } };
