@@ -13,7 +13,7 @@ So every building here has a real one behind it: the eight blocks of 中華商�
 
 A street runs away from the camera. Scrolling moves you down it and forward through forty years. A girl in red runs ahead of you, and slows to a walk when you stop. Big words surface as you go, and it ends on a man climbing Taipei 101.
 
-> *Where we go, we don't know. We only know we need to climb higher.*
+> *Just like the man on Taipei 101*
 
 ## Three chapters
 
