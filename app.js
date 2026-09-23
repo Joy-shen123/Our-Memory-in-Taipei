@@ -174,7 +174,15 @@
 
   // hemisphere: pale blue sky above, a warm pavement bounce below, so a roof and an underside are
   // never the same colour; its intensity is ERA_MIX.hemi, tweened per era
-  const hemi = new THREE.HemisphereLight(C('bone').lerp(C('sky'), 0.2), C('walk').lerp(C('ink'), 0.5), 0.55);
+  // coloured shadow (issue #11, research/bruno-simon/README.md section 4 and 6b): a shadowed
+  // surface receives only the hemisphere light and the environment, so tinting the hemisphere
+  // toward violet makes every shadow read as colour instead of grey while the sun stays warm.
+  // The tint keeps each colour's luminance, so nothing gets darker (CJ, 2026-09-20: bright).
+  // No day cycle: one tint, every chapter.
+  const SHADOW_TINT = new THREE.Color('#7b5cff'), SHADOW_MIX = 0.3;
+  const lumOf = c => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+  const tinted = c => { const y = lumOf(c); c.lerp(SHADOW_TINT, SHADOW_MIX); return c.multiplyScalar(y / lumOf(c)); };
+  const hemi = new THREE.HemisphereLight(tinted(C('bone').lerp(C('sky'), 0.2)), tinted(C('walk').lerp(C('ink'), 0.5)), 0.55);
   scene.add(hemi);
   const key = new THREE.DirectionalLight(C('lamp'), 0.9);
   key.position.set(18, 26, 12);
