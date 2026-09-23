@@ -133,10 +133,26 @@ def arms_and_bowl(g, dz):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+def backpack(g):
+    """書包, the school backpack (CJ, 2026-09-23: 「後面背個書包好了」): a rounded red box on her
+    back, a flap over its top with a mustard buckle, two straps over the shoulders down to the
+    chest. The shirt's back face is at y +0.16."""
+    solid('pack', 'verm', lambda bm: bm_box(bm, (0.42, 0.2, 0.46), (0, 0.27, 1.86)), bevel=0.05, group=g)
+    solid('pack_flap', 'verm', lambda bm: bm_box(bm, (0.44, 0.24, 0.16), (0, 0.28, 2.05)), bevel=0.04, group=g)
+    solid('pack_buckle', 'lamp', lambda bm: bm_box(bm, (0.1, 0.04, 0.08), (0, 0.39, 1.98)), bevel=0.0, group=g)
+    def straps(bm):
+        for x in (-0.15, 0.15):
+            bm_bar(bm, (x, 0.2, 2.04), (x, 0.0, 2.2), 0.07, t2=0.04)      # over the shoulder
+            bm_bar(bm, (x, 0.0, 2.2), (x, -0.19, 2.02), 0.07, t2=0.04)    # down the chest
+            bm_bar(bm, (x, -0.19, 2.02), (x, -0.185, 1.7), 0.07, t2=0.04)
+    solid('pack_straps', 'verm', straps, bevel=0.0, group=g)
+
+
 def frame(g, left_forward, bowl_dz):
     head(g)
     hair(g)
     torso(g)
+    backpack(g)
     skirt(g)
     legs(g, left_forward)
     arms_and_bowl(g, bowl_dz)

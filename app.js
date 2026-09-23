@@ -685,6 +685,9 @@
     const a = MODELS.node(root, 'runA'), b = MODELS.node(root, 'runB');
     if (!a || !b) return;
     girl.children.slice().forEach(c => girl.remove(c));
+    // the glb faces +z (the library convention) and she runs down -z ahead of the camera, so
+    // turn the frames once here and the camera sees her back (CJ, 2026-09-23: 「人物可以不要倒著走嗎」)
+    a.rotation.y = b.rotation.y = Math.PI;
     girl.add(a, b);
     frameA = a; frameB = b;
   });
