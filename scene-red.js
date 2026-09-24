@@ -744,8 +744,9 @@
   // 紅布條 across the road: the market's own sale, 楚留香 (on Taiwan's screens 1982–83, a national
   // event) and 小虎隊 (formed 1988), both inside 1985–1999, and the cinema street's banner.
   // CJ, 2026-09-24, on swapping the first two for a National Day and a road-safety banner:
-  // 「這個拿掉很尷尬」. Period accuracy serves the memory: a sign goes only if it could not have
-  // existed, never because something more official could have hung there.
+  // 「這個拿掉很尷尬」, then 「不是我是不要中華名國國慶的字樣不是不要布條」— the cloth banners stay
+  // as built; the 國慶 wording goes. Period accuracy serves the memory: a sign goes only if it
+  // could not have existed, never because something more official could have hung there.
   SIGNS.roadBanner('中華商場 歲末大拍賣', 38, 8.2, 'verm', 'lamp');
   SIGNS.roadBanner('電影街 本週上映 楚留香', 10, 7.6, 'lamp', 'verm');   // far enough that it sits under the opening title
   SIGNS.roadBanner('小虎隊 新專輯 全面上市', 0, 7.0, 'verm', 'lamp');
