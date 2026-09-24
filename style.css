@@ -159,6 +159,10 @@ html, body {
   .hud-music { left: 20px; bottom: 72px; width: calc(100vw - 40px); }   /* above the year, which owns the bottom-left corner on a phone */
   .hud-music .mus-k, .hud-music .mus-track, .hud-music .mus-decades { display: none; }   /* the sound toggle and the MV box only */
   .hud-music.muted .mus-box, .hud-music.locked .mus-box { display: none; }             /* the toggle shows the box (and unmutes) or hides it (muted and paused) */
+  /* CJ, 2026-09-24: 「youtube畫面太大都擋住了」. The playing MV box was the control's full width, 350 x 200 across the
+     bottom of the street. It is now 200 x 200 in the corner, the smallest YouTube's terms allow (music.js: visible, 200 px
+     or larger), so the street stays the page while a song plays; the player letterboxes the video inside it. */
+  .mus-box, .mus-box iframe, #musEmbed { width: 200px; }
   .hud-music button { font-size: 10px; padding: 5px 9px 4px 11px; }
   .hud-title { font-size: 10px; letter-spacing: 0.24em; top: auto; bottom: 28px; }   /* bottom-right on a phone: the chapter column owns the top */
   .hud-chapter { gap: 12px; }
