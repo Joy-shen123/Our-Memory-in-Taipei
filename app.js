@@ -1247,6 +1247,11 @@
   // the veil goes, then fades out over titleFrom → titleTo.
   const sm = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   const openEl = document.getElementById('opening');
+  // the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」): #guide (index.html, style.css .hud-guide) is a
+  // dim with a swipe-up arrow over the opening screen, display: none except under 480px. Its opacity follows the fog, so it
+  // clears in the same window and is gone by OPENING.fogTo; while it is on, the title is bone so it reads through the dim.
+  const guideEl = document.getElementById('guide');
+  let guideOn = false;
   const fogCol = new THREE.Color(), boneCol = C('bone'), inkCol = C('ink'), titleCol = new THREE.Color();
   // CJ, 2026-09-24: 「不然先給opening 一個復古色調的背景」. The opening fog carries a warm faded-print
   // tone instead of plain bone, strongest at scroll 0 and gone with the fog by OPENING.fogTo, so
@@ -1290,8 +1295,9 @@
       if (!mountainMat.toneMapped) { mountainMat.toneMapped = true; mountainMat.needsUpdate = true; }
     }
     openEl.style.opacity = title.toFixed(3);
-    openEl.style.color = '#' + titleCol.copy(inkCol).lerp(boneCol, 1 - fog).getHexString();
+    openEl.style.color = '#' + (guideOn ? boneCol : titleCol.copy(inkCol).lerp(boneCol, 1 - fog)).getHexString();
     openEl.style.visibility = title > 0.005 ? 'visible' : 'hidden';
+    if (guideEl) { guideEl.style.opacity = fog.toFixed(3); guideEl.style.visibility = fog > 0.005 ? 'visible' : 'hidden'; }
   }
 
   // ── scroll → progress, damped ────────────────────────────────────────────────
@@ -1306,6 +1312,7 @@
     post.uniforms.uRes.value.set(Math.floor(w * pr), Math.floor(h * pr));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    guideOn = !!guideEl && getComputedStyle(guideEl).display !== 'none';   // the phone guide is a media query; read it once per resize, not per frame
   }
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });
