@@ -20,23 +20,26 @@
   'use strict';
 
   // ── the videos, one list per decade, played in order. Swap entries freely: id is the v= of the watch link;
-  //    start (seconds) jumps to the chorus, CJ 2026-09-23 「use chorus」 ──
+  //    start (seconds) jumps to the chorus, CJ 2026-09-23 「use chorus」. A start belongs to that upload, not the
+  //    song (an intro card shifts everything): the five set on 2026-09-24 were read off the upload's own on-screen
+  //    lyrics, frame by frame (lyric video, karaoke tape, subtitled MVs), and 吻別, an album master with no lyrics
+  //    on screen, off the album's timed lyrics, checked against the audio's own repeat structure. ──
   const YT_VIDEOS = {
     '1980s': [
       { id: 'CRqwLPDSTkA', title: '望春風', artist: '鄧麗君', year: 1980, channel: 'Henry Chen (fan upload, may be taken down)', start: 56 },
-      { id: 'ZGRrJY7VELU', title: '台北的天空', artist: '王芷蕾', year: 1985, channel: 'Timeless Music (official lyric video)' },
+      { id: 'ZGRrJY7VELU', title: '台北的天空', artist: '王芷蕾', year: 1985, channel: 'Timeless Music (official lyric video)', start: 42 },   // 「台北的天空 有我年輕的笑容」 fades in at 42.5
       { id: 'lTxZmhAoSGU', title: '我的未來不是夢', artist: '張雨生', year: 1988, channel: '滾石唱片 ROCK RECORDS', start: 100 },
-      { id: 'ZYkxIi8H13w', title: '大約在冬季', artist: '齊秦', year: 1987, channel: '齊秦經典 Classic Chyi Chin', fallback: true },
+      { id: 'ZYkxIi8H13w', title: '大約在冬季', artist: '齊秦', year: 1987, channel: '齊秦經典 Classic Chyi Chin', fallback: true, start: 40 },   // 「沒有妳的日子裡」 lights up at 40.2; the hook 「妳問我何時歸故里」 follows at 53
     ],
     '1990s': [
-      { id: 'L3xC-dlVS5c', title: '吻別', artist: '張學友', year: 1993, channel: '張學友 Jacky Cheung (Topic)' },
-      { id: 'ZSWeurc1yMw', title: '心太軟', artist: '任賢齊', year: 1996, channel: '滾石唱片 ROCK RECORDS', fallback: true },
+      { id: 'L3xC-dlVS5c', title: '吻別', artist: '張學友', year: 1993, channel: '張學友 Jacky Cheung (Topic)', start: 82 },   // 「我的世界開始下雪」 at 1:22.3; 「我和你吻別」 follows at 1:38
+      { id: 'ZSWeurc1yMw', title: '心太軟', artist: '任賢齊', year: 1996, channel: '滾石唱片 ROCK RECORDS', fallback: true, start: 29 },   // the song opens on its chorus: 「你總是心太軟」 at 29.0 (4 s of intro card before the album's 0:25)
     ],
     '2000s': [
       { id: 'Bbp9ZaJD_eA', title: '七里香', artist: '周杰倫', year: 2004, channel: '周杰倫 Jay Chou', start: 80 },
     ],
     '2010s': [
-      { id: 'pd3eV-SG23E', title: '後來的我們', artist: '五月天', year: 2016, channel: '相信音樂BinMusic' },
+      { id: 'pd3eV-SG23E', title: '後來的我們', artist: '五月天', year: 2016, channel: '相信音樂BinMusic', start: 85 },   // 「只期待 後來的你 能快樂」 at 85.5
     ],
   };
   const YT_API = 'https://www.youtube.com/iframe_api';
