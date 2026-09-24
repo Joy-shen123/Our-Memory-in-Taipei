@@ -28,7 +28,7 @@ CJ, 2026-09-24: 「上面那些招牌還是很粗糙啊 路牌招牌 紅布條�
 - **Stars and cartoons as big boards on house walls** (鄧麗君 新歌上市, 鳳飛飛, 小叮噹, 科學小飛俠 …, up to 5 m high on any building). They become paper posters at eye level next to the record, rental and comic shops, with the years checked.
 - **Products hung as shop signs in the 1990s stretch** (電子雞, 皮卡丘, Game Boy, PlayStation, 拍貼 before 1995), some floating over the Red House plaza with no wall behind them. They are replaced by trades (佳佳唱片, KTV, 通訊行 大哥大, 電玩 SEGA, 牛肉麵, 漫畫王 …), and only where a facade stands.
 - **The 2000s boards in a chapter that ends in 1999** (周杰倫, S.H.E 5566, F4, 天堂 RO 楓之谷, Nokia Sony Ericsson, MP3 MSN) are removed. 阿宗麵線 (since 1975) stays as a light box.
-- **Road-spanning banners:** 電影街 本週上映 楚留香 and 小虎隊 新專輯 across a trunk road become 慶祝中華民國七十七年國慶 (z 10 is 1988) and 交通安全 人人有責. The market's sale banner and the cinema-street banner stay.
+- **Road-spanning banners: reverted.** The first pass swapped 電影街 本週上映 楚留香 and 小虎隊 新專輯 全面上市 for 慶祝中華民國七十七年國慶 and 交通安全 人人有責. CJ, 2026-09-24: 「這個拿掉很尷尬」. Both originals are back: 楚留香 aired in Taiwan 1982–83 and 小虎隊 formed in 1988, both inside the chapter. The rule for the rest of the pass: remove a sign only if it could not have existed, never because something more official could have hung there.
 - **Pole signs:** 西門町, 電影街 and 漢中街 were street signs for no street there. They are replaced by the real cross streets at the market's gaps.
 - **A second 樂聲戲院:** the library's cinema wall at z 38 carries its own 樂聲戲院 neon, while the real 樂聲 is at z −66. The neon is hidden in the scene (the library file is untouched), and the wall is named 國賓大戲院 (成都路, 1957).
 - **中華商場 fascia:** one canvas board per block becomes one light box per shop.

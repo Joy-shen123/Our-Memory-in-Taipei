@@ -741,11 +741,14 @@
   });
   SIGNS.roundSign(5.75, 31); SIGNS.roundSign(-5.75, -44.6);                            // 禁止停車 at the kerb
   SIGNS.busStop(5.75, 12.5, ['0東  12  18', '49  202  205', '242  604']);
-  // 紅布條 across the road: the market's own sale, the National Day banner (1988 = 民國七十七年),
-  // a road-safety slogan, and the cinema street's banner at 武昌街's end of the chapter
+  // 紅布條 across the road: the market's own sale, 楚留香 (on Taiwan's screens 1982–83, a national
+  // event) and 小虎隊 (formed 1988), both inside 1985–1999, and the cinema street's banner.
+  // CJ, 2026-09-24, on swapping the first two for a National Day and a road-safety banner:
+  // 「這個拿掉很尷尬」. Period accuracy serves the memory: a sign goes only if it could not have
+  // existed, never because something more official could have hung there.
   SIGNS.roadBanner('中華商場 歲末大拍賣', 38, 8.2, 'verm', 'lamp');
-  SIGNS.roadBanner('慶祝中華民國七十七年國慶', 10, 7.6, 'verm', 'lamp');
-  SIGNS.roadBanner('交通安全 人人有責', 0, 7.0, 'verm', 'bone');
+  SIGNS.roadBanner('電影街 本週上映 楚留香', 10, 7.6, 'lamp', 'verm');   // far enough that it sits under the opening title
+  SIGNS.roadBanner('小虎隊 新專輯 全面上市', 0, 7.0, 'verm', 'lamp');
   SIGNS.roadBanner('西門町 電影街 · 樂聲 豪華 今日上映', -52, 6.2, 'lamp', 'verm');
   // price cards on the kerb stalls, on stakes
   [['紅豆牛奶冰 15元', 32], ['彈珠汽水 8元', 21.5], ['尪仔標 一張5元', -19.5], ['錄影帶 一夜30元', -33]].forEach(([t, z]) => SIGNS.card(t, 1, 6.75, z + 0.2));
