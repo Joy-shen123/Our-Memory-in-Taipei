@@ -91,40 +91,65 @@
     RH.top = EAVE + 7.5;
   })();
 
-  // ═══ 2. 中華商場 — eight three-storey blocks with rooftop neon, 1961–1992 ══════════════
-  // Reference: the eight blocks 忠孝仁愛信義和平 along 中華路: concrete, an arcade of shops at
-  // street level, two floors of small windows and balconies above, flat roofs carrying the
-  // big steel-framed signs (國際牌, 黑松 …) that lit the road at night. West side of the street,
-  // 1985–1991 in scroll time; demolished in 1992, so the childhood chapter only.
-  // CJ, 2026-09-21: 「盡量矮點才能比較後來的建設跟慢慢長大的感覺」— drawn at two storeys (arcade +
-  // one floor) so the childhood street stays low and the later chapters grow above it.
+  // ═══ 2. 中華商場 — eight three-storey blocks along 中華路, 1961–1992 ═════════════════════
+  // Reference: research/realism-ximen/zone2-chunghwa/README.md. Eight joined concrete blocks,
+  // numbered 1–8 (忠孝仁愛信義和平), three storeys: a 3.5 m arcade with a signboard band on its
+  // fascia, open corridors behind solid parapets on floors 2 and 3, canvas awnings, 2nd-floor
+  // bridges across the cross streets, and on each end wall a lattice panel, 中華商場 painted
+  // vertically and the block's big number. The blocks never carried 忠棟 … plates.
+  // West side of the street, 1985–1991 in scroll time; demolished in 1992, so the childhood
+  // chapter only.
+  // CJ, 2026-09-21: 「盡量矮點才能比較後來的建設跟慢慢長大的感覺」— the real block is three storeys
+  // and is drawn so for the realism pass (2026-09-24); FLOORS = 2 in chunghwa.py and FLOOR * 2
+  // below give the lower street back.
   (() => {
-    const NAMES = ['忠', '孝', '仁', '愛', '信', '義', '和', '平'];
-    const NEON = [['國際牌', 'verm'], ['黑松汽水', 'lamp'], ['三洋', 'verm'], ['聲寶', 'lamp'], ['歌林', 'verm'], ['大同', 'lamp'], ['味全', 'verm'], ['SONY', 'lamp']];
-    const L = 10, GAP = 1.6, FLOOR = 3.3, XF = -6.2, DEPTH = 10;                 // block length, gap, storey height, arcade line, depth
-    // Issue #5 step 2: one block is the glb from asset/blender/chunghwa.py (arcade columns, shop
-    // wall with dark doorways and sign boards, the balcony-window storey, parapet, roof tank),
-    // cloned eight times. The name plates and the rooftop neon stay canvas text on it.
-    const blocks = libGroup(RED), blockZ = NAMES.map((nm, i) => 46 - L / 2 - i * (L + GAP));
-    MODELS.load('chunghwa', gltf => {
-      const root = MODELS.lambertize(gltf.scene);
-      blockZ.forEach(z => { const b = root.clone(); b.position.set(XF, 0, z); b.rotation.y = Math.PI / 2; blocks.add(b); });
+    const L = 9.4, GAP = 2.6, FLOOR = 3.3, TOP = FLOOR * 3, XF = -6.2, DEPTH = 10;  // match chunghwa.py
+    // Rooftop neon: the big rooftop signs came down from 1 May 1985, so a strictly 1985–1992
+    // roof is bare. ROOF_NEON keeps the sourced ones for the memory: the National tower on
+    // 信棟 (block 5), and 黑松, 大同, 精工, 森永, 旭光 boards on steel lattice.
+    const ROOF_NEON = true;
+    const NEON = [['黑松汽水', 'verm'], ['大同', 'lamp'], ['精工錶 SEIKO', 'verm'], ['森永', 'lamp'], null, ['旭光日光燈', 'verm'], ['黑松沙士', 'lamp'], ['大同電視', 'verm']];
+    const BAND = [['西裝 訂做', 'lamp', 'verm'], ['電子零件 收音機', 'bone', 'verm'], ['郵票 錢幣', 'lamp', 'ink'], ['唱片 錄音帶', 'bone', 'ink'], ['點心世界', 'lamp', 'verm'], ['眼鏡 鐘錶', 'bone', 'verm'], ['皮鞋 皮件', 'lamp', 'ink'], ['軍用品 刻印', 'bone', 'ink']];
+    const blockZ = [0, 1, 2, 3, 4, 5, 6, 7].map(i => 46 - L / 2 - i * (L + GAP));
+    const rot = Math.PI / 2, blocks = [], bridges = [];
+    blockZ.forEach((z, i) => {
+      blocks.push({ x: XF, z, r: rot, w: 1, d: 1, h: hOf(1) });
+      if (i < 7) bridges.push({ x: XF, z: z - L / 2 - GAP / 2, r: rot, w: 1, d: 1, h: hOf(1) });
     });
-    const plates = [];
-    NAMES.forEach((nm, i) => {
-      const z = blockZ[i], x0 = XF - DEPTH / 2;
-      // block name: a pale plate on the road-facing corner
-      const v = vertTex(nm + '棟', 'bone', 'ink', 'verm');
-      board(XF + 0.02, FLOOR + 0.3, z + L / 2 - 1.2, 3.0 * v.aspect, 3.0, v.t, RED, 'x');
-      // rooftop neon: a steel lattice frame and the sign, angled toward the road
-      const y = FLOOR * 2 + 0.5, sx = x0 + 1.5, sz = z;
-      [-1.9, 1.9].forEach(dz => F(sx, sz + dz, y, 0.18, 0.18, 3.4, 'ink'));
-      F(sx, sz, y + 3.4, 0.18, 4.2, 0.18, 'ink');
-      F(sx, sz, y + 1.7, 0.18, 4.2, 0.14, 'ink');
+    MODELS.load('chunghwa', gltf => {
+      MODELS.instance(MODELS.node(gltf.scene, 'block'), blocks, { emissive: 0.5 });
+      MODELS.instance(MODELS.node(gltf.scene, 'bridge'), bridges);
+    });
+    blockZ.forEach((z, i) => {
+      const zN = z + L / 2;                                                        // the north end wall, toward the camera
+      // the end wall: 中華商場 painted vertically by the road corner, the block number beside it
+      const v = vertTex('中華商場', 'bone', 'verm');
+      board(XF - 1.1, 3.9, zN + 0.07, 5.2 * v.aspect, 5.2, v.t, RED, 'z');
+      board(XF - 3.2, 4.6, zN + 0.07, 2.6, 3.6, boardTex(260, 360, 'bone', [{ text: String(i + 1), size: 330, y: 190, col: 'verm' }]), RED, 'z');
+      // the signboard band on the arcade fascia
+      const [bt, bg, fg] = BAND[i];
+      board(XF + 0.25, FLOOR - 0.86, z, L - 0.4, 0.52, boardTex(2048, 110, bg, [{ text: bt + ' · 中華商場', size: 82, y: 58, col: fg }]), RED, 'x');
+      if (!ROOF_NEON) return;
+      const y = TOP + 0.3, x0 = XF - DEPTH / 2;
+      if (!NEON[i]) {
+        // the National / 國際牌 tower on 信棟's south end: a box on a steel truss, logo on three faces
+        const tz = z - L / 2 + 2.4, tx = x0 + 1.2;
+        [-1.6, 1.6].forEach(dx => [-1.6, 1.6].forEach(dz => F(tx + dx, tz + dz, y, 0.2, 0.2, 1.6, 'ink')));
+        F(tx, tz, y + 1.6, 3.6, 3.6, 0.2, 'ink');
+        F(tx, tz, y + 1.8, 3.4, 3.4, 4.2, 'ink');
+        const nt = () => boardTex(512, 640, 'ink', [{ text: 'National', size: 110, y: 190, col: 'lamp' }, { text: '國際牌', size: 130, y: 420, col: 'verm' }], 'lamp');
+        board(tx + 1.77, y + 1.9, tz, 3.2, 4.0, nt(), RED, 'x', 0.8);
+        board(tx, y + 1.9, tz + 1.77, 3.2, 4.0, nt(), RED, 'z', 0.8);
+        return;
+      }
+      // a steel lattice frame and the board, turned a little toward the camera
+      const sx = x0 + 1.5;
+      [-1.9, 1.9].forEach(dz => F(sx, z + dz, y, 0.18, 0.18, 3.4, 'ink'));
+      F(sx, z, y + 3.4, 0.18, 4.2, 0.18, 'ink');
+      F(sx, z, y + 1.7, 0.18, 4.2, 0.14, 'ink');
       const [txt, colr] = NEON[i];
       const t = boardTex(768, 320, 'ink', [{ text: txt, size: 190, y: 160, col: colr }], colr);
-      const p = board(sx + 0.15, y + 0.5, sz, 4.4, 2.5, t, RED, 'x', 0.7); p.mesh.rotation.y = -0.35; // faces the road, turned toward the camera
-      plates.push(p);
+      const p = board(sx + 0.15, y + 0.5, z, 4.4, 2.5, t, RED, 'x', 0.7); p.mesh.rotation.y = -0.35;
     });
   })();
 
@@ -239,10 +264,12 @@
   front('public-phone-booth', 1, 10);
   front('yeh-lang-125', 1, 7.5); front('yeh-lang-125', 1, 6.3);
   front('internet-cafe', 1, 2); body(1, 2, 8, 4.2, 'walk');
-  front('phone-shop-window', 1, -8); body(1, -8, 8, 6.4, 'bone');
-  front('arcade-cabinet', 1, -14.5); front('gashapon-machine', 1, -16);
+  // z 0 … -50 is 1990–1992 in scroll time: no 2000s phone shop (Sony Ericsson, 2001), no
+  // Pikachu gashapon (1996) and no photo-sticker booth (1995) here; 1980s fronts instead
+  front('record-shop', 1, -8); body(1, -8, 8, 6.4, 'bone');
+  front('arcade-cabinet', 1, -14.5); front('public-phone-booth', 1, -16);
   front('manga-rental', 1, -22); body(1, -22, 8, 4, 'haze');
-  front('photo-sticker-booth', 1, -30);
+  front('yeh-lang-125', 1, -29.4); front('yeh-lang-125', 1, -30.6);
   front('tower-records', 1, -38); body(1, -38, 12, 6.6, 'lamp');                 // 淘兒 1992: the yellow front on the corner before the Red House plaza, two storeys
   front('bbcall-ad-standee', 1, -46);
   // west side after 中華商場 and 樂聲: the 1990s–2000s
@@ -299,7 +326,7 @@
 
   // 中華商場 (west, z 46 … -46): the shops under the arcade and the brands on the walls
   ['電子零件', '訂做制服', '點心世界', '郵票錢幣', '收音機', '軍用品', '皮鞋', '眼鏡', '鐘錶', '唱片', '文具', '玩具', '西裝', '鑰匙', '刻印', '布莊'].forEach((t, i) => hang(t, -1, 44 - i * 5.6, 2.9, i));
-  [['國際牌 National', 'verm'], ['黑松汽水', 'lamp'], ['三洋電視', 'sky'], ['聲寶', 'verm'], ['大同電鍋', 'bone'], ['歌林', 'lamp'], ['味全', 'verm'], ['統一', 'bone'], ['點心世界 酸辣湯', 'lamp'], ['中華商場 歲末大特價', 'verm'], ['電子零件 批發零售', 'sky'], ['訂做制服 一日交件', 'bone']].forEach(([t, bg], i) => sign(t, 2.6, -6.12, 5.5 - (i % 2) * 1.1, 42 - i * 7.4, Math.PI / 2, bg, false, 96));
+  [['國際牌 National', 'verm'], ['黑松汽水', 'lamp'], ['三洋電視', 'sky'], ['聲寶', 'verm'], ['大同電鍋', 'bone'], ['歌林', 'lamp'], ['味全', 'verm'], ['統一', 'bone'], ['點心世界 酸辣湯', 'lamp'], ['中華商場 歲末大特價', 'verm'], ['電子零件 批發零售', 'sky'], ['訂做制服 一日交件', 'bone']].forEach(([t, bg], i) => sign(t, 2.6, -6.02, i % 2 ? 3.85 : 7.15, 42 - i * 7.4, Math.PI / 2, bg, false, 96));
   // east side, the 1980s: shop names hanging, stars and cartoons on the walls, posters at eye level
   ['唱片行', '租書店', '冰果室', '電動間', '錄影帶', '卡帶黑膠', '漫畫', '麵線', '冰宮', 'MTV', '書局', '模型', '理髮', '相館', '茶行', '雜貨', '西藥房', '委託行', '小吃', '皮件'].forEach((t, i) => hang(t, 1, 44 - i * 4.4, 2.6 + (i % 3) * 0.7, i + 3));
   [['鄧麗君 新歌上市', 2.4], ['鳳飛飛', 1.6], ['羅大佑 鹿港小鎮', 2.4], ['蘇芮', 1.4], ['齊秦 王傑', 1.8], ['李宗盛', 1.6], ['小虎隊 1988', 2.2], ['小叮噹', 1.6], ['七龍珠', 1.6], ['怪博士與機器娃娃', 2.6], ['小甜甜', 1.4], ['科學小飛俠', 2.0], ['無敵鐵金剛', 2.0], ['楚留香', 1.6], ['林青霞 王祖賢', 2.2], ['張國榮', 1.6], ['周潤發 成龍', 2.2], ['米老鼠 Hello Kitty', 2.4]].forEach(([t, w], i) => wall(t, 1, 45 - i * 5.1, 3.9 + (i % 2) * 1.3, w, i + 1, 96));
