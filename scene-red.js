@@ -99,11 +99,17 @@
   // vertically and the block's big number. The blocks never carried 忠棟 … plates.
   // West side of the street, 1985–1991 in scroll time; demolished in 1992, so the childhood
   // chapter only.
+  // CJ, 2026-09-24: 「這個youtbue講怎麼shade像是arcade 試試看」— the Arcane method: the silhouette is
+  // geometry (chunghwa.glb: arcade recess, corridor gap, shopfront setback, bridges, tanks), the
+  // rest is painted (asset/paint/chunghwa_paint.py → asset/textures/chunghwa-*.webp) with the
+  // light baked in and a normal map for the relief: every shop unit's frontage and what it
+  // sells, shutters, sign frames, the lattice, concrete stains and formwork lines.
   // CJ, 2026-09-21: 「盡量矮點才能比較後來的建設跟慢慢長大的感覺」— the real block is three storeys
   // and is drawn so for the realism pass (2026-09-24); FLOORS = 2 in chunghwa.py and FLOOR * 2
   // below give the lower street back.
   (() => {
     const L = 9.4, GAP = 2.6, FLOOR = 3.3, TOP = FLOOR * 3, XF = -6.2, DEPTH = 10;  // match chunghwa.py
+    const ARCADE = 3.5, CORR = 3.0, SLAB = 0.34, CLEAR = FLOOR - SLAB;
     // Rooftop neon: the big rooftop signs came down from 1 May 1985, so a strictly 1985–1992
     // roof is bare. ROOF_NEON keeps the sourced ones for the memory: the National tower on
     // 信棟 (block 5), and 黑松, 大同, 精工, 森永, 旭光 boards on steel lattice.
@@ -116,16 +122,62 @@
       blocks.push({ x: XF, z, r: rot, w: 1, d: 1, h: hOf(1) });
       if (i < 7) bridges.push({ x: XF, z: z - L / 2 - GAP / 2, r: rot, w: 1, d: 1, h: hOf(1) });
     });
+    // ── the painted textures (linear, like the palette: the page applies gamma in its post pass) ──
+    const TL = new THREE.TextureLoader();
+    const tx = (name, wrap) => { const t = TL.load('asset/textures/' + name + '.webp'); t.anisotropy = 8; if (wrap) t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+    const concrete = tx('chunghwa-concrete', true), concreteN = tx('chunghwa-concrete-n', true), awning = tx('chunghwa-awning', true);
     MODELS.load('chunghwa', gltf => {
-      MODELS.instance(MODELS.node(gltf.scene, 'block'), blocks, { emissive: 0.5 });
-      MODELS.instance(MODELS.node(gltf.scene, 'bridge'), bridges);
+      const paint = sets => sets.forEach(({ mesh }) => {
+        const m = mesh.material, hex = m.color.getHex();
+        if (hex === C('verm').getHex()) { m.map = awning; m.color.set(0xffffff); }       // the stripes are painted in palette colour
+        else if ([C('walk'), C('bone'), C('haze'), C('leaf')].some(c => c.getHex() === hex)) { m.map = concrete; m.normalMap = concreteN; m.normalScale.set(0.8, 0.8); }
+        m.needsUpdate = true;
+      });
+      paint(MODELS.instance(MODELS.node(gltf.scene, 'block'), blocks));
+      paint(MODELS.instance(MODELS.node(gltf.scene, 'bridge'), bridges));
     });
+    // ── the painted walls: every shop unit's frontage on the arcade's back wall and on the two
+    //    corridors' back walls, and the end walls; all quads in two meshes, one draw call each ──
+    // chunghwa-shops.webp: 5 painted blocks (2 x 3 slots of 960 x 906 px), each a ground strip
+    // and two upper strips of 5 units; the blocks the camera passes in zone 2 (4–8) are all
+    // different, the first three reuse slots. chunghwa-ends.webp: 8 end walls, 2 x 4 of 384 x 380.
+    const SW = 1920, SH = 2718, SLOT = [1, 2, 3, 0, 4, 2, 3, 1];                   // slot 4 carries 點心世界 on 信棟
+    const EW = 768, EH = 1520;
+    const shopQ = [], endQ = [];
+    // a quad facing +x (road) from z0 (image left) to z1 (image right), or facing +z from x0 to x1
+    const quadX = (out, x, z0, z1, y0, y1, u0, u1, v0, v1) => out.push([[x, y0, z0, u0, v0], [x, y0, z1, u1, v0], [x, y1, z1, u1, v1], [x, y1, z0, u0, v1]]);
+    const quadZ = (out, z, x0, x1, y0, y1, u0, u1, v0, v1) => out.push([[x0, y0, z, u0, v0], [x1, y0, z, u1, v0], [x1, y1, z, u1, v1], [x0, y1, z, u0, v1]]);
     blockZ.forEach((z, i) => {
-      const zN = z + L / 2;                                                        // the north end wall, toward the camera
-      // the end wall: 中華商場 painted vertically by the road corner, the block number beside it
-      const v = vertTex('中華商場', 'bone', 'verm');
-      board(XF - 1.1, 3.9, zN + 0.07, 5.2 * v.aspect, 5.2, v.t, RED, 'z');
-      board(XF - 3.2, 4.6, zN + 0.07, 2.6, 3.6, boardTex(260, 360, 'bone', [{ text: String(i + 1), size: 330, y: 190, col: 'verm' }]), RED, 'z');
+      const zN = z + L / 2, zS = z - L / 2, s = SLOT[i];
+      const bx = (s % 2) * 960, by = Math.floor(s / 2) * 906;
+      const u0 = bx / SW, u1 = (bx + 960) / SW;
+      const vOf = py => 1 - py / SH;
+      quadX(shopQ, XF - ARCADE + 0.05, zN, zS, 0, CLEAR, u0, u1, vOf(by + 302), vOf(by));
+      [1, 2].forEach(f => quadX(shopQ, XF - CORR + 0.05, zN, zS, f * FLOOR, f * FLOOR + CLEAR, u0, u1, vOf(by + (f + 1) * 302), vOf(by + f * 302)));
+      // the end wall, 10 m deep x TOP high: the arcade's opening is left out
+      const ex = (i % 2) * 384, ey = Math.floor(i / 2) * 380;
+      const eu = x => (ex + (x - (XF - DEPTH)) / DEPTH * 384) / EW, ev = y => 1 - (ey + (1 - y / TOP) * 380) / EH;
+      quadZ(endQ, zN + 0.05, XF - DEPTH, XF, CLEAR, TOP, eu(XF - DEPTH), eu(XF), ev(CLEAR), ev(TOP));
+      quadZ(endQ, zN + 0.05, XF - DEPTH, XF - ARCADE, 0, CLEAR, eu(XF - DEPTH), eu(XF - ARCADE), ev(0), ev(CLEAR));
+    });
+    const quads = qs => {
+      const pos = [], uv = [], idx = [];
+      qs.forEach(q => { const b = pos.length / 3; q.forEach(([x, y, z, u, v]) => { pos.push(x, y, z); uv.push(u, v); }); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx); g.computeVertexNormals();
+      return g;
+    };
+    const painted = libGroup(RED);
+    // the shop fronts stand in the arcade's and corridors' shade, which is painted into them:
+    // unlit, so the paint shows as painted. The end walls take the sun: lit, with the normal map.
+    const shops = new THREE.Mesh(quads(shopQ), withFog(new THREE.MeshBasicMaterial({ map: tx('chunghwa-shops') })));
+    const ends = new THREE.Mesh(quads(endQ), withFog(new THREE.MeshLambertMaterial({ map: tx('chunghwa-ends'), normalMap: tx('chunghwa-ends-n') })));
+    ends.receiveShadow = true;
+    [shops, ends].forEach(m => { m.material.polygonOffset = true; m.material.polygonOffsetFactor = -2; m.material.polygonOffsetUnits = -4; });   // never fight the wall behind
+    painted.add(shops, ends);
+    blockZ.forEach((z, i) => {
       // the signboard band on the arcade fascia
       const [bt, bg, fg] = BAND[i];
       board(XF + 0.25, FLOOR - 0.86, z, L - 0.4, 0.52, boardTex(2048, 110, bg, [{ text: bt + ' · 中華商場', size: 82, y: 58, col: fg }]), RED, 'x');
@@ -272,6 +324,40 @@
   front('yeh-lang-125', 1, -29.4); front('yeh-lang-125', 1, -30.6);
   front('tower-records', 1, -38); body(1, -38, 12, 6.6, 'lamp');                 // 淘兒 1992: the yellow front on the corner before the Red House plaza, two storeys
   front('bbcall-ad-standee', 1, -46);
+  // zone 2 (z 0 … -50), the east side facing 中華商場: the gaps between the fronts get their own
+  // shophouses, and every shophouse storey here is painted (asset/paint/chunghwa_paint.py →
+  // ximen-fronts.webp): two 3 m shops per ground floor, each with what it sells; iron-grille
+  // cages, air conditioners, tile and vertical signs upstairs. The shopfront.glb modules stay
+  // behind the paint for the silhouette (balcony slabs, AC boxes, parapets, tanks).
+  body(1, -15, 6, 7.2, 'bone'); body(1, -29, 6, 10.5, 'haze'); body(1, -47, 6, 7.2, 'walk');
+  (() => {
+    const FW = 1536, FH = 844, CW = 384, CH = 211, X = 9.4 - 0.12;                // in front of the modules' sign boards
+    const q = [];
+    let g = 0, u = 0;
+    // one painted face per 6 m module per storey, facing the road (-x): u runs south → north
+    const face = (z, len, h, ground) => {
+      const nx = Math.max(1, Math.round(len / 6)), tw = len / nx, ny = Math.max(1, Math.round((h - 0.6) / 3.3));
+      for (let i = 0; i < nx; i++) {
+        const zz = z + len / 2 - tw * (i + 0.5);
+        for (let f = ground ? 0 : 1; f < ny; f++) {
+          const k = f === 0 ? (g++ % 8) : 8 + (u++ * 3 % 8), cx = (k % 4) * CW, cy = Math.floor(k / 4) * CH;
+          const u0 = cx / FW, u1 = (cx + CW) / FW, v1 = 1 - cy / FH, v0 = 1 - (cy + CH) / FH;
+          q.push([[X, f * 3.3, zz - tw / 2, u0, v0], [X, f * 3.3, zz + tw / 2, u1, v0], [X, (f + 1) * 3.3, zz + tw / 2, u1, v1], [X, (f + 1) * 3.3, zz - tw / 2, u0, v1]]);
+        }
+      }
+    };
+    face(-8, 8, 6.4, false); face(-38, 12, 6.6, false);                           // behind library fronts: the storeys only
+    face(-15, 6, 7.2, true); face(-29, 6, 10.5, true); face(-47, 6, 7.2, true);
+    const pos = [], uv = [], idx = [];
+    q.forEach(qq => { const b = pos.length / 3; qq.forEach(([x, y, z, a, c]) => { pos.push(x, y, z); uv.push(a, c); }); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    const TL = new THREE.TextureLoader(), t = n => { const x = TL.load('asset/textures/' + n + '.webp'); x.anisotropy = 8; return x; };
+    const m = new THREE.Mesh(geo, withFog(new THREE.MeshLambertMaterial({ map: t('ximen-fronts'), normalMap: t('ximen-fronts-n'), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
+    m.receiveShadow = true;
+    lib.add(m);
+  })();
   // west side after 中華商場 and 樂聲: the 1990s–2000s
   front('f4-poster-wall', -1, -82); body(-1, -82, 8, 6.6, 'bone');
   front('zhangjunya-snack-shelf', -1, -88.5);

@@ -1,5 +1,24 @@
 # Zone 2 — 中華商場 (Chunghwa Market), realism pass
 
+## Pass 2 (2026-09-24): painted, the Arcane method
+
+CJ saw pass 1: 「我是要細節都參照真實當地建築 沒有覺得變細節」. Then: 「這個youtbue講怎麼shade像是arcade 試試看」 (https://www.youtube.com/watch?v=zKkM3UrOAvc). The detail now lives in painted textures on simple meshes, with the light baked into the paint; the silhouette stays geometry.
+
+- **Geometry (the silhouette):** the arcade recess, the corridor gap behind the parapets, the shopfront setback, the bridges, the roof tanks, the awnings. `chunghwa.glb` went from 8,816 to 4,048 triangles: the door cutters, tubes, stripes and lattice holes are paint now. Box-mapped UVs, 4 m per UV unit (`stylized.run(..., uvs=4.0)`).
+- **Paint (`asset/paint/chunghwa_paint.py`, deterministic):**
+  - 75 painted 中華商場 units: 5 blocks × 15. Each has its own frontage, a sign board with its trade, and its goods painted: shoes on shelves, clocks, stamp albums, suits on a rail, radios, beef-noodle counters with steam, seal carvers, cloth bolts, TVs under repair, and homes with iron grilles and laundry upstairs. 點心世界 is on block 5.
+  - End walls: 中華商場 painted vertically, the number, and the lattice panel.
+  - Concrete: formwork lifts, stains, rain streaks.
+  - Awning canvas stripes.
+- **The east side of zone 2** (the buildings facing the market, previously flat boxes): three new shophouses fill the gaps at z −15, −29 and −47. Every storey in the zone is painted (`ximen-fronts.webp`): ground floors with two 3 m shops each (西藥房, 麵包店, 冰果室, 錄影帶, 理髮廳, 銀樓, 書局 …), and upper storeys with mosaic tile, 鐵窗 grille cages, window air conditioners, vertical signs and drip stains. The shopfront.glb modules stay behind the paint for the balcony slabs, AC boxes and tanks.
+- **Shaders:** the shop fronts are unlit (MeshBasic): they stand in the arcade's shade, which is painted in. The end walls and east facades are Lambert with a normal map; the concrete is Lambert, with the painted map and a normal map.
+- **Texture budget:** 619 KB in total, every file under 400 KB: `chunghwa-shops.webp` 274, `chunghwa-ends.webp` 118, `chunghwa-ends-n.webp` 46, `chunghwa-concrete.webp` 17, `chunghwa-concrete-n.webp` 3, `chunghwa-awning.webp` 4, `ximen-fronts.webp` 96, `ximen-fronts-n.webp` 61.
+- **fps (headed, 1440×900):** 100.4 / 100.4 / 100.3 at 0.08 / 0.2 / 0.30; second run 100.4 / 100.3 / 100.3. The console is empty, and the three scene files re-run clean.
+- **Proof frames:** `~/Desktop/realism-ximen/zone2-after.png` (scroll 0.06 / 0.12 / 0.15), `zone2-crop-east-shops.png` (the 0.15 frame cropped: 冰果室, the tape shelves, 西藥房, 銀樓), `zone2-closeup-market-arcade.png` (a debug camera in the road looking into the arcade; the scroll path passes the market nearly edge-on, so its shops only show at the frame's left edge).
+- Two bugs found on the way: the painted planes z-fought the wall behind them (fixed with a 5 cm offset and a polygon offset), and the shop interiors were never filled because of a box-format slip in the painter.
+
+## Pass 1
+
 Brief: `docs/briefs/BRIEF-realism-ximen.md`. Researched and built 2026-09-24. Screenshots: `~/Desktop/realism-ximen/zone2-before.png`, `zone2-after.png`, `zone2-side-by-side.png` (scroll 0.06 / 0.12 / 0.15, i.e. 1988 / 1990 / 1991, 1440×900).
 
 Note on the range: the brief puts zone 2 at z 0 → −50, but the eight blocks stand at z +46 → −46 (one glb, instanced eight times). The rebuild covers all eight blocks; the other items in z +60 → 0 are left for zone 1.

@@ -7,7 +7,7 @@
 # Reference (research/realism-ximen/zone2-chunghwa/README.md): eight joined three-storey
 # concrete blocks along 中華路. The road face, the one the street sees:
 #   - ground floor: a 3.5 m arcade (騎樓) behind square piers, a deep soffit with fluorescent
-#     tubes, shops opening into it, a continuous signboard band on the fascia (the text is
+#     tubes (painted), shops opening into it, a signboard band on the fascia (the text is
 #     canvas in the scene);
 #   - floors 2 and 3: open corridors 3 m deep behind solid concrete parapet walls, square
 #     columns rising through every floor, each floor slab a strong horizontal band, canvas
@@ -23,7 +23,9 @@
 # Depth runs into +y, the block's length along X about 0, origin on the ground at the road
 # face's centre. The -X end is the north end, the one the camera sees walking south.
 #
-# Look: primitives, boolean-cut openings, bevelled edges, flat palette materials (stylized.py).
+# Look (CJ 2026-09-24, the Arcane method): the silhouette only, box-mapped UVs (4 m per UV unit)
+# for the painted concrete; the shop fronts, lattice, stripes and stains are painted by
+# asset/paint/chunghwa_paint.py and laid on by scene-red.js.
 
 import math
 import os
@@ -53,19 +55,13 @@ UNIT_XS = [-L / 2 + 0.95 + k * 1.9 for k in range(5)]                   # 2 m sh
 
 
 def body():
-    """The concrete mass behind the arcade and corridors, full depth, up to the roof."""
+    """The concrete mass behind the arcade and corridors, full depth, up to the roof. Plain: the
+    shop fronts on its road faces are painted (chunghwa-shops.webp) on planes the scene lays there."""
     g = 'block'
-    # ground-floor shop wall with a dark shop opening per unit
-    shops = cutter('shop_open', 'ink', lambda bm: [
-        bm_solid(bm, rect_pts(1.5, 2.3, 0.1), ARCADE - 0.6, ARCADE + 0.5, Matrix.Translation((x, 0, 0))) for x in UNIT_XS])
-    solid('ground_mass', 'walk', lambda bm: bm_box(bm, (L, DEPTH - ARCADE, FLOOR), (0, (ARCADE + DEPTH) / 2, FLOOR / 2)), cutters=(shops,), group=g)
-    # the upper floors: the corridor's back wall with a door and a window per unit
+    solid('ground_mass', 'walk', lambda bm: bm_box(bm, (L, DEPTH - ARCADE, FLOOR), (0, (ARCADE + DEPTH) / 2, FLOOR / 2)), group=g)
     for f in range(1, FLOORS):
         z0 = f * FLOOR
-        ups = cutter(f'up_open_{f}', 'ink', lambda bm, z0=z0: [
-            bm_solid(bm, rect_pts(0.8, 2.1, z0 + 0.05), CORR - 0.6, CORR + 0.4, Matrix.Translation((x - 0.4, 0, 0))) for x in UNIT_XS] + [
-            bm_solid(bm, rect_pts(0.7, 1.0, z0 + 1.0), CORR - 0.6, CORR + 0.4, Matrix.Translation((x + 0.45, 0, 0))) for x in UNIT_XS])
-        solid(f'upper_mass_{f}', 'walk', lambda bm, z0=z0: bm_box(bm, (L, DEPTH - CORR, FLOOR), (0, (CORR + DEPTH) / 2, z0 + FLOOR / 2)), cutters=(ups,), group=g)
+        solid(f'upper_mass_{f}', 'walk', lambda bm, z0=z0: bm_box(bm, (L, DEPTH - CORR, FLOOR), (0, (CORR + DEPTH) / 2, z0 + FLOOR / 2)), group=g)
 
 
 def frame():
@@ -87,12 +83,6 @@ def frame():
             back = ARCADE if f == 1 else CORR
             bm_box(bm, (L - 0.05, back, 0.06), (0, back / 2, f * FLOOR - SLAB - 0.03))
     solid('soffit', 'haze', soffit, bevel=0.0, group=g)
-    # fluorescent tubes under the arcade soffit, two per bay (glow via the 'lamp' emissive)
-    def tubes(bm):
-        for x in BAY_XS:
-            for y in (1.1, 2.4):
-                bm_box(bm, (1.2, 0.07, 0.05), (x, y, FLOOR - SLAB - 0.09))
-    solid('tubes', 'lamp', tubes, bevel=0.0, group=g)
     # parapet walls between the columns on floors 2 and 3, and the low roof parapet
     def parapets(bm):
         for f in range(1, FLOORS):
@@ -114,7 +104,7 @@ def frame():
 
 
 def awnings():
-    """Canvas awnings over the 2nd-floor corridor bays, red with pale stripes, sloping out."""
+    """Canvas awnings over the 2nd-floor corridor bays, sloping out; the stripes are painted."""
     g = 'block'
     z = FLOOR + 2.55
     tilt = Matrix.Rotation(math.radians(24), 4, 'X')
@@ -122,23 +112,14 @@ def awnings():
         for x in BAY_XS:
             bm_box(bm, (BAY_W - 0.1, 1.0, 0.04), (0, 0, 0), Matrix.Translation((x, -0.25, z)) @ tilt)
     solid('awning', 'verm', red, bevel=0.0, group=g)
-    def stripes(bm):
-        for x in BAY_XS:
-            for k in range(4):
-                sx = x - (BAY_W - 0.1) / 2 + 0.2 + k * (BAY_W - 0.5) / 3
-                bm_box(bm, (0.16, 1.01, 0.05), (0, 0, 0), Matrix.Translation((sx, -0.25, z)) @ tilt)
-    solid('awning_stripes', 'bone', stripes, bevel=0.0, group=g)
 
 
 def ends():
-    """The north end wall (-X): the tall concrete lattice panel. Text and number are canvas."""
+    """The north end wall (-X). The lattice panel, 中華商場 and the number are painted on it."""
     g = 'block'
     x0 = -L / 2
     # the solid end wall over the arcade, closing the corridors' ends; the arcade stays open
     solid('end_wall', 'walk', lambda bm: bm_box(bm, (0.3, DEPTH, TOP - FLOOR + SLAB), (x0 + 0.15, DEPTH / 2, FLOOR - SLAB + (TOP - FLOOR + SLAB) / 2)), group=g)
-    holes = cutter('lattice_holes', 'ink', lambda bm: [
-        bm_box(bm, (0.5, 0.34, 0.34), (x0, 5.2 + i * 0.5, 1.4 + j * 0.5)) for i in range(5) for j in range(int((TOP - 2.2) / 0.5))])
-    solid('lattice', 'bone', lambda bm: bm_box(bm, (0.16, 2.6, TOP - 1.6), (x0 - 0.06, 6.2, 1.0 + (TOP - 1.6) / 2)), cutters=(holes,), bevel=0.02, group=g)
 
 
 def rooftop():
@@ -186,4 +167,4 @@ def build():
 
 
 if __name__ == '__main__':
-    S.run(build, camera=((-16, -14, 7), (0, 2, 5), 45))
+    S.run(build, camera=((-16, -14, 7), (0, 2, 5), 45), uvs=4.0)

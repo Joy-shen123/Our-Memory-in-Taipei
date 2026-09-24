@@ -327,6 +327,26 @@ def join(objs, name):
     return main
 
 
+def box_uvs(ob, size):
+    """Box-mapped UVs in metres (2026-09-24, the texture rule is lifted): each face takes the two
+    axes across its dominant normal, one UV unit per `size` metres, so a tiling painted texture
+    keeps the same scale on every wall, slab and pier. U runs along the face as seen from outside."""
+    me = ob.data
+    uv = me.uv_layers.new(name='UVMap')
+    for p in me.polygons:
+        n = p.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        for li in p.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            if ax == 0:
+                u, v = co.y * (1 if n.x > 0 else -1), co.z
+            elif ax == 1:
+                u, v = co.x * (-1 if n.y > 0 else 1), co.z
+            else:
+                u, v = co.x, co.y
+            uv.data[li].uv = (u / size, v / size)
+
+
 def tri_count(me):
     return sum(len(p.vertices) - 2 for p in me.polygons)
 
@@ -374,7 +394,7 @@ def preview(path, obs, camera=None):
     bpy.ops.render.render(write_still=True)
 
 
-def run(build, camera=None, argv=None):
+def run(build, camera=None, argv=None, uvs=None):
     """Parse --out/--preview/--stats, build, apply, join per group, export the glb, report."""
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
     ap = argparse.ArgumentParser()
@@ -402,6 +422,9 @@ def run(build, camera=None, argv=None):
         if g not in groups:
             groups.append(g)
     joined = [join([ob for ob, g in OBJECTS if g == grp], grp) for grp in groups]
+    if uvs:
+        for o in joined:
+            box_uvs(o, uvs)
 
     total = sum(tri_count(o.data) for o in joined)
     lo, hi = bounds(joined)
@@ -412,7 +435,7 @@ def run(build, camera=None, argv=None):
 
     bpy.ops.export_scene.gltf(
         filepath=args.out, export_format='GLB', export_apply=True, export_yup=True,
-        export_normals=True, export_texcoords=False, export_materials='EXPORT',
+        export_normals=True, export_texcoords=bool(uvs), export_materials='EXPORT',
         export_animations=False, export_skins=False, export_morph=False, export_cameras=False,
         export_extras=False)
     print(f'[model] wrote {args.out}')
