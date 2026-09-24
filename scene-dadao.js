@@ -7,7 +7,7 @@
 // Everything exists in all three eras (the tower era only ever sees this stretch behind it).
 (function () {
   if (!window.SCENE) return;
-  const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd, libGroup, asset, lam } = window.SCENE;
+  const { part, instSet, only, C, boxGeo, anchors, PALETTE, rnd, libGroup, asset, lam, people } = window.SCENE;
 
   const ALL = ['red', 'dadao', 'tower'], DT = ['dadao', 'tower'], T = ['tower'];
   const H = (r, d, t) => ({ red: r, dadao: d, tower: t });
@@ -51,10 +51,17 @@
   const KERB = 6.6, FACE = 6.2, BACK = 9.4, DEEP = 18;
   // Issue #5 step 3: a bay is one of three glbs (asset/blender/dihua-{min,yang,baroque}.py, built
   // on dihua_common.py) instanced through MODELS.instance: column, arcade slab, shop wall with
-  // its lattice door, two floors of framed windows, pilaster, cornice and the crest of its style.
-  // Every bay has two upper floors now (the old floors: 3 and tall: options are ignored); the
-  // width scales to the bay, and a Baroque bay's plaster takes the bay's colour per instance.
+  // its lattice door, framed windows, pilaster, cornice and the crest of its style. The width
+  // scales to the bay, and a Baroque bay's plaster takes the bay's colour per instance.
+  // Issue #15 step 3 restored the floor variety: each glb carries three groups — 'main' (arcade,
+  // shop wall, one upper floor), 'storey' (one more upper floor, built where the second sits) and
+  // 'crest' (roof slab and parapet). A bay instances main once, storey floors-1 times at
+  // y = (k-1)*FH, and crest once at y = (floors-2)*FH, so opts.floors 1/2/3 and opts.tall (three
+  // floors) mean something again instead of being ignored.
+  const FH = 3.4;                                              // storey height, dihua_common.FH
   const bays = { min: [], yang: [], baroque: [] };
+  const storeys = { min: [], yang: [], baroque: [] };
+  const crests = { min: [], yang: [], baroque: [] };
   // bay(side, z0, z1, style, opts): opts.col (wall colour), opts.libDepth (a library storefront
   // stands at the arcade back, this deep, so the body starts behind it), opts.open (no bay glb: a
   // library facade fills the kerb line), opts.goods.
@@ -66,10 +73,21 @@
     const bf = o.open ? 7.2 : (o.libDepth ? BACK + o.libDepth + 0.1 : BACK);   // where the body starts
     bodies.push({ x: s * (bf + DEEP) / 2, z: zc, w: DEEP - bf, d: d - 0.05, h: HA(o.open ? top : 3.8), c: C(o.open ? col : 'haze') });
     if (o.open) return;
-    bays[style].push({ x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) });
+    const floors = Math.min(3, Math.max(1, o.floors || (o.tall ? 3 : 2)));
+    const it = { x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) };
+    bays[style].push(it);
+    for (let k = 1; k < floors; k++) storeys[style].push(Object.assign({}, it, { y: (k - 1) * FH }));
+    crests[style].push(Object.assign({}, it, { y: (floors - 2) * FH }));
     if (o.goods !== false) shops.push({ fx: s * BACK, z: zc, span: d, s });
   }
-  Object.keys(bays).forEach(style => MODELS.load('dihua-' + style, gltf => MODELS.instance(gltf.scene, bays[style], { colorPrim: style === 'baroque' ? 'walk' : null })));
+  Object.keys(bays).forEach(style => MODELS.load('dihua-' + style, gltf => {
+    const opts = { colorPrim: style === 'baroque' ? 'walk' : null };
+    [['main', bays], ['storey', storeys], ['crest', crests]].forEach(([g, list]) => {
+      const n = MODELS.node(gltf.scene, g);
+      if (n) MODELS.instance(n, list[style], opts);
+      else console.error('dihua-' + style + '.glb has no ' + g + ' group');
+    });
+  }));
   // east side: 24 bays from z -150 down to -262, one wider slot for the library's Baroque facade
   const east = [['baroque', { tall: true }], ['yang'], ['min'], ['baroque', { col: 'walk' }], ['baroque', { floors: 3 }], ['yang'],
                 ['lib'], ['baroque'], ['min'], ['baroque', { col: 'walk', medal: 'verm' }], ['yang', { floors: 3 }], ['baroque'],
@@ -245,22 +263,32 @@
     part(-14, 0, gz, 10, gapZ[0] - gapZ[1] - 0.2, only(ALL, 0.1, 'road'));
   })();
 
-  // ── people: the 年貨大街 crowd in the road, the 月老 queue, the old men, the promenade ──
+  // ── people (issue #13, the engine's people() figures): the 年貨大街 crowd between the stalls
+  //    (the market street is closed to traffic; nothing moves), the 月老 queue, the old men, the
+  //    promenade, the arcades, the market front and the walk south toward 2020 ──
   const figs = [];
   for (let i = 0; i < 170; i++) {
-    const z = -196 - rnd() * 90, x = (rnd() < 0.5 ? -1 : 1) * (1.2 + rnd() * 2.8), c = i % 10 === 0 ? 'verm' : (i % 3 === 0 ? 'haze' : 'bone');
+    const z = -196 - rnd() * 90, x = (rnd() < 0.5 ? -1 : 1) * (1.2 + rnd() * 2.8);
     const fh = 1.45 + rnd() * 0.3;   // kept off |x| < 1.2: the engine's girl runs down the centre lane
-    figs.push({ x, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(c), h: H(0, fh, fh) });
+    figs.push({ x, z, y: 0.02, r: rnd() * 6.28, h: H(0, fh, fh) });
   }
   for (let i = 0; i < 30; i++) {   // today's queue for the matchmaker, north along the west sidewalk from the temple
     const qx = -6.45 - (i % 3) * 0.3, qz = G.z + 5.8 + i * 1.15 + (i % 2) * 0.2;
-    figs.push({ x: qx, y: WALK, z: qz, w: 0.55, d: 0.45, r: 0, c: C(i % 6 === 0 ? 'verm' : 'bone'), h: H(0, 0, 1.55 + (i % 3) * 0.1) });
+    figs.push({ x: qx, y: WALK, z: qz, r: Math.PI, h: H(0, 0, 1.55 + (i % 3) * 0.1) });   // facing the temple, down the street
   }
-  [[-0.9, 0], [0.7, -0.5], [0.4, 0.8]].forEach(o => figs.push({ x: -7.8 + o[0], y: WALK, z: G.z - 5.2 + o[1], w: 0.5, d: 0.42, r: rnd() * 6, c: C('bone'), h: H(1.25, 1.25, 0) }));
-  for (let i = 0; i < 10; i++) figs.push({ x: -22 - rnd() * 5, y: 0.8, z: -196 - rnd() * 36, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(i % 4 === 0 ? 'verm' : 'bone'), h: HA(1.55) });
+  [[-0.9, 0], [0.7, -0.5], [0.4, 0.8]].forEach(o => figs.push({ x: -7.8 + o[0], y: WALK, z: G.z - 5.2 + o[1], r: rnd() * 6, v: 0, h: H(1.25, 1.25, 0) }));   // the old men at the tea table, seated height
+  for (let i = 0; i < 10; i++) figs.push({ x: -22 - rnd() * 5, y: 0.8, z: -196 - rnd() * 36, r: rnd() * 6.28, h: HA(1.55) });   // the promenade
   for (let i = 0; i < 20; i++) {   // shoppers under the arcades, north of the festival
     const s = i % 2 ? 1 : -1, z = -152 - rnd() * 44;
-    figs.push({ x: s * (6.9 + rnd() * 1.8), y: WALK, z, w: 0.5, d: 0.4, r: rnd() * 6.28, c: C(i % 5 === 0 ? 'verm' : (i % 3 === 0 ? 'haze' : 'bone')), h: HA(1.5 + rnd() * 0.3) });
+    figs.push({ x: s * (6.9 + rnd() * 1.8), y: WALK, z, r: rnd() * 6.28, h: HA(1.5 + rnd() * 0.3) });
+  }
+  for (let i = 0; i < 16; i++) {   // shoppers at the 永樂市場 fabric front and the east arcade opposite (the 0.52 frame)
+    const s = i % 3 ? -1 : 1, z = -264 - rnd() * 20;
+    figs.push({ x: s * (6.6 + rnd() * 1.6), y: WALK, z, r: rnd() * 6.28, h: HA(1.5 + rnd() * 0.3) });
+  }
+  for (let i = 0; i < 26; i++) {   // walkers on both sidewalks south of the market, toward the 2020 marking (the 0.58 frame)
+    const s = i % 2 ? 1 : -1, z = -288 - rnd() * 44, fwd = rnd() < 0.5;
+    figs.push({ x: s * (6.5 + rnd() * 2.2), y: WALK, z, r: (fwd ? 0 : Math.PI) + (rnd() - 0.5) * 0.8, h: H(0, 1.5 + rnd() * 0.3, 1.5 + rnd() * 0.3) });
   }
 
   // ── parked at the kerb, north of the festival only: scooters and bicycles, the library
@@ -326,6 +354,6 @@
     MODELS.instance(MODELS.node(gltf.scene, 'crate'), crates);
     MODELS.instance(MODELS.node(gltf.scene, 'bicycle'), bikes);
   });
-  instSet(boxGeo, lam('bone'), figs, { colors: true });
+  people(figs);
   instSet(boxGeo, lam('haze'), veh, { colors: true });
 })();

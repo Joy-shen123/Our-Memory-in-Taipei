@@ -1,0 +1,125 @@
+/* photos.css — the street markers, the photograph panel and the credits block (issue #17, photos.js).
+   Same language as style.css: bone on ink, small caps with wide tracking, 1px rules, pill buttons.
+   The panel is bright (bone card, ink text) and never darkens the page: CJ, 2026-09-20, "CLOSE THE MIST
+   I WANT THE WEBSITE BE BRIGHT AND PRETTY". Colours come from data.js as --ink --bone --lamp --verm. */
+
+/* ── the markers: a small bone dot in a ring, pinned to the building, 44px hit area for a thumb ── */
+#photoSpots { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.spot {
+  position: absolute; left: 0; top: 0;
+  width: 44px; height: 44px; margin: -22px 0 0 -22px;
+  padding: 0; border: 0; background: none;
+  cursor: pointer; pointer-events: auto;
+  opacity: 0;
+  will-change: transform, opacity;
+  -webkit-tap-highlight-color: transparent;
+}
+.spot[hidden] { display: none; }
+.spot-dot, .spot-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; transform: translate(-50%, -50%); }
+.spot-dot { width: 10px; height: 10px; background: var(--bone); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 55%, transparent), 0 2px 10px color-mix(in srgb, var(--ink) 50%, transparent); transition: transform 160ms ease, background 160ms ease; }
+.spot-ring { width: 26px; height: 26px; border: 1px solid var(--bone); opacity: 0.85; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 35%, transparent); animation: spot-breathe 2.8s ease-in-out infinite; }
+.spot-tag {
+  position: absolute; left: 50%; top: 100%;
+  transform: translate(-50%, -6px);
+  font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--bone); text-shadow: 0 1px 8px var(--ink), 0 0 2px var(--ink);
+  white-space: nowrap; opacity: 0; transition: opacity 160ms ease;
+  pointer-events: none;
+}
+.spot:hover .spot-tag, .spot:focus-visible .spot-tag, .spot.open .spot-tag { opacity: 0.9; }
+.spot:hover .spot-dot, .spot:focus-visible .spot-dot { transform: translate(-50%, -50%) scale(1.3); }
+.spot:hover .spot-ring, .spot:focus-visible .spot-ring, .spot.open .spot-ring { animation: none; opacity: 1; }
+.spot.open .spot-dot { background: var(--lamp); }
+.spot:focus-visible { outline: none; }
+.spot:focus-visible .spot-ring { border-color: var(--lamp); }
+@keyframes spot-breathe { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.85; } 50% { transform: translate(-50%, -50%) scale(1.25); opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .spot-ring { animation: none; } }
+@media (hover: none) { .spot-tag { opacity: 0.9; } }   /* no hover on a phone: the year always shows under the dot */
+
+/* ── the panel: a bright card on the right, the model still visible beside it ── */
+#photoPanel, #photoCredits {
+  position: fixed;
+  z-index: 3;
+  top: clamp(72px, 10vh, 110px);
+  right: clamp(20px, 4vw, 56px);
+  width: min(460px, calc(100vw - 40px));
+  max-height: calc(100vh - clamp(72px, 10vh, 110px) - clamp(24px, 6vh, 72px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--bone) 94%, white);
+  color: var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--ink) 28%, transparent), 0 1px 0 color-mix(in srgb, var(--bone) 60%, white) inset;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 220ms ease, transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  -webkit-font-smoothing: antialiased;
+}
+#photoPanel[hidden], #photoCredits[hidden] { display: none; }
+#photoPanel.show, #photoCredits.show { opacity: 1; transform: none; }
+.pp-close {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--ink); background: color-mix(in srgb, var(--bone) 80%, transparent);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: var(--ink); font: 22px/1 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.pp-close:hover { background: var(--ink); color: var(--bone); }
+.pp-close:focus-visible, .pp-all:focus-visible, #photoCreditsBtn:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+.pp-fig { background: color-mix(in srgb, var(--ink) 6%, var(--bone)); border-radius: 16px 16px 0 0; overflow: hidden; }
+.pp-fig img { display: block; width: 100%; height: auto; max-height: min(52vh, 420px); object-fit: contain; }
+.pp-fig.tall img { max-height: min(56vh, 460px); }
+.pp-body { padding: 16px 20px 20px; }
+.pp-k { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; opacity: 0.6; border-top: 1px solid var(--ink); padding-top: 8px; }
+.pp-name { margin: 8px 0 0; font-size: clamp(20px, 2vw, 26px); font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
+.pp-zh { font-size: 12px; letter-spacing: 0.3em; opacity: 0.7; margin-top: 3px; }
+.pp-cap { margin: 12px 0 0; font-size: 14px; line-height: 1.6; }
+.pp-note { margin: 6px 0 0; font-size: 12px; line-height: 1.5; opacity: 0.6; }
+.pp-note[hidden] { display: none; }
+.pp-credit { margin-top: 12px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); font-size: 11px; letter-spacing: 0.06em; line-height: 1.6; opacity: 0.8; }
+.pp-credit a, .pc-line a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.pp-all {
+  margin-top: 12px; padding: 5px 12px 4px 14px;
+  font: inherit; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--ink); background: none; border: 1px solid var(--ink); border-radius: 999px; cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.pp-all:hover { background: var(--ink); color: var(--bone); }
+
+/* ── the credits: a caps button under the title, and the block listing every photograph ── */
+#photoCreditsBtn {
+  position: fixed; z-index: 2;
+  top: calc(clamp(20px, 4vw, 56px) + 34px);
+  right: clamp(20px, 4vw, 56px);
+  padding: 4px 10px 3px 12px;
+  font: inherit; font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--bone); background: color-mix(in srgb, var(--ink) 28%, transparent);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--bone) 70%, transparent); border-radius: 999px; cursor: pointer;
+  opacity: 0.8; transition: opacity 160ms ease, background 160ms ease, color 160ms ease;
+}
+#photoCreditsBtn:hover { opacity: 1; background: var(--bone); color: var(--ink); }
+.pc-body { padding: 20px 20px 22px; }
+.pc-intro { margin: 12px 0 0; font-size: 13px; line-height: 1.6; }
+.pc-list { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.pc-list li { display: flex; flex-direction: column; gap: 2px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); }
+.pc-place { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+.pc-zh { font-size: 11px; font-weight: 400; letter-spacing: 0.24em; opacity: 0.7; margin-left: 0.4em; }
+.pc-line { font-size: 11px; letter-spacing: 0.04em; line-height: 1.6; opacity: 0.85; }
+
+/* ── a phone: the panel is a sheet from the bottom, the markers keep their 44px hit area ── */
+@media (max-width: 600px) {
+  #photoPanel, #photoCredits {
+    top: auto; right: 12px; left: 12px; bottom: 12px;
+    width: auto; max-height: 78vh;
+    transform: translateY(16px);
+  }
+  #photoPanel.show, #photoCredits.show { transform: none; }
+  .pp-fig img, .pp-fig.tall img { max-height: 42vh; }
+  .pp-body { padding: 14px 16px 18px; }
+  .pp-name { font-size: 20px; }
+  .pp-cap { font-size: 13px; }
+  .pc-body { padding: 18px 16px 20px; }
+  #photoCreditsBtn { top: auto; bottom: 56px; right: 20px; }   /* under the title, which sits bottom-right on a phone */
+}

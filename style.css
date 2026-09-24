@@ -1,6 +1,31 @@
 /* 時代迷霧 · 大稻埕 — the five colours come from data.js as --ink --haze --lamp --bone --verm.
    No hex codes here. */
 
+/* The typefaces (issue #10 pairing 04, picked 2026-09-24): Barlow Condensed for the big words, Barlow for everything
+   readable, Chocolate Classical Sans for the Chinese secondary names. Six self-hosted woff2 files under asset/fonts/, each
+   subset to the glyphs the page's own strings use (rebuild with asset/fonts/gen/subset-fonts.py when a string changes;
+   the OFL licences sit beside them). To swap the pairing, change the @font-face rules and the names below; nothing else
+   in this file names a family. display: block, as bruno-simon does: the words stay invisible for the few ms the local
+   file takes rather than flashing the fallback. */
+@font-face { font-family: "Barlow Condensed";         src: url("asset/fonts/barlow-condensed-700.woff2") format("woff2");         font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "Barlow Condensed";         src: url("asset/fonts/barlow-condensed-300.woff2") format("woff2");         font-weight: 300; font-style: normal; font-display: block; }
+@font-face { font-family: "Barlow";                   src: url("asset/fonts/barlow-400.woff2") format("woff2");                   font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Barlow";                   src: url("asset/fonts/barlow-600.woff2") format("woff2");                   font-weight: 600; font-style: normal; font-display: block; }
+@font-face { font-family: "Barlow";                   src: url("asset/fonts/barlow-700.woff2") format("woff2");                   font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "Chocolate Classical Sans"; src: url("asset/fonts/chocolate-classical-sans-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: block; }
+:root {
+  --font-big: "Barlow Condensed";          /* the big words, the opening title, "Keep climbing," */
+  --font-hud: "Barlow";                    /* everything readable: the HUD, the anchor labels, the rest of the closing line, the music control */
+  --font-zh:  "Chocolate Classical Sans";  /* the Chinese secondary names only; anything else Chinese (song titles) falls to the system face */
+  --font-sys: -apple-system, "PingFang TC", "Microsoft JhengHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* the big word's measure goes with the face: a condensed face wants more size than the system sans did.
+     The sub line is a fraction of it (CJ, 2026-09-24: 「下面的字小一點」): the big line leads, the sub supports. */
+  --word-size: clamp(48px, 8.8vw, 136px);
+  --word-sub: 0.45;
+  --word-track: -0.01em;
+  --word-lh: 0.92;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -8,7 +33,7 @@ html, body {
   padding: 0;
   background: var(--ink);
   color: var(--bone);
-  font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--font-hud), var(--font-sys);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -65,7 +90,7 @@ html, body {
 .chap-of { font-size: 12px; font-weight: 400; letter-spacing: 0.32em; opacity: 0.6; margin-left: 0.3em; vertical-align: 0.5em; }
 .chap-name { font-size: 12px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; max-width: 240px; line-height: 1.5; }
 .chap-years { font-size: 11px; letter-spacing: 0.3em; opacity: 0.7; }
-.chap-zh { writing-mode: vertical-rl; font-size: 22px; font-weight: 700; letter-spacing: 0.3em; line-height: 1; padding-top: 8px; border-top: 1px solid var(--bone); }
+.chap-zh { font-family: var(--font-zh), var(--font-hud), var(--font-sys); writing-mode: vertical-rl; font-size: 22px; font-weight: 700; letter-spacing: 0.3em; line-height: 1; padding-top: 8px; border-top: 1px solid var(--bone); }
 
 .hud-year {
   position: absolute;
@@ -155,52 +180,67 @@ html, body {
   will-change: transform, opacity;
 }
 .label-name { font-size: clamp(18px, 2vw, 26px); font-weight: 700; letter-spacing: 0.08em; text-shadow: 0 2px 16px var(--ink); }
-.label-en { font-size: 11px; letter-spacing: 0.24em; opacity: 0.7; margin-top: 2px; }
+.label-en { font-family: var(--font-zh), var(--font-hud), var(--font-sys); font-size: 11px; letter-spacing: 0.24em; opacity: 0.7; margin-top: 2px; }   /* carries the Chinese name */
 .label-cap { font-size: clamp(13px, 1.1vw, 15px); line-height: 1.6; margin-top: 10px; opacity: 0.95; text-shadow: 0 1px 10px var(--ink); }
 .label-cap span { opacity: 0; transition: opacity 260ms ease; }
 .label.on .label-cap span { opacity: 1; }
 
-/* the closing line, fading in beside the climbing man, below the chapter column */
+/* the closing line (issue #16 treatment 1): two beats stacked in the left column above the tower, "Keep climbing,"
+   in the display face, the rest under it in the text face; each beat rises in on its own fade window (app.js) */
 .hud-closing {
   position: absolute;
-  top: clamp(170px, 24vh, 260px);
+  top: 20vh;
   left: clamp(20px, 4vw, 56px);
-  max-width: min(560px, 80vw);
-  font-size: clamp(22px, 2.6vw, 40px);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  opacity: 0;
+  max-width: min(820px, 80vw);
   text-shadow: 0 2px 24px var(--ink);
 }
+.hud-closing span { display: block; opacity: 0; transform: translateY(0.25em); transition: transform 640ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.hud-closing span.in { transform: none; }
+.hud-closing .c1 { font-family: var(--font-big), var(--font-hud), var(--font-sys); font-size: clamp(52px, 8.4vw, 130px); font-weight: 700; line-height: 0.92; letter-spacing: -0.01em; }
+.hud-closing .c2 { margin-top: 14px; font-size: clamp(20px, 2.4vw, 38px); font-weight: 600; line-height: 1.2; letter-spacing: -0.005em; }
 
-/* the words: big, centred, one at a time */
+/* the opening title (issue #16): the wordmark, centred, waiting in the fog at scroll 0. app.js sets its opacity, its
+   colour (ink in the fog, bone as it clears) and visibility; no ink shadow, since it starts as ink on bone */
+.hud-opening {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; opacity: 0; visibility: hidden; pointer-events: none;
+  will-change: opacity;
+}
+.op-big { font-family: var(--font-big), var(--font-hud), var(--font-sys); font-size: clamp(64px, 15vw, 236px); font-weight: 700; line-height: 0.88; letter-spacing: -0.01em; }
+.op-big span { display: block; white-space: nowrap; }
+.op-sub { margin-top: 22px; font-size: clamp(13px, 1.3vw, 20px); font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; opacity: 0.85; }
+
+/* the words (issue #16, CJ's pick: today's lines in option 3's treatment): the big line in the display face at 700,
+   the sub under it at 300 and --word-sub of the size, left column at 24vh. A line with no sub stands alone in 700. */
 .hud-word {
   position: absolute;
   left: clamp(20px, 4vw, 56px);
   right: clamp(20px, 4vw, 56px);
-  top: 26vh;
+  top: 24vh;
   opacity: 0;
   text-align: left;
-  max-width: 900px;
+  max-width: 980px;
 }
-.word-big {
-  font-size: clamp(44px, 8.5vw, 132px);
-  font-weight: 700;
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+.word-big, .word-sub {
+  font-family: var(--font-big), var(--font-hud), var(--font-sys);
+  font-size: var(--word-size);
+  line-height: var(--word-lh);
+  letter-spacing: var(--word-track);
   text-shadow: 0 3px 30px var(--ink), 0 0 2px var(--ink);
 }
-.word-sub {
-  margin-top: 18px;
-  font-size: clamp(15px, 1.5vw, 22px);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.85;
-  text-shadow: 0 2px 16px var(--ink);
-}
+.word-big { font-weight: 700; }
+.word-sub { font-weight: 300; font-size: calc(var(--word-size) * var(--word-sub)); line-height: 1.1; margin-top: 0.3em; opacity: 0.92; }
 /* letter-by-letter reveal: each glyph is a span with its own transition-delay, set in app.js */
 .word-big .w, .word-sub .w { display: inline-block; white-space: nowrap; }
 .word-big .w span, .word-sub .w span { display: inline-block; opacity: 0; transform: translateY(0.35em); transition: opacity 360ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1); }
 .hud-word.show .word-big span, .hud-word.show .word-sub span { opacity: 1; transform: none; }
-@media (max-width: 480px) { .hud-word { top: 18vh; } .word-big { font-size: 44px; } }
+@media (max-width: 480px) {
+  .hud-word { top: 18vh; }
+  .word-big { font-size: 54px; }
+  .word-sub { font-size: calc(54px * var(--word-sub)); }
+  .hud-closing { top: 18vh; max-width: calc(100vw - 40px); }
+  .hud-closing .c1 { font-size: 60px; }
+  .hud-closing .c2 { font-size: 20px; }
+  .op-big { font-size: 84px; }
+}

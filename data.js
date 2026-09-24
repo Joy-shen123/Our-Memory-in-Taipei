@@ -31,30 +31,50 @@
     { key: 'dadao', start: 2000, end: 2020, years: '2000–2019', label: 'Spring Festival', zh: '大稻埕 · Dadaocheng',
       zRange: [-140, -290], uPrint: 0.0,  traffic: 14,
       palette: { ground: 'haze', roof: 'bone', accent: 'lamp' } },
-    { key: 'tower', start: 2020, end: 2040, years: '2020–',     label: 'The Future',      zh: '台北101 · Taipei 101',
+    { key: 'tower', start: 2020, end: 2027, years: '2020–2027',     label: 'The Future',      zh: '台北101 · Taipei 101',
       zRange: [-290, -460], uPrint: 0.0,  traffic: 30,
       palette: { ground: 'haze', roof: 'bone', accent: 'verm' } },
   ];
 
   // ── THE WORDS — big lines that surface as you scroll. at = scroll progress 0..1
+  // Issue #16, CJ 2026-09-24: the text stays (「這些要保留」) except two lines (「"Nostalgia." 和 "The future."
+  // 應該改成feeling 跟Into the future」); the treatment is the two-tier one he picked (「我喜歡item1的3的風格」):
+  // `big` in the display face at 700, `sub` under it at 300 and about half the size (CJ, 2026-09-24:
+  // 「下面的字小一點」). 'That feeling.' is CJ's final call on the 0.17 line (2026-09-24: 「That feeling.」).
+  // The wordmark beat that used to sit at 0.03 is now the opening title (CLOSING's sibling OPENING below):
+  // it waits in the fog at scroll 0 and is gone by 0.05, so it is not repeated here.
   const WORDS = [
-    { at: 0.03, big: 'Our Memory in Taipei',          sub: 'Three generations. One street.' },
     { at: 0.10, big: 'We were children.',             sub: 'We felt happiness.' },
-    { at: 0.17, big: 'Nostalgia.',                    sub: 'Toys, candy, playful things.' },
+    { at: 0.17, big: 'That feeling.',                 sub: 'Toys, candy, playful things.' },
     { at: 0.25, big: 'We remember the small things.', sub: '' },
     { at: 0.37, big: 'We grow older.',                sub: '' },
     { at: 0.45, big: 'Spring Festival.',              sub: 'The street fills with red.' },
     { at: 0.53, big: 'We carry responsibility.',      sub: '' },
     { at: 0.62, big: 'We build things.',              sub: '' },
-    { at: 0.74, big: 'The future.',                   sub: '' },
+    { at: 0.74, big: 'Into the future.',              sub: '' },
     { at: 0.82, big: 'Where do we go?',               sub: '' },
   ];
 
   // ── THE CLOSING LINE ──────────────────────────────────────────────────────────
+  // Issue #16, CJ 2026-09-24: 「最後Just like the man on 101 應該要大字一點然後前面要有keep climbing, just
+  // like the man on Taipei 101」. Two beats, each with its own fade window: "Keep climbing," lands
+  // first, the rest arrives under it as his hands reach the rim (0.971). `line` is the sentence
+  // for anyone reading it as text (and for the glyph subset); app.js renders `parts`.
   const CLOSING = {
-    line: 'Where we go, we don’t know. We only know we need to climb higher.',
-    showFrom: 0.9,   // scroll progress at which the line fades in
+    line: 'Keep climbing, just like the man on Taipei 101',
+    showFrom: 0.88,
+    parts: [
+      { text: 'Keep climbing,',                  from: 0.88, to: 0.93 },
+      { text: 'just like the man on Taipei 101', from: 0.94, to: 0.985 },
+    ],
   };
+
+  // ── THE OPENING ───────────────────────────────────────────────────────────────
+  // Issue #16, CJ 2026-09-24: 「開頭也要迷霧然後顯示our memory in taipei」. The page opens in fog with
+  // the title waiting in it; the fog clears only as the visitor scrolls (fogTo), the title goes a
+  // little sooner. A scoped opening device: CJ's 2026-09-20 "CLOSE THE MIST" rule for the street
+  // still holds, the veil is fully off by fogTo, before the first word and long before the Red House.
+  const OPENING = { fogTo: 0.08, titleFrom: 0.02, titleTo: 0.05 };
 
   // ── ANCHOR TILES ──────────────────────────────────────────────────────────────
   const ANCHORS = [
@@ -120,12 +140,13 @@
     { p: [2, 5, -300],     t: [0, 40, -420],   fov: 55 },
     // 4 · the base — looking straight up the west face
     { p: [-3, 3, -372],    t: [-4, 50, -420],  fov: 62 },
-    // 5 · closing — high beside the tower, the man near the top. The fov opens from 62 to 82
-    //     over the climb so the world widens as he nears the crown (IVRESS borrow e).
-    { p: [-26, 70, -386],  t: [-4, 86, -420],  fov: 82 },
+    // 5 · closing — high beside the tower, level with the crown, the man standing on its rim
+    //     (issue #12). The fov opens from 62 to 82 over the climb so the world widens as he nears
+    //     the crown (IVRESS borrow e). z still decreasing: the rig's uAtZ bisection needs it.
+    { p: [-19, 90, -395],  t: [-3, 104, -420], fov: 82 },
   ];
 
   const root = document.documentElement;
   Object.keys(PALETTE).forEach(k => root.style.setProperty('--' + k, PALETTE[k]));
-  window.DATA = { PALETTE, GRID, ERAS, TILES, CAM, CLOSING, WORDS };
+  window.DATA = { PALETTE, GRID, ERAS, TILES, CAM, CLOSING, WORDS, OPENING };
 })();

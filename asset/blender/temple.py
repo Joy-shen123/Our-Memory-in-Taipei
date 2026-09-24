@@ -28,7 +28,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stylized as S
-from stylized import bm_box, bm_bar, bm_solid, bm_cylinder, bm_prism, bm_lathe, bm_sphere, rect_pts, face_frame, quad, solid, cutter
+from stylized import bm_box, bm_bar, bm_solid, bm_cylinder, bm_prism, bm_lathe, bm_sphere, rect_pts, face_frame, quad, cubic, solid, cutter
 
 # ── dimensions (metres), from scene-dadao.js ─────────────────────────────────
 HW = 4.0            # half width of the hall (x ±4)
@@ -44,6 +44,9 @@ ROOF_X = HW + 0.3                 # gable ends just past the walls (硬山: no s
 EAVE_Z = 5.5                      # top of the eave beam, the roof's bottom edge
 RIDGE_Z = 9.4                     # roof apex
 TIP_X, TIP_Z = 5.9, 12.0          # swallowtail tips
+DOU_BASE = WH - 0.43              # 4.57: top of the porch beam, foot of the 斗拱 stacks
+DOOR_X = 1.3                      # the two door centres
+REC_D = 0.46                      # how deep the door recess is cut into the 0.58 front wall
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -77,51 +80,122 @@ def hall():
 
 
 def front_wall():
-    """The carved wooden front (ink), 0.6 thick, with two red doors in pale frames, a lattice
-    panel between them and one beside each door, and a carved beam band along the top."""
-    solid('front_wall', 'ink', lambda bm: bm_box(bm, (2 * HW - 0.2, 0.58, WH), (0, 0.31, WH / 2)))
+    """The carved front (ink), 0.58 thick. Each red door sits at the back of a 0.3 m recess behind
+    pale stone jambs, a 門楣 lintel and a 門檻 threshold, instead of standing proud of a flat board."""
+    rec = cutter('door_recess', 'ink', lambda bm: [
+        bm_box(bm, (1.46, REC_D, 3.36), (x, -0.02 + REC_D / 2, 1.8)) for x in (-DOOR_X, DOOR_X)])
+    solid('front_wall', 'ink', lambda bm: bm_box(bm, (2 * HW - 0.2, 0.58, WH), (0, 0.31, WH / 2)), cutters=(rec,))
 
     def doors(bm):
-        for x in (-1.3, 1.3):
-            bm_box(bm, (1.2, 0.12, 3.0), (x, -0.02, 1.5 + 0.1), None)
+        for x in (-DOOR_X, DOOR_X):
+            bm_box(bm, (1.4, 0.12, 3.2), (x, 0.38, 1.72), None)
     solid('doors', 'verm', doors, bevel=0.03)
 
     def frames(bm):
-        for x in (-1.3, 1.3):
-            bm_box(bm, (0.16, 0.2, 3.3), (x - 0.68, -0.05, 1.75), None)
-            bm_box(bm, (0.16, 0.2, 3.3), (x + 0.68, -0.05, 1.75), None)
-            bm_box(bm, (1.52, 0.2, 0.16), (x, -0.05, 3.32), None)
-        bm_box(bm, (2 * HW - 0.2, 0.25, 0.3), (0, -0.05, WH - 0.35), None)       # the carved lintel band
-        bm_box(bm, (2 * HW - 0.2, 0.25, 0.2), (0, -0.05, 0.1), None)             # the sill board
+        for x in (-DOOR_X, DOOR_X):
+            for dx in (-0.78, 0.78):
+                bm_box(bm, (0.18, 0.3, 3.62), (x + dx, -0.04, 1.81), None)            # jambs
+            bm_box(bm, (1.92, 0.3, 0.26), (x, -0.04, 3.61), None)                     # 門楣 lintel
+            bm_box(bm, (1.74, 0.34, 0.2), (x, -0.04, 0.1), None)                      # 門檻 threshold
+        bm_box(bm, (2 * HW - 0.2, 0.25, 0.3), (0, -0.05, WH - 0.35), None)            # the carved lintel band
+        bm_box(bm, (2 * HW - 0.2, 0.25, 0.2), (0, -0.05, 0.1), None)                  # the sill board
     solid('door_frames', 'bone', frames, bevel=0.03)
 
     def door_studs(bm):
-        for x in (-1.3, 1.3):
-            for dx in (-0.3, 0.3):
-                for dz in (1.0, 2.0, 2.7):
-                    bm_box(bm, (0.14, 0.08, 0.14), (x + dx, -0.1, dz), None)
+        for x in (-DOOR_X, DOOR_X):
+            for dx in (-0.38, 0.0, 0.38):
+                for dz in (1.05, 1.95, 2.85):
+                    bm_box(bm, (0.13, 0.08, 0.13), (x + dx, 0.28, dz), None)
     solid('door_studs', 'lamp', door_studs, bevel=0.0)
 
-    def panels(bm):
-        for x, w in ((0.0, 1.1), (-3.1, 1.4), (3.1, 1.4)):
-            n = 3 if w < 1.2 else 4
-            for i in range(n):
-                dx = -w / 2 + 0.15 + i * (w - 0.3) / (n - 1)
-                bm_box(bm, (0.06, 0.1, 1.9), (x + dx, -0.04, 2.6), None)
-            for dz in (1.9, 2.6, 3.3):
-                bm_box(bm, (w - 0.2, 0.1, 0.06), (x, -0.04, dz), None)
-    solid('front_lattice', 'bone', panels, bevel=0.0)
+
+def stone_window():
+    """竹節窗, the bamboo-joint stone window between the two doors: three round bars with joints,
+    in a plain stone surround. The real front has one of these in every blind bay."""
+    z0, z1 = 1.55, 3.45
+
+    def frame(bm):
+        bm_box(bm, (0.86, 0.26, 0.18), (0, -0.04, z0 - 0.09), None)
+        bm_box(bm, (0.86, 0.26, 0.18), (0, -0.04, z1 + 0.09), None)
+        for dx in (-0.37, 0.37):
+            bm_box(bm, (0.12, 0.26, z1 - z0 + 0.36), (dx, -0.04, (z0 + z1) / 2), None)
+    solid('window_frame', 'walk', frame, bevel=0.03)
+
+    def bars(bm):
+        for dx in (-0.23, 0.0, 0.23):
+            bm_cylinder(bm, 0.06, z0, z1, 8, (dx, -0.09))
+            for z in (2.03, 2.5, 2.97):
+                bm_cylinder(bm, 0.1, z - 0.06, z + 0.06, 8, (dx, -0.09))
+    solid('window_bars', 'walk', bars, bevel=0.0)
+
+
+def wall_relief():
+    """The two carved stone 堵 panels beside the doors — a raised frame, a 卷草 scroll spiral and
+    two cloud curls standing off the field, a round boss at the eye — and a 石鼓 drum stone at the
+    foot of each outer jamb. This is the carved relief the first pass dropped."""
+    PX, PZ, PW, PH = 3.05, 2.5, 1.42, 2.5
+
+    def frames(bm):
+        for x in (-PX, PX):
+            for dz in (-PH / 2, PH / 2):
+                bm_box(bm, (PW, 0.2, 0.15), (x, -0.04, PZ + dz), None)
+            for dx in (-PW / 2 + 0.075, PW / 2 - 0.075):
+                bm_box(bm, (0.15, 0.2, PH), (x + dx, -0.04, PZ), None)
+    solid('relief_frames', 'walk', frames, bevel=0.03)
+
+    def carving(bm):
+        """A closed 團螭 roundel over three carved bands: continuous rings read as carving, a
+        broken spiral reads as damage."""
+        for sgn in (-1, 1):
+            cx, cz = sgn * PX, PZ + 0.42
+            for R, n, t in ((0.44, 14, 0.1), (0.24, 10, 0.08)):
+                ring = [(cx + R * math.cos(i * 2 * math.pi / n), cz + R * math.sin(i * 2 * math.pi / n)) for i in range(n)]
+                for p, q in zip(ring, ring[1:] + ring[:1]):
+                    bm_bar(bm, (p[0], -0.12, p[1]), (q[0], -0.12, q[1]), t)
+            for k in range(4):                                       # four cloud spokes off the ring
+                a = math.pi / 4 + k * math.pi / 2
+                bm_bar(bm, (cx + 0.4 * math.cos(a), -0.11, cz + 0.4 * math.sin(a)),
+                       (cx + 0.66 * math.cos(a), -0.11, cz + 0.66 * math.sin(a)), 0.09)
+            for dz in (-0.62, -0.86, -1.1):                          # carved bands under the roundel
+                bm_box(bm, (PW - 0.44, 0.1, 0.09), (cx, -0.11, PZ + dz), None)
+    solid('relief_carving', 'haze', carving, bevel=0.0)
+
+    def boss(bm):
+        for x in (-PX, PX):
+            bm_lathe(bm, [(0, 0), (0.15, 0), (0.17, -0.07), (0.12, -0.16), (0, -0.2)], 10,
+                     Matrix.Translation((x, -0.06, PZ + 0.3)) @ Matrix.Rotation(-math.pi / 2, 4, 'X'))
+    solid('relief_boss', 'lamp', boss, bevel=0.0)
+
+    def drums(bm):
+        for x in (-DOOR_X - 0.78, DOOR_X + 0.78):
+            T = Matrix.Translation((x, -0.19, 0.66)) @ Matrix.Rotation(math.pi / 2, 4, 'X')
+            bm_cylinder(bm, 0.3, -0.12, 0.12, 14, (0, 0), T)
+            bm_box(bm, (0.56, 0.46, 0.4), (x, -0.16, 0.2), None)
+    solid('door_drums', 'walk', drums, bevel=0.03)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # the porch
 # ─────────────────────────────────────────────────────────────────────────────
+def gong_pts(L, h, lobes=2):
+    """A 栱 arm seen from the side: flat top, the ends cut back, the bottom scalloped into lobes."""
+    top, bot = h / 2, -h / 2
+    xr = L / 2 - 0.08
+    pts = [(-L / 2, top), (L / 2, top), (L / 2, bot + 0.06), (xr, bot)]
+    step = 2 * xr / lobes
+    for i in range(lobes):
+        a, b = xr - i * step, xr - (i + 1) * step
+        pts += quad((a, bot), ((a + b) / 2, bot + 0.10), (b, bot), 3)
+    pts.append((-L / 2, bot + 0.06))
+    return pts
+
+
 def porch():
-    """Two thick red columns on octagonal stone bases at the kerb, a low brick step between
-    them, red beams tying the column tops to the hall, and the bracket stacks under the eave."""
+    """Two thick red columns on octagonal stone bases at the kerb, a low brick step between them,
+    red beams tying the column tops to the hall, and the 斗拱 stacks carrying the eave."""
     def columns(bm):
         for x in (-COL_X, COL_X):
-            bm_cylinder(bm, 0.35, WALK + 0.35, WH + 0.1, 12, (x, COL_Y))
+            bm_cylinder(bm, 0.35, WALK + 0.35, DOU_BASE, 12, (x, COL_Y))
     solid('columns', 'verm', columns, bevel=0.03)
 
     def bases(bm):
@@ -132,31 +206,32 @@ def porch():
 
     def beams(bm):
         for x in (-COL_X, COL_X):
-            bm_box(bm, (0.4, -COL_Y + 0.2, 0.4), (x, COL_Y / 2 + 0.1, WH - 0.3), None)   # tie beams to the hall
-        bm_box(bm, (2 * COL_X + 0.4, 0.4, 0.5), (0, COL_Y, WH - 0.35), None)            # the front beam between the columns
+            bm_box(bm, (0.4, -COL_Y + 0.2, 0.4), (x, COL_Y / 2 + 0.1, DOU_BASE - 0.2), None)   # tie beams to the hall
+        bm_box(bm, (2 * COL_X + 0.4, 0.4, 0.5), (0, COL_Y, DOU_BASE - 0.25), None)             # the front beam
     solid('porch_beams', 'verm', beams, bevel=0.03)
 
-    def brackets(bm):
-        # 斗拱, simplified: a red block, a pale arm, a wider red arm, stepping out under the eave
-        def stack(x, y, along_x):
-            bm_box(bm, (0.5, 0.5, 0.26), (x, y, WH - 0.05 + 0.13), None)
-            bm_box(bm, (1.0, 0.3, 0.2) if along_x else (0.3, 1.0, 0.2), (x, y, WH + 0.31), None)
-        for x in (-COL_X, COL_X):
-            stack(x, COL_Y, True)
-        for x in (-1.8, 1.8):
-            stack(x, COL_Y, True)
-        for y in (1.5, 4.5, 7.5):
-            stack(-HW - 0.05, y, False)
-            stack(HW + 0.05, y, False)
-    solid('brackets', 'verm', brackets, bevel=0.03)
+    # 斗拱: each stack is a flared 坐斗, a scalloped 栱 across the eave line, a 華栱 projecting out
+    # under it, and three 升 blocks carrying the eave beam. Red blocks, pale arms, as on the real
+    # temple. Front stacks sit over the porch, side stacks under the gable eaves.
+    STACKS = [(x, COL_Y, True) for x in (-COL_X, -1.8, 0.0, 1.8, COL_X)]
+    STACKS += [(sx * (HW + 0.05), y, False) for sx in (-1, 1) for y in (1.5, 4.5, 7.5)]
 
-    def bracket_arms(bm):
-        for x in (-COL_X, COL_X, -1.8, 1.8):
-            bm_box(bm, (1.4, 0.26, 0.16), (x, COL_Y, WH + 0.49), None)
-        for y in (1.5, 4.5, 7.5):
-            bm_box(bm, (0.26, 1.4, 0.16), (-HW - 0.05, y, WH + 0.49), None)
-            bm_box(bm, (0.26, 1.4, 0.16), (HW + 0.05, y, WH + 0.49), None)
-    solid('bracket_arms', 'bone', bracket_arms, bevel=0.03)
+    def blocks(bm):
+        for x, y, along_x in STACKS:
+            T = Matrix.Translation((x, y, 0)) @ Matrix.Rotation(0 if along_x else math.pi / 2, 4, 'Z')
+            bm_prism(bm, 4, 0.20, 0.27, DOU_BASE, DOU_BASE + 0.21, rot=math.pi / 4, xform=T)      # 坐斗
+            for u in (-0.55, 0.0, 0.55):
+                bm_prism(bm, 4, 0.11, 0.15, DOU_BASE + 0.43, DOU_BASE + 0.55, rot=math.pi / 4,
+                         xform=T, center=(u, 0))                                                  # 升
+    solid('brackets', 'verm', blocks, bevel=0.025)
+
+    def arms(bm):
+        for x, y, along_x in STACKS:
+            R = Matrix.Rotation(0 if along_x else math.pi / 2, 4, 'Z')
+            T = Matrix.Translation((x, y, DOU_BASE + 0.32)) @ R
+            bm_solid(bm, gong_pts(1.30, 0.22), -0.12, 0.12, T)                                    # 栱
+            bm_solid(bm, gong_pts(0.92, 0.18, 1), -0.09, 0.09, T @ Matrix.Rotation(math.pi / 2, 4, 'Z'))  # 華栱
+    solid('bracket_arms', 'bone', arms, bevel=0.025)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -227,6 +302,90 @@ def ridge():
     solid('ridge_pearl', 'lamp', pearl, bevel=0.0)
 
 
+def ridge_dragons():
+    """雙龍搶珠: one 剪黏 dragon on each half of the ridge, its tail out over the swallowtail and
+    its head reared in toward the pearl. The spine is a shallow cubic S that hugs the ridge, the
+    body a chain of bars tapering from the tail to the neck, with a swept-back comb, two clawed
+    legs, a blocky head with an upturned snout and horns, and a fanned tail. Thin bars, no bevel."""
+    y0 = ROOF_YC
+    spine = cubic((4.35, RIDGE_Z + 0.95), (3.5, RIDGE_Z + 1.85), (2.2, RIDGE_Z + 0.75),
+                  (1.25, RIDGE_Z + 1.25), 10, include_start=True)
+    N = len(spine)
+    wave = [0.10 * math.sin(i * math.pi / 3) for i in range(N)]   # a little off the ridge plane
+
+    def pt(sgn, i):
+        return (sgn * spine[i][0], y0 + wave[i], spine[i][1])
+
+    def axes(i):
+        """Unit tangent and the up-ish normal of the spine at vertex i, in the X-Z plane."""
+        a, b = spine[max(i - 1, 0)], spine[min(i + 1, N - 1)]
+        d = Vector((b[0] - a[0], 0.0, b[1] - a[1])).normalized()
+        n = Vector((-d.z, 0.0, d.x))
+        return d, (n if n.z >= 0 else -n)
+
+    def body(bm):
+        for sgn in (-1, 1):
+            for i in range(N - 1):
+                t = 0.10 + 0.17 * (i / (N - 2)) ** 0.8
+                bm_bar(bm, pt(sgn, i), pt(sgn, i + 1), t)
+    solid('dragon_body', 'verm', body, bevel=0.0)
+
+    def comb(bm):
+        for sgn in (-1, 1):
+            for i in range(2, N - 1, 2):
+                d, n = axes(i)
+                v = (n - d * 0.5).normalized() * 0.15          # swept back toward the tail
+                p = pt(sgn, i)
+                bm_bar(bm, p, (p[0] + sgn * v.x, p[1], p[2] + v.z), 0.06, t2=0.2)
+    solid('dragon_comb', 'lamp', comb, bevel=0.0)
+
+    def head(bm):
+        for sgn in (-1, 1):
+            hx, hz = sgn * spine[-1][0], spine[-1][1]
+            y = y0 + wave[-1]
+            bm_box(bm, (0.52, 0.38, 0.38), (hx - sgn * 0.22, y, hz + 0.08), None)       # skull
+            bm_box(bm, (0.36, 0.26, 0.2), (hx - sgn * 0.56, y, hz + 0.02), None)        # snout
+            bm_box(bm, (0.2, 0.22, 0.16), (hx - sgn * 0.7, y, hz + 0.16), None)         # upturned nose
+            bm_box(bm, (0.34, 0.3, 0.1), (hx - sgn * 0.52, y, hz - 0.15), None)         # jaw
+            for dy in (-0.17, 0.17):
+                bm_bar(bm, (hx - sgn * 0.12, y + dy, hz + 0.2),
+                       (hx + sgn * 0.3, y + dy, hz + 0.52), 0.07)                       # horns, swept back
+    solid('dragon_head', 'verm', head, bevel=0.025)
+
+    def eyes(bm):
+        for sgn in (-1, 1):
+            hx, hz = sgn * spine[-1][0], spine[-1][1]
+            for dy in (-0.2, 0.2):
+                bm_sphere(bm, 0.075, (hx - sgn * 0.36, y0 + wave[-1] + dy, hz + 0.14), 8, 6)
+    solid('dragon_eyes', 'ink', eyes, bevel=0.0)
+
+    def legs(bm):
+        for sgn in (-1, 1):
+            for i in (3, 7):
+                c, y = pt(sgn, i), y0 + wave[i]
+                for dy in (-0.15, 0.15):
+                    knee = (c[0] - sgn * 0.2, y + dy * 1.5, c[2] - 0.26)
+                    bm_bar(bm, (c[0], y + dy * 0.7, c[2]), knee, 0.085)
+                    bm_bar(bm, knee, (knee[0] - sgn * 0.02, knee[1], knee[2] - 0.24), 0.07)
+    solid('dragon_legs', 'verm', legs, bevel=0.0)
+
+    def claws(bm):
+        for sgn in (-1, 1):
+            for i in (3, 7):
+                c, y = pt(sgn, i), y0 + wave[i]
+                for dy in (-0.15, 0.15):
+                    bm_box(bm, (0.2, 0.16, 0.1), (c[0] - sgn * 0.24, y + dy * 1.5, c[2] - 0.55), None)
+    solid('dragon_claws', 'lamp', claws, bevel=0.0)
+
+    def tail(bm):
+        for sgn in (-1, 1):
+            tx, tz = spine[0]
+            for a, L in ((0.35, 0.5), (0.85, 0.66), (1.35, 0.5)):
+                bm_bar(bm, (sgn * tx, y0 + wave[0], tz),
+                       (sgn * (tx + L * math.cos(a)), y0 + wave[0], tz - 0.04 + L * math.sin(a)), 0.06, t2=0.19)
+    solid('dragon_tail', 'lamp', tail, bevel=0.0)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # lanterns and the incense burner
 # ─────────────────────────────────────────────────────────────────────────────
@@ -243,7 +402,7 @@ def lanterns():
         for x in (-2.0, 2.0):
             bm_cylinder(bm, 0.2, LAN_Z + 0.36, LAN_Z + 0.52, 10, (x, LAN_Y))       # top cap
             bm_cylinder(bm, 0.2, LAN_Z - 0.52, LAN_Z - 0.36, 10, (x, LAN_Y))       # bottom cap
-            bm_bar(bm, (x, LAN_Y, LAN_Z + 0.5), (x, LAN_Y, WH - 0.1), 0.05)         # cord up to the beam
+            bm_bar(bm, (x, LAN_Y, LAN_Z + 0.5), (x, LAN_Y, DOU_BASE - 0.05), 0.05)  # cord up to the beam
             bm_bar(bm, (x, LAN_Y, LAN_Z - 0.85), (x, LAN_Y, LAN_Z - 0.5), 0.05)     # tassel cord
     solid('lantern_caps', 'ink', caps, bevel=0.0)
 
@@ -282,9 +441,12 @@ def _bm(fn):
 def build():
     hall()
     front_wall()
+    stone_window()
+    wall_relief()
     porch()
     roof()
     ridge()
+    ridge_dragons()
     lanterns()
     burner()
 
