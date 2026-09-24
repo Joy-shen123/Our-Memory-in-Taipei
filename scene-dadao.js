@@ -33,13 +33,136 @@
     const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
     return { tex: t, aspect: cv.width / cv.height };
   }
-  // a text board. axis 'z': faces ±z (read walking down the street); axis 'x': faces the road.
-  function signPart(str, bg, fg, vertical, axis, x, y, z, h, eras) {
-    const { tex, aspect } = textTex(str, bg, fg, vertical), ww = h * aspect;
-    const p = axis === 'z' ? part(x, y, z, ww, 0.12, only(eras, h, 'bone')) : part(x, y, z, 0.1, ww, only(eras, h, 'bone'));
-    p.mesh.material.map = tex; p.mesh.material.needsUpdate = true;
-    return p;
-  }
+  // Light-box construction follows scene-red.js: a shared atlas, merged cases/brackets,
+  // two readable faces on projecting signs, proud rims and an outer-edge neon tube.
+  const SIGNAGE = (() => {
+    const W = 2048, H = 4096, PX = 100;
+    const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d'), batches = new Map(), records = [];
+    let ax = 2, ay = 2, row = 0;
+    const faces = new Map();
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const unit = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
+    const matrix = new THREE.Matrix4(), normal = new THREE.Matrix3(), q = new THREE.Quaternion();
+    function batch(eras, z) {
+      const zone = z > -190 ? 1 : z > -230 ? 2 : z > -260 ? 3 : 4;
+      const key = eras.join(',') + ':' + zone;
+      if (!batches.has(key)) batches.set(key, { eras, face: { pos: [], uv: [], idx: [] }, hw: { pos: [], nor: [], col: [] }, glow: { pos: [], nor: [], col: [] } });
+      return batches.get(key);
+    }
+    function face(text, w, h, bg, fg, vertical) {
+      const key = [text, w, h, bg, fg, vertical].join('|');
+      if (faces.has(key)) return faces.get(key);
+      const pw = Math.max(32, Math.ceil(w * PX)), ph = Math.max(32, Math.ceil(h * PX));
+      if (ax + pw + 2 > W) { ax = 2; ay += row + 4; row = 0; }
+      if (ay + ph + 2 > H) throw new Error('Dadaocheng sign atlas is full');
+      const x = ax, y = ay; ax += pw + 4; row = Math.max(row, ph);
+      ctx.fillStyle = PALETTE[bg]; ctx.fillRect(x - 2, y - 2, pw + 4, ph + 4);
+      const gradient = ctx.createRadialGradient(x + pw / 2, y + ph / 2, 0, x + pw / 2, y + ph / 2, Math.max(pw, ph) * .7);
+      gradient.addColorStop(0, 'rgba(255,255,255,.2)'); gradient.addColorStop(1, 'rgba(0,0,0,.12)');
+      ctx.fillStyle = gradient; ctx.fillRect(x, y, pw, ph);
+      ctx.strokeStyle = PALETTE[fg]; ctx.lineWidth = 1; ctx.strokeRect(x + 4, y + 4, pw - 8, ph - 8);
+      ctx.fillStyle = PALETTE[fg]; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const chars = [...text]; let size = vertical ? Math.min(pw * .7, ph * .82 / chars.length) : ph * .68;
+      const font = n => `700 ${n}px -apple-system, "PingFang TC", "Heiti TC", sans-serif`;
+      ctx.font = font(size);
+      if (!vertical && ctx.measureText(text).width > pw * .86) { size *= pw * .86 / ctx.measureText(text).width; ctx.font = font(size); }
+      if (vertical) chars.forEach((c, i) => ctx.fillText(c, x + pw / 2, y + ph / 2 + (i - (chars.length - 1) / 2) * size * 1.08));
+      else ctx.fillText(text, x + pw / 2, y + ph / 2);
+      const uv = [x / W, (x + pw) / W, 1 - (y + ph) / H, 1 - y / H]; faces.set(key, uv); return uv;
+    }
+    function quad(acc, c, right, w, h, uv) {
+      const base = acc.pos.length / 3, [u0, u1, v0, v1] = uv;
+      for (const [sx, sy, u, v] of [[-1, -1, u0, v0], [1, -1, u1, v0], [1, 1, u1, v1], [-1, 1, u0, v1]]) {
+        const p = c.clone().addScaledVector(right, sx * w / 2); p.y += sy * h / 2;
+        acc.pos.push(p.x, p.y, p.z); acc.uv.push(u, v);
+      }
+      acc.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    function hardware(acc, center, size, color, rotation) {
+      matrix.compose(center, rotation || new THREE.Quaternion(), size); normal.getNormalMatrix(matrix);
+      const pos = unit.attributes.position, nor = unit.attributes.normal, v = V(0, 0, 0), c = C(color);
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(matrix); acc.pos.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(nor, i).applyMatrix3(normal).normalize(); acc.nor.push(v.x, v.y, v.z); acc.col.push(c.r, c.g, c.b);
+      }
+    }
+    const box = (acc, x, y, z, w, h, d, c) => hardware(acc, V(x, y, z), V(w, h, d), c);
+    function bar(acc, a, b, thickness, color = 'ink') {
+      const d = b.clone().sub(a); q.setFromUnitVectors(V(0, 0, 1), d.clone().normalize());
+      hardware(acc, a.clone().add(b).multiplyScalar(.5), V(thickness, thickness, d.length()), color, q);
+    }
+    function light(text, bg, fg, vertical, axis, x, y, z, h, eras, mount) {
+      const b = batch(eras, z), D = .14;
+      const w = vertical ? Math.min(.75, Math.max(.4, h / (text.length + .5))) : h * (text.length + .5);
+      const side = Math.sign(x) || 1, gap = .16, cy = y + h / 2;
+      const wall = mount == null ? Math.abs(x) + (axis === 'z' ? w / 2 : D / 2) + gap : mount;
+      const inside = side * (wall - gap), outside = inside - side * w;
+      const cx = axis === 'z' ? (inside + outside) / 2 : side * (wall - gap - D / 2);
+      box(b.hw, cx, cy, z, axis === 'z' ? w : D, h, axis === 'z' ? D : w, 'haze');
+      const uv = face(text, w - .06, h - .06, bg, fg, vertical);
+      if (axis === 'z') {
+        quad(b.face, V(cx, cy, z + D / 2 + .013), V(1, 0, 0), w - .06, h - .06, uv);
+        quad(b.face, V(cx, cy, z - D / 2 - .013), V(-1, 0, 0), w - .06, h - .06, uv);
+        for (const yy of [y, y + h]) box(b.hw, cx, yy, z, w + .03, .035, D + .05, 'bone');
+        for (const xx of [inside, outside]) box(b.hw, xx, cy, z, .035, h + .03, D + .05, 'bone');
+        for (const yy of [y + .12, y + h - .12]) bar(b.hw, V(side * wall, yy, z), V(inside, yy, z), .04);
+        bar(b.hw, V(side * wall, y + .12, z), V(cx, y + h - .12, z), .03);
+        box(b.glow, outside - side * .03, cy, z, .025, h - .12, D + .05, 'lamp');
+        box(b.hw, side * wall, cy, z, .04, h * .9, .2, 'ink');
+      } else {
+        quad(b.face, V(cx - side * (D / 2 + .013), cy, z), V(0, 0, side), w - .06, h - .06, uv);
+        for (const yy of [y, y + h]) box(b.hw, cx, yy, z, D + .05, .035, w + .03, 'bone');
+        for (const zz of [z - w / 2, z + w / 2]) box(b.hw, cx, cy, zz, D + .05, h + .03, .035, 'bone');
+        for (const zz of [z - w * .35, z + w * .35]) bar(b.hw, V(side * wall, cy, zz), V(cx, cy, zz), .04);
+      }
+      records.push({ text, axis, side, x: cx, z, y, h, w, wall, gap, kind: 'lightbox' });
+    }
+    // Printing attached to an existing physical portal, and actual price cards, stays flat.
+    function print(text, bg, fg, vertical, axis, x, y, z, h, eras) {
+      const b = batch(eras, z), w = h * (vertical ? 1 / (text.length + .5) : text.length + .5);
+      quad(b.face, V(x, y + h / 2, z), axis === 'z' ? V(1, 0, 0) : V(0, 0, Math.sign(x) || 1), w, h, face(text, w, h, bg, fg, vertical));
+    }
+    function finish() {
+      const texture = new THREE.CanvasTexture(canvas); texture.anisotropy = 8;
+      // Cases and neon tubes use solid-color atlas swatches. One mesh per spatial/era
+      // batch keeps distant sign groups culled without paying three calls per group.
+      const swatches = new Map();
+      for (const b of batches.values()) for (const key of ['hw', 'glow']) {
+        const a = b[key], base = b.face.pos.length / 3;
+        b.face.pos.push(...a.pos);
+        for (let i = 0; i < a.pos.length / 3; i++) {
+          const rgb = a.col.slice(i * 3, i * 3 + 3), id = rgb.join(',');
+          if (!swatches.has(id)) {
+            const name = Object.keys(PALETTE).find(k => { const c = C(k); return Math.abs(c.r - rgb[0]) + Math.abs(c.g - rgb[1]) + Math.abs(c.b - rgb[2]) < .00001; }) || 'bone';
+            const uv = face('', .12, .12, name, name, false);
+            ctx.fillStyle = PALETTE[name]; ctx.fillRect(uv[0] * W, (1 - uv[3]) * H, (uv[1] - uv[0]) * W, (uv[3] - uv[2]) * H);
+            swatches.set(id, [(uv[0] + uv[1]) / 2, (uv[2] + uv[3]) / 2]);
+          }
+          b.face.uv.push(...swatches.get(id)); b.face.idx.push(base + i);
+        }
+        a.pos.length = 0;
+      }
+      texture.needsUpdate = true;
+      for (const b of batches.values()) {
+        const group = libGroup(b.eras);
+        for (const [key, material] of [
+          ['face', new THREE.MeshLambertMaterial({ map: texture, emissiveMap: texture, emissive: 0xffffff, emissiveIntensity: .12, side: THREE.DoubleSide })],
+          ['hw', new THREE.MeshLambertMaterial({ vertexColors: true })],
+          ['glow', new THREE.MeshBasicMaterial({ vertexColors: true })]
+        ]) {
+          const a = b[key]; if (!a.pos.length) continue;
+          const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(a.pos, 3));
+          if (a.uv) { geo.setAttribute('uv', new THREE.Float32BufferAttribute(a.uv, 2)); geo.setIndex(a.idx); geo.computeVertexNormals(); }
+          else { geo.setAttribute('normal', new THREE.Float32BufferAttribute(a.nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(a.col, 3)); }
+          const mesh = new THREE.Mesh(geo, window.SCENE.withFog(material)); mesh.castShadow = key !== 'glow'; mesh.receiveShadow = key !== 'glow'; group.add(mesh);
+        }
+      }
+    }
+    return { light, print, finish, records };
+  })();
+  const lightBox = (...args) => SIGNAGE.light(...args);
+  const appliedPrint = (...args) => SIGNAGE.print(...args);
 
   // ── the shophouse bays: one arcade system on both sides ─────────────────────
   // Reference: Dihua Street Section 1 — frontages 4–5 m, 騎樓 at ground level over the sidewalk
@@ -119,9 +242,9 @@
         zone2[style + '_crest'].push(Object.assign({}, it, { y: extra ? 4.25 : 0 }));
       }
       const name = ['南北貨', '茶莊', '布行', '中藥行', '乾貨', '米行'][index % 6];
-      signPart(name, 'bone', 'ink', false, 'x', s * 9.0, 3.02, zc, .46, ALL);
-      signPart(name, index % 3 ? 'verm' : 'bone', index % 3 ? 'bone' : 'ink', true, 'z', s * 6.0, 3.65, zc - d * .35, 1.9, ALL);
-      if (style !== 'min') signPart(['商號', '茶', '布'][index % 3], 'walk', 'ink', false, 'x', s * 6.02, 4.38, zc, .38, ALL);
+      lightBox(name, 'bone', 'ink', false, 'x', s * 9.0, 3.02, zc, .46, ALL);
+      lightBox(name, index % 3 ? 'verm' : 'bone', index % 3 ? 'bone' : 'ink', true, 'z', s * 6.0, 3.65, zc - d * .35, 1.9, ALL);
+      if (style !== 'min') lightBox(['商號', '茶', '布'][index % 3], 'walk', 'ink', false, 'x', s * 6.02, 4.38, zc, .38, ALL);
       if (o.goods !== false) shops.push({ fx: s * BACK, z: zc, span: d, s });
       return;
     }
@@ -186,7 +309,7 @@
       const g = asset(id, lib, 0, zc, Math.PI / 2, sc);
       if (g) { const sz = g.userData.size; g.position.x = -(BACK - 0.1) - sz.x / 2 + 0.01; g.updateMatrixWorld(true); }
     }
-    if (o.sign) signPart(o.sign, o.signCol === 'lamp' ? 'lamp' : 'bone', 'ink', true, 'z', -(FACE - 0.55), 4.4, zc, 2.6, ALL);
+    if (o.sign) lightBox(o.sign, o.signCol === 'lamp' ? 'lamp' : 'bone', 'ink', true, 'z', -(FACE - 0.55), 4.4, zc, 2.6, ALL);
     if (o.drawers) { // 百子櫃 — the herb shop's wall of little drawers, drawn to a canvas, as the shop wall
       const cv = document.createElement('canvas'); cv.width = 256; cv.height = 192;
       const g = cv.getContext('2d');
@@ -212,11 +335,11 @@
   });
   // painted shop names on the east pilasters, read walking down the street
   [['米行', 'bone', -152.3], ['南北貨', 'bone', -175.3], ['布莊', 'verm', -207.9], ['茶行', 'lamp', -234.5], ['中藥', 'bone', -253]].forEach(([t, bg, z]) =>
-    signPart(t, bg, bg === 'bone' ? 'ink' : 'bone', true, 'z', FACE - 0.55, 4.4, z, 2.6, ALL));
+    lightBox(t, bg, bg === 'bone' ? 'ink' : 'bone', true, 'z', FACE - 0.55, 4.4, z, 2.6, ALL));
 
   // ── goods under the east arcade and in the west fillers: sacks, price boards, crates, jars,
   //    hanging dried goods, tin signs under the arcade lip, acrylic boxes on the facade ──
-  const goods = [], jars = [], signs = [], sacks = [], crates = [], bikes = [];
+  const goods = [], jars = [], sacks = [], crates = [], bikes = [];
   shops.forEach((s, si) => {
     const side = s.s, gx = s.fx - side * 0.3, hz = s.span / 2 - 0.5;
     for (let i = 0; i < 4; i++) {                              // sacks, some two high (props.glb, issue #5)
@@ -236,10 +359,12 @@
       const zz = s.z - hz + 0.35 + i * ((2 * hz - 0.7) / 5), hh = 0.45 + rnd() * 0.5;
       goods.push({ x: s.fx - side * 0.25, y: 3.0 - hh, z: zz, w: 0.2, d: 0.3, r: (rnd() - 0.5) * 0.6, c: C(i % 3 === 0 ? 'lamp' : (i % 3 === 1 ? 'haze' : 'bone')), h: HA(hh) });
     }
-    const lampSign = si % 3 === 0;                             // a tin sign hanging under the arcade lip
-    signs.push({ x: side * (KERB + 0.35), y: 2.3, z: s.z - 0.3, w: 0.1, d: 1.2, r: 0, c: C(lampSign ? 'lamp' : 'bone'), h: HA(1.2) });
-    if (!lampSign) signs.push({ x: side * (KERB + 0.35), y: 3.2, z: s.z - 0.3, w: 0.12, d: 1.22, r: 0, c: C('verm'), h: HA(0.3) });
-    if (si % 2 === 0) signs.push({ x: side * (FACE - 0.55), y: 4.6 + rnd() * 1.6, z: s.z + 0.9, w: 1.0, d: 0.14, r: 0, c: C(si % 4 === 0 ? 'lamp' : 'haze'), h: HA(0.9 + rnd() * 0.8) });
+    const lampSign = si % 3 === 0;
+    lightBox(['南北貨', '茶行', '布莊', '中藥'][si % 4], lampSign ? 'lamp' : 'bone', 'ink', false, 'x', side * (KERB + .35), 2.3, s.z - .3, .46, ALL);
+    if (si % 2 === 0) {
+      const y = 4.6 + rnd() * 1.6, h = .9 + rnd() * .8; // preserve the scene's seeded layout
+      lightBox(['茶', '布', '米'][si % 3], si % 4 === 0 ? 'lamp' : 'haze', 'ink', true, 'z', side * (FACE - .55), y, s.z + .9, h, ALL);
+    }
   });
 
   // ── 霞海城隍廟 — one of Taipei's smallest temples: a single hall, red columns, a dark carved
@@ -256,10 +381,10 @@
       root.position.set(xf, 0, cz); root.rotation.y = Math.PI / 2;
       temple.add(root);
     });
-    signPart('霞海城隍廟', 'ink', 'lamp', false, 'x', -5.65, WH - 0.9, cz, 0.85, ALL);   // the name on the eave, facing the road
+    lightBox('霞海城隍廟', 'ink', 'lamp', false, 'x', -5.65, WH - 0.9, cz, 0.85, ALL);   // the name on the eave, facing the road
     part(-6.9, WALK + 1.05, cz, 0.1, 0.1, only(ALL, 2.4, 'bone'));                     // smoke off the burner
     part(-6.75, WALK + 1.05, cz - 0.12, 0.07, 0.07, only(ALL, 3.0, 'bone'));
-    signPart('月老', 'verm', 'bone', true, 'x', -6.35, WALK, cz + 5.2, 1.8, DT);       // the matchmaker board at the queue head
+    lightBox('月老', 'verm', 'bone', true, 'x', -6.35, WALK, cz + 5.2, 1.8, DT);       // the matchmaker board at the queue head
     G.top = 12.5;
     asset('temple-tea-table', lib, -7.8, cz - 5.2, Math.PI / 2);
     asset('yuelao-worship-area', lib, -8.0, cz + 5.4, Math.PI / 2, 0.8);
@@ -278,9 +403,9 @@
       root.position.set(xf, 0, zc); root.rotation.y = Math.PI / 2;
       market.add(root);
     });
-    signPart('永樂市場', 'verm', 'bone', true, 'z', xf + 0.6, 6.0, z0 - 1.6, 7.0, ALL);
-    signPart('永樂布業商場', 'bone', 'verm', false, 'x', xf + 0.15, 4.5, zc, 1.3, ALL);
-    signPart('永樂市場', 'verm', 'bone', false, 'x', xf - 4.0, 24.6, zc, 1.8, ALL);   // rooftop
+    lightBox('永樂市場', 'verm', 'bone', true, 'z', xf + 0.6, 6.0, z0 - 1.6, 7.0, ALL);
+    lightBox('永樂布業商場', 'bone', 'verm', false, 'x', xf + 0.15, 4.5, zc, 1.3, ALL);
+    lightBox('永樂市場', 'verm', 'bone', false, 'x', xf - 4.0, 24.6, zc, 1.8, ALL);   // rooftop
     // fabric stalls under the front: bolts of cloth in the site colours
     const cloth = ['verm', 'lamp', 'sky', 'leaf', 'glass', 'bone', 'brick', 'haze'];
     for (let z = z0 - 2.4; z > z1 + 1.5; z -= 2.6) {
@@ -302,7 +427,7 @@
     part(WX, 3.5, gz, 0.95, 6.4, only(ALL, 0.5, 'haze'));                                   // over the gate
     [-3.2, 3.2].forEach(dz => part(WX, 0, gz + dz, 1.1, 0.5, only(ALL, 4.2, 'verm')));    // 5號水門: red steel frame
     part(WX, 3.3, gz, 1.1, 6.9, only(ALL, 0.45, 'verm'));
-    signPart('5', 'verm', 'bone', false, 'x', WX + 0.6, 4.3, gz, 0.9, ALL);
+    lightBox('5', 'verm', 'bone', false, 'x', WX + 0.6, 4.3, gz, 0.9, ALL);
     part(-24, 0, -214, 8.2, 60, only(ALL, 0.8, 'walk'));                                   // promenade plaza
     part(-28.75, 0, -214, 1.5, 60, only(ALL, 0.5, 'haze'));                                // embankment steps
     part(-30.25, 0, -214, 1.5, 60, only(ALL, 0.25, 'haze'));
@@ -379,8 +504,8 @@
   const fest = [], stalls = [];
   // Reviewed issue-18-archway before adapting its temporary portal proportions. The
   // undated zodiac mascot is omitted; the wrap uses the page's existing palette.
-  signPart('台北年貨大街', 'verm', 'bone', false, 'z', 0, 6.95, -149.39, 1.02, ['red', 'dadao']);
-  [-1, 1].forEach(s => signPart('迎春納福', 'verm', 'lamp', true, 'z', s * 6.35, 1.5, -149.28, 3.7, ['red', 'dadao']));
+  appliedPrint('台北年貨大街', 'verm', 'bone', false, 'z', 0, 6.95, -149.39, 1.02, ['red', 'dadao']);
+  [-1, 1].forEach(s => appliedPrint('迎春納福', 'verm', 'lamp', true, 'z', s * 6.35, 1.5, -149.28, 3.7, ['red', 'dadao']));
 
   // Lantern addendum: build-time catenaries, sampled as one merged wire mesh. The
   // main branch's scene-red.js cloth uses the same fixed subdivided-mesh approach
@@ -443,7 +568,7 @@
     const shopAccess = z < -190 && z > -230 && (k === 1 || k === 4);
     if (!shopAccess) stalls.push({ x, z, r: side > 0 ? -Math.PI / 2 : Math.PI / 2, w: 1, d: 1, h: HA(1) });          // table, goods, canopy, posts: stall.glb (issue #5)
     if (shopAccess) continue;
-    if (k < 4) signPart(priceTexts[boardN++ % 8], 'verm', 'bone', false, 'x', x - side * 0.85, 0.95, z + 0.4, 0.42, ALL);   // red paper, written
+    if (k < 4) appliedPrint(priceTexts[boardN++ % 8], 'verm', 'bone', false, 'x', x - side * 0.85, 0.95, z + 0.4, 0.42, ALL);   // red paper, written
     else fest.push({ x: x - side * 0.85, y: 0.95, z: z + 0.4, w: 0.05, d: 0.9, r: 0, c: C('verm'), h: HA(0.42) });         // red paper, plain
     fest.push({ x: x - side * 0.85, y: 0.95, z: z - 0.9, w: 0.05, d: 0.6, r: 0, c: C(k % 2 ? 'verm' : 'bone'), h: HA(0.36) });
   } });
@@ -471,7 +596,8 @@
   brickSplit(boxGeo, bodies);
   instSet(boxGeo, lam('bone'), goods, { colors: true });
   instSet(cylGeo, lam('bone'), jars, { colors: true });
-  instSet(boxGeo, lam('bone', { emissive: C('lamp'), emissiveIntensity: 0.18 }), signs, { colors: true });
+  SIGNAGE.finish();
+  window.__dadaoSigns = () => ({ count: SIGNAGE.records.length, records: SIGNAGE.records });
   instSet(sphGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), lant, { colors: true });
   instSet(boxGeo, lam('bone'), fest, { colors: true });
   MODELS.load('stall', gltf => MODELS.instance(gltf.scene, stalls, { emissive: 0.5 }));
