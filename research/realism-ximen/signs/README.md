@@ -48,3 +48,20 @@ The library storefronts placed in the 1994–1999 stretch are 2000s items: the F
 - fps, headed: 100.3 / 100.3 / 100.3 at 0.08 / 0.2 / 0.30, twice. The console is empty and the three scene files re-run clean.
 - Downloads added: `chunghwa-shops.json`, 2 KB. The atlas is painted at load time.
 - Before/after pictures: `~/Desktop/realism-ximen/signs-*.png` and `signs-before-after.png`.
+
+## Anchoring (2026-09-24)
+
+CJ: 「有些招牌懸空了」 (`floating-signs.png`, same folder). The market's upstairs light boxes on the end columns (0.3 m from a block's corner) stood out over the cross street, in front of the next block's end wall, with their arms on a 0.5 m column hidden behind them. Nothing tested for a wall at all.
+
+- `WALLS` in `scene-red.js`: every street face, `{ side, z0, z1, top }`, filled by `front()` (the library fronts' own width and height) and `body()` (the length, to the roof parapet).
+- `SIGNS.anchor()`: every wall-mounted vertical box, horizontal box, letter set and poster passes through it.
+  - It keeps the sign where it is if a face stands behind the whole of it and reaches above its top arm.
+  - Otherwise it moves the sign to the nearest face within 4 m, lowering or shortening it to fit.
+  - Otherwise it drops the sign.
+  - The result is in `window.__signAnchor`.
+- The market: the upstairs boxes go on the three interior columns only (two at most per column and floor), with a column-wide plate for the arms. The fascia boxes run along the fascia beam, which is the whole block long.
+- The result: 168 signs, the same as before, with none dropped.
+  - 唱片行 and 漫畫出租 are lowered to 2.5 m to fit under their 4 m walls.
+  - 怪博士與機器娃娃 and 神奇寶貝 posters slide onto a wall.
+  - Six painted-shop boxes are nudged about 0.1 m off wall ends.
+- fps, headed, 1440×900, at 0.14 / 0.20 / 0.30: run 1 gave 96.8 / 91.9 / 100.2 (the first arrival at each position), run 2 gave 100.3 / 100.3 / 100.3, and a fresh page with a 240-frame settle gave 100.3 / 100.3 / 100.3.

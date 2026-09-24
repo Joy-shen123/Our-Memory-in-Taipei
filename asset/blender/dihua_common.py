@@ -31,6 +31,7 @@ from stylized import bm_box, bm_prism, bm_solid, arch_pts, rect_pts, solid, cutt
 
 W = 4.6                 # frontage
 HW = W / 2
+DEPTH = 11.8            # close the shell to scene-dadao.js DEEP - FACE
 WALK = 0.22             # sidewalk top
 CEIL = 3.8              # arcade ceiling
 F0 = 4.2                # first upper floor
@@ -78,6 +79,10 @@ def shop_wall(col):
     F = S.face_frame(0, 3.2)
     c = cutter('shop_open', 'ink', lambda bm: bm_solid(bm, rect_pts(3.6, 2.7, WALK + 0.02), -0.5, 0.32, F))
     solid('shop_wall', col, lambda bm: bm_box(bm, (W, 0.4, CEIL - WALK), (0, 3.4, WALK + (CEIL - WALK) / 2)), cutters=(c,), group='main')
+    def sides(bm):
+        for x in (-HW + .09, HW - .09):
+            bm_box(bm, (.18, DEPTH - 3.4, CEIL - WALK), (x, (DEPTH + 3.4) / 2, WALK + (CEIL - WALK) / 2))
+    solid('shop_sides', col, sides, bevel=0, group='main', smooth=False)
     solid('shop_sign', 'bone', lambda bm: bm_box(bm, (3.9, 0.1, 0.6), (0, 3.15, 3.3)), bevel=0.03, group='main')
 
     def lattice(bm):
@@ -108,13 +113,21 @@ def upper_floor(col, window_pts, surround_pts, z0, group, mullions=True, extra_c
           cutters=(c1, c2) + tuple(extra_cutters), group=group)
 
     def floors(bm):
-        bm_box(bm, (W, 2.9, 0.25), (0, 1.95, z0 + 0.125))
-        bm_box(bm, (W, 0.2, FH), (0, 3.3, z0 + FH / 2))
-    solid('floors' + sfx, col, floors, bevel=0.03, group=group)
+        # Closed upper volume: the floor is also the visible overhang's soffit.
+        bm_box(bm, (W, DEPTH + .4, .25), (0, (DEPTH - .4) / 2, z0 + .125))
+        bm_box(bm, (W, .2, FH), (0, DEPTH - .1, z0 + FH / 2))
+        for x in (-HW + .09, HW - .09):
+            bm_box(bm, (.18, DEPTH, FH), (x, DEPTH / 2, z0 + FH / 2))
+    solid('floors' + sfx, col, floors, bevel=0, group=group, smooth=False)
     solid('floor_band' + sfx, 'bone', lambda bm: bm_box(bm, (W, 0.14, 0.22), (0, -0.02, z0 + FH - 0.11)), bevel=0.03, group=group)
 
     def trim(bm):
         z = z0 + 0.5
+        for x in (-HW + .05, HW - .05):
+            for zz in (z0 + .1, z0 + FH - .11):
+                bm_box(bm, (.18, DEPTH + .4, .2), (x, (DEPTH - .4) / 2, zz))
+            for y in (.2, 3.4, 7.4, DEPTH - .2):
+                bm_box(bm, (.16, .24, FH - .4), (x, y, z0 + FH / 2))
         for dx in (-WIN_X, WIN_X):
             bm_box(bm, (WIN_W + 0.36, 0.26, 0.12), (dx, -0.02, z - 0.06))            # sill
             bm_box(bm, (WIN_W + 0.62, 0.3, 0.1), (dx, -0.05, z - 0.19))              # sill corbel course
@@ -143,8 +156,15 @@ def pilaster(col, z0, group, cap=False):
     solid('pilaster' + sfx, col, b, bevel=0.03, group=group)
 
 
-def roof_slab():
-    solid('roof', 'ink', lambda bm: bm_box(bm, (W, 3.2, 0.3), (0, 1.8, TOP + 0.15)), bevel=0.03, group='crest')
+def roof_slab(col):
+    solid('roof', 'ink', lambda bm: bm_box(bm, (W, DEPTH + .4, .3), (0, (DEPTH - .4) / 2, TOP + .15)), bevel=0, group='crest', smooth=False)
+    def returns(bm):
+        for x in (-HW + .11, HW - .11):
+            bm_box(bm, (.22, DEPTH, .64), (x, DEPTH / 2, TOP + .32))
+            bm_box(bm, (.34, DEPTH + .1, .12), (x, DEPTH / 2, TOP + .69))
+        bm_box(bm, (W, .22, .64), (0, DEPTH - .11, TOP + .32))
+        bm_box(bm, (W, .34, .12), (0, DEPTH - .11, TOP + .69))
+    solid('parapet_returns', col, returns, bevel=0, group='crest', smooth=False)
 
 
 def dentils(col, z, n=14, size=0.16, proud=0.1):
@@ -171,7 +191,7 @@ def build_bay(crest_parts, wall_col, window_pts=None, surround_pts=None, column_
     pilaster(pc, F0, 'main', pil_cap)
     upper_floor(wall_col, wp, sp, STOREY_Z, 'storey', mullions)
     pilaster(pc, STOREY_Z, 'storey', pil_cap)
-    roof_slab()
+    roof_slab(pc)
     crest_parts()
 
 

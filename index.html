@@ -38,11 +38,21 @@
     <!-- the opening title (issue #16): waits in the fog at scroll 0, app.js fades and recolours it -->
     <div class="hud-opening" id="opening"><div class="op-big"><span>Our Memory</span> <span>in Taipei</span></div><div class="op-sub">Three generations. One street.</div></div>
     <div class="hud-year"><span class="hud-year-k">YEAR</span><span id="year">1853</span></div>
-    <!-- the decade music player (music.js): a YouTube MV box per decade, local loops when YouTube cannot play. -->
+    <!-- the decade music player (music.js): an audio bar over an unseen YouTube player per decade, local loops when YouTube cannot play.
+         CJ, 2026-09-24: 「左下角youtube 變成音訊條可以拉就好」 -->
     <div class="hud-music" id="music" role="group" aria-label="Music">
       <div class="mus-body">
         <div class="mus-k">MUSIC · <span id="musDecade">1980s</span> · <span id="musStatus">connecting to YouTube…</span></div>
         <div class="mus-track" id="musTrack"></div>
+        <div class="mus-bar">
+          <button class="mus-play" id="musPlay" type="button" aria-label="Play" aria-pressed="false">
+            <svg class="ic-play" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1l7 4-7 4z"/></svg>
+            <svg class="ic-pause" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1h2.4v8H1.5zM6.1 1h2.4v8H6.1z"/></svg>
+          </button>
+          <span class="mus-time" id="musNow">0:00</span>
+          <div class="mus-scrub" id="musScrub" role="slider" tabindex="0" aria-label="Position in the song" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="mus-fill" id="musFill"></div><div class="mus-knob" id="musKnob"></div></div>
+          <span class="mus-time" id="musDur">0:00</span>
+        </div>
         <div class="mus-row">
           <div class="mus-decades">
             <button type="button" data-decade="1980s" aria-label="Play the 1980s videos">80s</button>
@@ -52,7 +62,8 @@
           </div>
           <button class="mus-mute" id="musMute" type="button" title="Sound (m)" aria-pressed="false">Click to play</button>
         </div>
-        <div class="mus-box" id="musBox"><div id="musEmbed"></div></div>
+        <!-- the player lives here, clipped to nothing and transparent; never display: none, or some browsers stop the audio -->
+        <div class="mus-hide" id="musBox" aria-hidden="true"><div id="musEmbed"></div></div>
       </div>
     </div>
   </div>
