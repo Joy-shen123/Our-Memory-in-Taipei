@@ -1243,6 +1243,7 @@
   // the veil goes, then fades out over titleFrom → titleTo.
   const sm = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   const openEl = document.getElementById('opening');
+  // the HUD blocks that sit over the opening fog and have to darken with the title
   const fogCol = new THREE.Color(), boneCol = C('bone'), inkCol = C('ink'), titleCol = new THREE.Color();
   // CJ, 2026-09-24: 「不然先給opening 一個復古色調的背景」. The opening fog carries a warm faded-print
   // tone instead of plain bone, strongest at scroll 0 and gone with the fog by OPENING.fogTo, so
@@ -1288,6 +1289,12 @@
     openEl.style.opacity = title.toFixed(3);
     openEl.style.color = '#' + titleCol.copy(inkCol).lerp(boneCol, 1 - fog).getHexString();
     openEl.style.visibility = title > 0.005 ? 'visible' : 'hidden';
+    // CJ, 2026-09-24: 「我比較希望是換這邊的顏色」, then 「那些小字的顏色不對」. The HUD is bone
+    // (#f7f2e8) everywhere, a 1.6:1 contrast on the opening's faded-print fog. The title already
+    // turned ink in the fog; nothing else did. Enumerating elements in JS missed the credits button
+    // and every `border-top: var(--bone)` rule, so this is a body class and style.css does the rest —
+    // inheritance reaches the small text, and the borders are named explicitly there.
+    document.body.classList.toggle('in-fog', fog > 0.004);
   }
 
   // ── scroll → progress, damped ────────────────────────────────────────────────
