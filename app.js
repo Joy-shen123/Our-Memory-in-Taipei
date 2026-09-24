@@ -1218,7 +1218,11 @@
       const dist = Math.hypot(L.A.x - camera.position.x, L.A.z - camera.position.z);
       const inFront = wp.z < 1 && Math.abs(wp.x) < 1.1;
       const near = Math.min(1, Math.max(0, (LABEL_NEAR - dist) / 30));
-      const vis = s.built && inFront ? near * eraE * (1 - closingA) : 0;   // labels step aside for the closing line
+      // labels step aside for the closing line. On a portrait phone the label is pinned to the left column, the
+      // same column the closing line takes (lx below clamps it there), so there it is gone before the first
+      // beat rises in; on a landscape screen the label sits by the building, clear of the line, and keeps closingA
+      const aside = innerWidth < innerHeight ? Math.min(1, Math.max(0, (progress - (CLOSING.parts[0].from - 0.03)) / 0.02)) : closingA;
+      const vis = s.built && inFront ? near * eraE * (1 - aside) : 0;
       if (L.shownKey !== key) { // reveal the caption word by word (per character, this is 中文)
         L.shownKey = key;
         L.name.textContent = L.A.tile.name.en;
@@ -1244,6 +1248,11 @@
   const sm = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   const openEl = document.getElementById('opening');
   // the HUD blocks that sit over the opening fog and have to darken with the title
+  // the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」): #guide (index.html, style.css .hud-guide) is a
+  // dim with a swipe-up arrow over the opening screen, display: none except under 480px. Its opacity follows the fog, so it
+  // clears in the same window and is gone by OPENING.fogTo; while it is on, the title is bone so it reads through the dim.
+  const guideEl = document.getElementById('guide');
+  let guideOn = false;
   const fogCol = new THREE.Color(), boneCol = C('bone'), inkCol = C('ink'), titleCol = new THREE.Color();
   // CJ, 2026-09-24: 「不然先給opening 一個復古色調的背景」. The opening fog carries a warm faded-print
   // tone instead of plain bone, strongest at scroll 0 and gone with the fog by OPENING.fogTo, so
@@ -1287,7 +1296,7 @@
       if (!mountainMat.toneMapped) { mountainMat.toneMapped = true; mountainMat.needsUpdate = true; }
     }
     openEl.style.opacity = title.toFixed(3);
-    openEl.style.color = '#' + titleCol.copy(inkCol).lerp(boneCol, 1 - fog).getHexString();
+    openEl.style.color = '#' + (guideOn ? boneCol : titleCol.copy(inkCol).lerp(boneCol, 1 - fog)).getHexString();
     openEl.style.visibility = title > 0.005 ? 'visible' : 'hidden';
     // CJ, 2026-09-24: 「我比較希望是換這邊的顏色」, then 「那些小字的顏色不對」. The HUD is bone
     // (#f7f2e8) everywhere, a 1.6:1 contrast on the opening's faded-print fog. The title already
@@ -1295,6 +1304,7 @@
     // and every `border-top: var(--bone)` rule, so this is a body class and style.css does the rest —
     // inheritance reaches the small text, and the borders are named explicitly there.
     document.body.classList.toggle('in-fog', fog > 0.004);
+    if (guideEl) { guideEl.style.opacity = fog.toFixed(3); guideEl.style.visibility = fog > 0.005 ? 'visible' : 'hidden'; }
   }
 
   // ── scroll → progress, damped ────────────────────────────────────────────────
@@ -1309,6 +1319,7 @@
     post.uniforms.uRes.value.set(Math.floor(w * pr), Math.floor(h * pr));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    guideOn = !!guideEl && getComputedStyle(guideEl).display !== 'none';   // the phone guide is a media query; read it once per resize, not per frame
   }
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });

@@ -159,6 +159,10 @@ html, body {
   .hud-music { left: 20px; bottom: 72px; width: calc(100vw - 40px); }   /* above the year, which owns the bottom-left corner on a phone */
   .hud-music .mus-k, .hud-music .mus-track, .hud-music .mus-decades { display: none; }   /* the sound toggle and the MV box only */
   .hud-music.muted .mus-box, .hud-music.locked .mus-box { display: none; }             /* the toggle shows the box (and unmutes) or hides it (muted and paused) */
+  /* CJ, 2026-09-24: 「youtube畫面太大都擋住了」. The playing MV box was the control's full width, 350 x 200 across the
+     bottom of the street. It is now 200 x 200 in the corner, the smallest YouTube's terms allow (music.js: visible, 200 px
+     or larger), so the street stays the page while a song plays; the player letterboxes the video inside it. */
+  .mus-box, .mus-box iframe, #musEmbed { width: 200px; }
   .hud-music button { font-size: 10px; padding: 5px 9px 4px 11px; }
   .hud-title { font-size: 10px; letter-spacing: 0.24em; top: auto; bottom: 28px; }   /* bottom-right on a phone: the chapter column owns the top */
   .hud-chapter { gap: 12px; }
@@ -210,6 +214,25 @@ html, body {
 .op-big { font-family: var(--font-big), var(--font-hud), var(--font-sys); font-size: clamp(64px, 15vw, 236px); font-weight: 700; line-height: 0.88; letter-spacing: -0.01em; }
 .op-big span { display: block; white-space: nowrap; }
 .op-sub { margin-top: 22px; font-size: clamp(13px, 1.3vw, 20px); font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; opacity: 0.85; }
+/* the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」, replacing the same day's SCROLL TO BEGIN text
+   hint): the opening screen starts dimmed under a bone arrow that swipes up, and it clears with the opening fog. app.js sets
+   its opacity to the fog value, so it is gone by OPENING.fogTo (0.08), and turns the wordmark bone while the dim is on so it
+   reads through it. Phone only. First child of .hud, so every HUD line paints over the dim; pointer-events: none inherited
+   from .hud, so it adds no tap target. */
+/* The dim is a band, not a sheet: the top 100px and the bottom 100px stay clear (fading in over the next 60px), because the
+   chapter block sits in the top strip and the music button, the credits button, the year and the title sit in the bottom
+   strip, and those blocks turn ink in the opening fog (the lead's HUD-contrast fix on main, CJ 2026-09-24: 「我比較希望是換這
+   邊的顏色」). Ink on a dark dim is unreadable; on the fog it is what that fix intends. The wordmark and the guide sit inside
+   the band, in bone. */
+.hud-guide { display: none; position: absolute; inset: 0; opacity: 0; visibility: hidden; will-change: opacity;
+  --dim: color-mix(in srgb, var(--ink) 62%, transparent);
+  background: linear-gradient(to bottom, transparent 100px, var(--dim) 160px, var(--dim) calc(100% - 160px), transparent calc(100% - 100px)); }
+.guide-arrow { position: absolute; left: 50%; bottom: 210px; width: 2px; height: 56px; margin-left: -1px; background: var(--bone); border-radius: 1px; animation: guide-swipe 1.8s ease-in-out infinite; }
+/* CJ, 2026-09-24: 「往上箭頭要有scroll字樣」: the word under the arrow, in the same caps as the sub line; its glyphs are in the hud subset */
+.guide-word { position: absolute; left: 0; right: 0; bottom: 182px; text-align: center; color: var(--bone); font-size: 11px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; }
+.guide-arrow::before { content: ""; position: absolute; left: -5px; top: 0; width: 12px; height: 12px; border-left: 2px solid var(--bone); border-top: 2px solid var(--bone); transform: rotate(45deg); }
+@keyframes guide-swipe { 0% { transform: translateY(18px); opacity: 0; } 25% { opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(-18px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .guide-arrow { animation: none; } }
 
 /* the words (issue #16, CJ's pick: today's lines in option 3's treatment): the big line in the display face at 700,
    the sub under it at 300 and --word-sub of the size, left column at 24vh. A line with no sub stands alone in 700. */
@@ -243,6 +266,7 @@ html, body {
   .hud-closing .c1 { font-size: 60px; }
   .hud-closing .c2 { font-size: 20px; }
   .op-big { font-size: 84px; }
+  .hud-guide { display: block; }
 }
 
 /* The opening's faded-print fog (issue #16) is a cream ground, and the HUD is bone, so at scroll 0

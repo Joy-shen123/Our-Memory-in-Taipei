@@ -187,9 +187,14 @@
   // bollards at the entry and the arched 西門町 gateway signs. The camera reaches z -96 in 1996.
   (() => {
     const z0 = -96, z1 = -144;
+    // CJ, 2026-09-24: 「後面地板破圖了」. On a phone the paving fills the bottom third of the frame, and what it showed there
+    // was one lone half-strength red square per tile on near-white pavers with grey joins between them: it read as missing
+    // textures (the same at 1440, only smaller and in the vignette; the pixel ratio and the shadow map were tested and
+    // change nothing). The joins are now faint and the red is a band across every tile, the 西門町 pavers' own banding, so
+    // the surface reads as one paved floor with a pattern in it rather than tiles with something showing through.
     const { cv, g } = canvas(128, 128, 'walk');
-    g.fillStyle = 'rgba(43,47,58,0.35)'; for (let i = 0; i < 4; i++) { g.fillRect(0, i * 32, 128, 2); g.fillRect(i * 32 + (i % 2) * 16, 0, 2, 128); }
-    g.fillStyle = PALETTE.verm; g.globalAlpha = 0.5; g.fillRect(48, 48, 32, 32); g.globalAlpha = 1;
+    g.fillStyle = PALETTE.verm; g.globalAlpha = 0.16; g.fillRect(0, 48, 128, 32); g.globalAlpha = 1;
+    g.fillStyle = 'rgba(43,47,58,0.18)'; for (let i = 0; i < 4; i++) { g.fillRect(0, i * 32, 128, 2); g.fillRect(i * 32 + (i % 2) * 16, 0, 2, 128); }
     const t = tex(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 16);
     const pv = part(0, 0, (z0 + z1) / 2, 12.4, z0 - z1, only(ALL, 0.08, 'haze'));
     pv.mesh.material.map = t; pv.mesh.material.needsUpdate = true;
