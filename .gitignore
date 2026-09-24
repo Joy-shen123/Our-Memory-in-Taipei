@@ -16,3 +16,8 @@ research/**/shots-src/
 # local-only: Blender/style experiments and video transcripts kept out of the repo
 asset/attic/
 research/transcripts/
+
+# Blender scene exports — the .blend files and renders stay local
+render/
+*.blend
+*.blend1
