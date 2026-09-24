@@ -4,3 +4,10 @@ asset/music/private/*
 !asset/music/private/README.md
 !asset/music/private/manifest.example.js
 __pycache__/
+
+# Research output stays local. CJ, 2026-09-24: 「研究過程不用上傳」.
+# The written findings are kept in the worktrees and on Desktop; the screenshots and
+# candidate downloads are process, not the page, and they are what makes the repo heavy.
+research/*/shots/
+research/**/candidates/
+research/refs/
