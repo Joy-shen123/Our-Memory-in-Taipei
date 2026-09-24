@@ -111,8 +111,8 @@ html, body {
 }
 
 /* the music player, bottom-left: the same rule-and-caps language as the chapter column. music.js drives it;
-   the YouTube API replaces #musEmbed with its iframe inside the MV box (200 px tall, the width of the control;
-   YouTube's terms want the player visible, so the box is never hidden while it plays). */
+   the YouTube API replaces #musEmbed with its iframe inside .mus-hide, a box clipped to a pixel (the bar rules
+   sit at the end of this file, after the chrome system they belong to). */
 .hud-music {
   position: absolute;
   left: clamp(20px, 4vw, 56px);
@@ -127,9 +127,6 @@ html, body {
 .mus-body { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--bone); padding-top: 8px; }
 .mus-k { opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mus-track { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mus-box { height: 200px; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--ink) 28%, transparent); }
-.mus-box iframe, #musEmbed { display: block; width: 100%; height: 200px; border: 0; }
-.hud-music[data-mode="local"] .mus-box { display: none; }
 .mus-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mus-decades { display: flex; gap: 6px; }
 .hud-music button {
@@ -157,12 +154,7 @@ html, body {
 
 @media (max-width: 480px) {
   .hud-music { left: 20px; bottom: 72px; width: calc(100vw - 40px); }   /* above the year, which owns the bottom-left corner on a phone */
-  .hud-music .mus-k, .hud-music .mus-track, .hud-music .mus-decades { display: none; }   /* the sound toggle and the MV box only */
-  .hud-music.muted .mus-box, .hud-music.locked .mus-box { display: none; }             /* the toggle shows the box (and unmutes) or hides it (muted and paused) */
-  /* CJ, 2026-09-24: 「youtube畫面太大都擋住了」. The playing MV box was the control's full width, 350 x 200 across the
-     bottom of the street. It is now 200 x 200 in the corner, the smallest YouTube's terms allow (music.js: visible, 200 px
-     or larger), so the street stays the page while a song plays; the player letterboxes the video inside it. */
-  .mus-box, .mus-box iframe, #musEmbed { width: 200px; }
+  .hud-music .mus-k, .hud-music .mus-decades { display: none; }   /* the track line, the bar and the sound toggle only (CJ, 2026-09-24: 「youtube畫面太大都擋住了」, now a bar) */
   .hud-music button { font-size: 10px; padding: 5px 9px 4px 11px; }
   .hud-title { font-size: 10px; letter-spacing: 0.24em; top: auto; bottom: 28px; }   /* bottom-right on a phone: the chapter column owns the top */
   .hud-chapter { gap: 12px; }
@@ -336,3 +328,26 @@ body.in-fog .ph-credits-btn { background: rgba(43, 47, 58, 0.10); border-color: 
 .hud-year-k { font-size: 11px; font-weight: 500; letter-spacing: 0.16em; }
 .hud-title  { font-size: 11.5px; font-weight: 600; letter-spacing: 0.16em; }
 .mus-k      { font-size: 10.5px; font-weight: 500; letter-spacing: 0.14em; }
+
+/* The audio bar (CJ, 2026-09-24: 「左下角youtube 變成音訊條可以拉就好」). The MV box is gone; what plays is heard,
+   not seen. The bar is the same hand as the rest of the chrome: a hairline rule for the track, ink for the part
+   already played (the one filled state), a 2 px tick for the head, dim tabular digits either side, and the play
+   button a plain outlined square like the pills. music.js sets --p (the fraction) through the fill width and the
+   tick's left, on a 250 ms timer. */
+.mus-hide { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.mus-hide iframe, #musEmbed { display: block; width: 200px; height: 200px; border: 0; }   /* the player keeps the size its script expects; the box clips it away */
+.mus-bar { display: flex; align-items: center; gap: 10px; min-height: 22px; }
+.hud-music .mus-play { flex: none; width: 24px; height: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.mus-play svg { width: 9px; height: 9px; fill: currentColor; display: block; }
+.mus-play .ic-pause, .hud-music.playing .mus-play .ic-play { display: none; }
+.hud-music.playing .mus-play .ic-pause { display: block; }
+.mus-time { flex: none; min-width: 2.6em; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: none; font-variant-numeric: tabular-nums; color: var(--hud-dim); }
+#musNow { text-align: right; }
+.mus-scrub { position: relative; flex: 1; height: 22px; cursor: pointer; touch-action: none; outline: none; }
+.mus-scrub::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hud-faint); }
+.mus-fill { position: absolute; left: 0; top: 50%; width: 0; height: 1px; background: var(--hud-fg); }
+.mus-knob { position: absolute; left: 0; top: 50%; width: 2px; height: 9px; margin: -4.5px 0 0 -1px; background: var(--hud-fg); border-radius: 1px; transition: height 120ms ease, margin 120ms ease; }
+.mus-scrub:hover .mus-knob, .hud-music.scrubbing .mus-knob { height: 13px; margin-top: -6.5px; }
+.mus-scrub:focus-visible::before { background: var(--hud-fg); }
+.hud-music.scrubbing { user-select: none; -webkit-user-select: none; }
+@media (max-width: 480px) { .mus-bar { gap: 8px; } .mus-track { font-size: 12px; } }
