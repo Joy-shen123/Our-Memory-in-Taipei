@@ -62,6 +62,38 @@
   const bays = { min: [], yang: [], baroque: [] };
   const storeys = { min: [], yang: [], baroque: [] };
   const crests = { min: [], yang: [], baroque: [] };
+  // Dedicated models for complete bays inside zone 2; boundaries and other zones stay fixed.
+  const zone2 = { arcade: [], min: [], yang: [], baroque: [], yang_crest: [], baroque_crest: [], storey: [] };
+  let zone2Bay = 0;
+  // A deterministic brick bond in palette-relative values. Planar UVs are generated on
+  // the dedicated model only; original shared assets/materials remain untouched.
+  const brickCanvas = document.createElement('canvas');
+  brickCanvas.width = brickCanvas.height = 512;
+  const brickCtx = brickCanvas.getContext('2d');
+  brickCtx.fillStyle = '#626262'; brickCtx.fillRect(0, 0, 512, 512);
+  for (let row = 0; row < 20; row++) for (let col = -1; col < 9; col++) {
+    const shade = 178 + ((row * 31 + col * 17 + 99) % 65);
+    brickCtx.fillStyle = `rgb(${shade},${shade},${shade})`;
+    brickCtx.fillRect(col * 64 + (row % 2) * 32 + 2, row * 25.6 + 2, 60, 22);
+  }
+  const brickMap = new THREE.CanvasTexture(brickCanvas);
+  brickMap.wrapS = brickMap.wrapT = THREE.RepeatWrapping; brickMap.anisotropy = 4;
+  function referenceInstances(node, items) {
+    node.traverse(mesh => {
+      if (!mesh.isMesh || mesh.material.color.getHex() !== C('brick').getHex()) return;
+      const p = mesh.geometry.attributes.position, n = mesh.geometry.attributes.normal;
+      const uv = new Float32Array(p.count * 2);
+      for (let i = 0; i < p.count; i++) {
+        uv[i * 2] = (Math.abs(n.getX(i)) > .5 ? p.getZ(i) : p.getX(i)) / 2.4;
+        uv[i * 2 + 1] = p.getY(i) / 2.4;
+      }
+      mesh.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    });
+    MODELS.instance(node, items).forEach(set => {
+      if (set.mesh.material.color.getHex() !== C('brick').getHex()) return;
+      set.mesh.material.map = brickMap; set.mesh.material.needsUpdate = true;
+    });
+  }
   // bay(side, z0, z1, style, opts): opts.col (wall colour), opts.libDepth (a library storefront
   // stands at the arcade back, this deep, so the body starts behind it), opts.open (no bay glb: a
   // library facade fills the kerb line), opts.goods.
@@ -75,6 +107,24 @@
     if (o.open) return;
     const floors = Math.min(3, Math.max(1, o.floors || (o.tall ? 3 : 2)));
     const it = { x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) };
+    if (z0 <= -190 && z1 >= -230) {
+      const index = zone2Bay++;
+      // Ground + one upper floor, with an occasional real additional floor. The arcade
+      // head stays at 4.1 m: stretching the whole asset would stretch every doorway.
+      zone2.arcade.push(it);
+      zone2[style].push(it);
+      if (style !== 'min') {
+        const extra = index % 5 === 1;
+        if (extra) zone2.storey.push(Object.assign({}, it, { y: 4.25 }));
+        zone2[style + '_crest'].push(Object.assign({}, it, { y: extra ? 4.25 : 0 }));
+      }
+      const name = ['南北貨', '茶莊', '布行', '中藥行', '乾貨', '米行'][index % 6];
+      signPart(name, 'bone', 'ink', false, 'x', s * 9.0, 3.02, zc, .46, ALL);
+      signPart(name, index % 3 ? 'verm' : 'bone', index % 3 ? 'bone' : 'ink', true, 'z', s * 6.0, 3.65, zc - d * .35, 1.9, ALL);
+      if (style !== 'min') signPart(['商號', '茶', '布'][index % 3], 'walk', 'ink', false, 'x', s * 6.02, 4.38, zc, .38, ALL);
+      if (o.goods !== false) shops.push({ fx: s * BACK, z: zc, span: d, s });
+      return;
+    }
     bays[style].push(it);
     for (let k = 1; k < floors; k++) storeys[style].push(Object.assign({}, it, { y: (k - 1) * FH }));
     crests[style].push(Object.assign({}, it, { y: (floors - 2) * FH }));
@@ -94,14 +144,15 @@
                 ['min'], ['baroque', { tall: true }], ['yang'], ['baroque', { col: 'walk' }], ['baroque'], ['min'],
                 ['yang'], ['baroque', { floors: 3, medal: 'verm' }], ['baroque'], ['min'], ['baroque', { col: 'walk' }], ['yang']];
   let ze = -150;
-  east.forEach(([style, o]) => {
+  east.forEach(([style, o], index) => {
     if (style === 'lib') {
       const w = 5.6;
       bay(1, ze, ze - w, 'baroque', { open: true, col: 'bone' });
       const t = asset('baroque-gable-townhouse', lib, FACE + 0.25, ze - w / 2, -Math.PI / 2);   // front faces the road
       ze -= w; return;
     }
-    bay(1, ze, ze - 4.6, style, o); ze -= 4.6;
+    const width = index >= 9 && index <= 16 ? [4.2, 5.3, 3.9, 4.9, 4.3, 5.1, 4.4, 4.7][index - 9] : 4.6;
+    bay(1, ze, ze - width, style, o); ze -= width;
   });
   cols.push({ x: KERB, z: ze, w: 0.5, d: 0.5, h: HA(3.8), c: C('walk') });
   D.top = 11;
@@ -151,6 +202,14 @@
   });
   cols.push({ x: -KERB, z: gapZ[0], w: 0.5, d: 0.5, h: HA(3.8), c: C('walk') });
   cols.push({ x: -KERB, z: zw, w: 0.5, d: 0.5, h: HA(3.8), c: C('walk') });
+  MODELS.load('dihua-zone2', gltf => {
+    Object.keys(zone2).forEach(name => {
+      if (!zone2[name].length) return;
+      const node = MODELS.node(gltf.scene, name === 'storey' ? 'yang' : name);
+      if (!node) { console.error('dihua-zone2.glb has no ' + name + ' group'); return; }
+      referenceInstances(node, zone2[name]);
+    });
+  });
   // painted shop names on the east pilasters, read walking down the street
   [['米行', 'bone', -152.3], ['南北貨', 'bone', -175.3], ['布莊', 'verm', -207.9], ['茶行', 'lamp', -234.5], ['中藥', 'bone', -253]].forEach(([t, bg, z]) =>
     signPart(t, bg, bg === 'bone' ? 'ink' : 'bone', true, 'z', FACE - 0.55, 4.4, z, 2.6, ALL));
@@ -319,7 +378,9 @@
   let boardN = 0;
   [-1, 1].forEach(side => { for (let k = 0; k < 15; k++) {
     const z = -199 - k * 6 + (rnd() - 0.5) * 1.5, x = side * 5.0;
-    stalls.push({ x, z, r: side > 0 ? -Math.PI / 2 : Math.PI / 2, w: 1, d: 1, h: HA(1) });          // table, goods, canopy, posts: stall.glb (issue #5)
+    const shopAccess = z < -190 && z > -230 && (k === 1 || k === 4);
+    if (!shopAccess) stalls.push({ x, z, r: side > 0 ? -Math.PI / 2 : Math.PI / 2, w: 1, d: 1, h: HA(1) });          // table, goods, canopy, posts: stall.glb (issue #5)
+    if (shopAccess) continue;
     if (k < 4) signPart(priceTexts[boardN++ % 8], 'verm', 'bone', false, 'x', x - side * 0.85, 0.95, z + 0.4, 0.42, ALL);   // red paper, written
     else fest.push({ x: x - side * 0.85, y: 0.95, z: z + 0.4, w: 0.05, d: 0.9, r: 0, c: C('verm'), h: HA(0.42) });         // red paper, plain
     fest.push({ x: x - side * 0.85, y: 0.95, z: z - 0.9, w: 0.05, d: 0.6, r: 0, c: C(k % 2 ? 'verm' : 'bone'), h: HA(0.36) });
