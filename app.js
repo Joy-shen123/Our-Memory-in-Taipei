@@ -1042,11 +1042,35 @@
     f = Math.min(1, f);
     return f * f * (3 - 2 * f);
   }
+  // The phone frame (fault 5, CJ 2026-09-24: 「手機的鏡頭能轉嗎 不然都看不到畫面」). PerspectiveCamera.fov is the
+  // vertical angle, so a 390x844 phone (aspect 0.46) at the keyframes' 50° saw 24° of street sideways against 73°
+  // at 1440x900. Portrait only, the keyframes untouched, a landscape frame pixel-identical: the fov is lifted so
+  // the frame's CORNER sits at the same angle off-axis as the 16:10 desktop corner, i.e. the same edge stretch the
+  // desktop already has (tan(v/2) scales by sqrt((1+A²)/(1+a²)), A = REF_ASPECT), `match` of the way, capped at
+  // MAX_FOV. Full compensation (a 116° vertical) is a fisheye; this is not. match 0.6 is where it landed
+  // (2026-09-25): 66° vertical / 34° sideways at the 50° keyframes; at 1 (77° / 40°) the near lantern and the
+  // arcade column at the frame edge had started to stretch in the Dadaocheng frame.
+  // The pitch is NOT touched. A lens shift that slid the horizon down the frame was tried and measured (a raycast
+  // grid over the frame, sky / road / street): at 1994 the phone showed sky 30 / road 36 / street 34 before any
+  // change, and with the lift kept no horizon setting gets sky and road both under a quarter — sliding the
+  // horizon only trades one for the other, and the balance point is where the keyframes already have it. What the
+  // portrait frame lacks vertically is the price of widening it; the lever that would change that is a
+  // portrait-only camera position, which is a framing decision, not a correction.
+  // window.__fog.portrait reads the result; PORTRAIT is live-tunable there.
+  const PORTRAIT = { REF_ASPECT: 1.6, match: 0.6, MAX_FOV: 85 };
+  let portraitState = { fov: 0, hfov: 0 };
+  const hfovOf = (v, a) => 2 * Math.atan(Math.tan(v * Math.PI / 360) * a) * 180 / Math.PI;
   function placeCamera(u) {
     posCurve.getPoint(u, pTmp);
     tgtCurve.getPoint(u, tTmp);
     const s = u * (fovs.length - 1), i = Math.min(fovs.length - 2, Math.floor(s)), f = s - i;
-    camera.fov = fovs[i] + (fovs[i + 1] - fovs[i]) * f;
+    let fov = fovs[i] + (fovs[i + 1] - fovs[i]) * f;
+    const a = camera.aspect, portrait = a < 1;
+    if (portrait) {
+      const lifted = 2 * Math.atan(Math.tan(fov * Math.PI / 360) * Math.sqrt((1 + PORTRAIT.REF_ASPECT * PORTRAIT.REF_ASPECT) / (1 + a * a))) * 180 / Math.PI;
+      fov += (Math.min(PORTRAIT.MAX_FOV, lifted) - fov) * PORTRAIT.match;
+    }
+    camera.fov = fov;
     camera.position.copy(pTmp);
     camera.lookAt(tTmp);
     const k = parallaxFade(u);
@@ -1054,6 +1078,7 @@
     camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
     camera.position.addScaledVector(camRight, driftX * k).addScaledVector(camUp, driftY * k);
     camera.updateProjectionMatrix();
+    portraitState = { fov: +fov.toFixed(1), hfov: +hfovOf(fov, a).toFixed(1) };
     return pTmp.z;
   }
   // scroll progress u at which the camera reaches world z, by bisection.
@@ -1230,6 +1255,7 @@
       const zh = era.zh.split(' · ');                                  // '西門町 · Ximending' → vertical 西門町, romanised name under the years
       chapNEl.textContent = String(ERAS.indexOf(era) + 1).padStart(2, '0');
       eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + (zh[1] ? ' · ' + zh[1] : ''); eraZhEl.textContent = zh[0];
+      measureLabelMin();                                             // the block's height follows its text (fault 5: the anchor label sits under it on a phone)
     };
     clearTimeout(swapTimer);
     if (instant) { eraBox.classList.remove('swap'); apply(); return; }
@@ -1248,6 +1274,13 @@
     return { A, el, shownKey: '', name: el.children[0], en: el.children[1], cap: el.children[2] };
   });
   const wp = new THREE.Vector3();
+  // on a portrait phone the label is clamped into the left column, under the chapter block (fault 5: at 110 px it
+  // sat on the block's last line); measured once per resize, since the block's height depends on the wrap
+  let labelMinY = 110;
+  const wp2 = new THREE.Vector3();
+  const chapterEl = document.querySelector('.hud-chapter');
+  function measureLabelMin() { labelMinY = innerWidth < innerHeight && chapterEl ? Math.max(110, chapterEl.getBoundingClientRect().bottom + 14) : 110; }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureLabelMin);   // and the web font, which wraps it differently
   function updateLabels() {
     const key = ERAS[eraIdx].key;
     labels.forEach(L => {
@@ -1271,7 +1304,12 @@
       el.style.opacity = vis.toFixed(2);
       el.classList.toggle('on', vis > 0.6);
       const lx = Math.min(innerWidth - Math.min(380, innerWidth * 0.7 + 20), (wp.x + 1) / 2 * innerWidth);
-      const ly = Math.max(110, (1 - wp.y) / 2 * innerHeight);
+      let ly = (1 - wp.y) / 2 * innerHeight;
+      if (innerWidth < innerHeight) {                                    // fault 5: the left-column clamp put the label beside the roofline, over sky; centre it on the building's face instead
+        const base = wp2.set(L.A.x, 0, L.A.z).project(camera);
+        ly = (ly + (1 - base.y) / 2 * innerHeight) / 2 - L.el.offsetHeight / 2;
+      }
+      ly = Math.max(labelMinY, ly);
       el.style.transform = `translate(${lx.toFixed(0)}px, ${ly.toFixed(0)}px)`;
     });
   }
@@ -1356,6 +1394,7 @@
     post.uniforms.uRes.value.set(Math.floor(w * pr), Math.floor(h * pr));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    measureLabelMin();
   }
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });
@@ -1471,7 +1510,7 @@
                    slow: SLOW, PHOTO, PHOTO_SRC, get frameMs() { return +frameMs.toFixed(2); },
                    get photo() { return { key: photoKey, a: +post.uniforms.uPhotoA.value.toFixed(3), note: +photoNote.style.opacity, window: PHOTO.window, peak: PHOTO.peak, at: photoAt().map(s => ({ key: s.key, at: +s.at.toFixed(4), d: +(progress - s.at).toFixed(4) })), loaded: Object.keys(photoTex).filter(k => photoTex[k].image && photoTex[k].image.width), fit: post.uniforms.uPhotoFit.value.toArray().map(v => +v.toFixed(3)), caption: photoNote.children[0].textContent, credit: photoNote.children[1].textContent }; },
                    get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get man() { return Object.assign({ x: +man.position.x.toFixed(2), y: +man.position.y.toFixed(2), z: +man.position.z.toFixed(2), soles: +man.position.y.toFixed(2), hands: +(man.position.y + MAN_HANDS).toFixed(2), faceX: TOWER.faceX ? +TOWER.faceX(man.position.y).toFixed(2) : null, screen: (() => { const v = man.position.clone().project(camera); return [Math.round((v.x + 1) / 2 * innerWidth), Math.round((1 - v.y) / 2 * innerHeight)]; })() }, manState); }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
-                   get opening() { return openState; },
+                   get opening() { return openState; }, get portrait() { return portraitState; }, PORTRAIT, get labelMinY() { return labelMinY; }, get camera() { return camera; }, get labels() { return labels; },
                    get shadow() { let c = 0, r = 0, t = 0, black = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m && m.vertexColors && o.geometry && !o.geometry.attributes.color) black++; } });
                      return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, uncoloured: black, map: !!key.shadow.map, size: key.shadow.mapSize.x,
                               box: [key.shadow.camera.left, key.shadow.camera.right], pos: key.position.toArray().map(v => +v.toFixed(1)), target: key.target.position.toArray().map(v => +v.toFixed(1)), camZ: +camera.position.z.toFixed(1) }; } };
