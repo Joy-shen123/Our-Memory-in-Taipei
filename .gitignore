@@ -12,3 +12,7 @@ research/*/shots/
 research/**/candidates/
 research/refs/
 research/**/shots-src/
+
+# local-only: Blender/style experiments and video transcripts kept out of the repo
+asset/attic/
+research/transcripts/

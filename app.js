@@ -42,6 +42,8 @@
   // both in chapter 1 (ERA_MIX scales them for the others). Set together against step0-0.05.png:
   // the road and the shop walls sit 3–8 levels brighter than before and the saturation is unchanged,
   // while the clipped-white share of the frame goes from 3% to 0.
+  // WARM — CJ, 2026-09-24 「整體色調可以改復古一點黃一點嗎我覺得太藍了」. 0 is the old cool frame, 1 the full amber roll.
+  const WARM = 1.0;
   const EXPOSURE = 0.85;
   const ENV_I = 0.35;
   const HEMI = 0.65;
@@ -1080,10 +1082,11 @@
   const post = new THREE.ShaderMaterial({
     uniforms: { tDiffuse: { value: rt.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uPrint: { value: 1 },
                 uTime: { value: 0 }, uInk: { value: C('ink') }, uHaze: { value: C('haze') }, uBone: { value: C('bone') },
-                uPhoto: { value: blankTex }, uPhotoA: { value: 0 }, uPhotoOld: { value: 0 }, uPhotoFit: { value: new THREE.Vector2(1, 1) } },
+                uPhoto: { value: blankTex }, uPhotoA: { value: 0 }, uPhotoOld: { value: 0 }, uPhotoFit: { value: new THREE.Vector2(1, 1) },
+                uWarm: { value: WARM } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
     fragmentShader: `
-      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime; uniform vec3 uInk, uHaze, uBone;
+      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime, uWarm; uniform vec3 uInk, uHaze, uBone;
       uniform sampler2D uPhoto; uniform float uPhotoA, uPhotoOld; uniform vec2 uPhotoFit;
       varying vec2 vUv;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -1128,6 +1131,15 @@
           print *= 1.0 - smoothstep(0.35, 0.85, d) * 0.4;
           c = mix(c, mix(p, print, uPhotoOld), uPhotoA);
         }
+        // WARM GRADE — CJ, 2026-09-24 「整體色調可以改復古一點黃一點嗎我覺得太藍了」. The street read
+        // lavender: the violet shadow tint (issue #11) over a blue sky left every mid-tone cool. This is
+        // a grade, not a repaint — the palette hues are untouched, the frame is rolled toward amber,
+        // hardest in the shadows where the violet sat, and a little saturation comes out the way an old
+        // print sits. uWarm scales the whole thing so it can be tuned or switched off from one place.
+        float wl = lum(c);
+        vec3 warmAmt = mix(vec3(0.115, 0.020, -0.105), vec3(0.040, 0.010, -0.040), smoothstep(0.18, 0.82, wl));
+        c *= (1.0 + warmAmt * uWarm);
+        c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 - 0.07 * uWarm);
         gl_FragColor = vec4(c, 1.0);
       }`,
     depthTest: false, depthWrite: false

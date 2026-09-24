@@ -289,38 +289,50 @@ body.in-fog .ph-credits-btn { background: rgba(43, 47, 58, 0.10); border-color: 
 .hud-chapter, .hud-title, .hud-year, .hud-music, #photoCreditsBtn,
 .chap-col, .chap-zh, .mus-body { transition: color 260ms linear, border-color 260ms linear, background 260ms linear; }
 
-/* CJ, 2026-09-24: 「有些小字看不清楚」, on a frame where the HUD sat over pale plaster. The HUD's
-   own shadow was soft-only (16–24px blur), which smudges rather than separates; the big words read
-   because they carry a tight halo as well. The small text is the worst case, so it gets the most:
-   a halo plus a 1px drop, which costs nothing and works on any facade the street can put behind it. */
-.chap-years, .chap-of, .hud-title, .hud-title span, .hud-year-k, .mus-k, .mus-track, .mus-status {
-  text-shadow: 0 0 3px var(--ink), 0 1px 2px var(--ink), 0 2px 12px var(--ink);
-}
-.chap-years { opacity: 0.85; }
-.chap-of { opacity: 0.75; }
-/* in the opening fog the ground is cream, so the ink halo would smear — drop it there */
-body.in-fog .chap-years, body.in-fog .chap-of, body.in-fog .hud-title,
-body.in-fog .hud-title span, body.in-fog .hud-year-k, body.in-fog .mus-k,
-body.in-fog .mus-track, body.in-fog .mus-status,
-body.in-fog .hud-chapter, body.in-fog .hud-year, body.in-fog .hud-music { text-shadow: none; }
+/* CJ, 2026-09-24, five tries, ending 「四個角的字都改成簡單有質感深色字體」. The chrome had been
+   pale, wide-tracked and half-transparent — it read as muddy rather than quiet. One system now,
+   and it is dark: near-black ink at three weights, tracking pulled in so the letters hold together
+   instead of drifting apart, and the transparency taken out of the small lines (a dim colour beats
+   a faded one — it keeps its edge). No shadows, no outlines, no panels. The big words are not
+   chrome; they are the page's voice, and keep their own bone-and-shadow treatment. */
+:root { --hud-fg: #241d18; --hud-dim: #5a4a3e; --hud-faint: rgba(36,29,24,0.28); }
+.hud-chapter, .hud-year, .hud-title, .hud-music,
+.hud-chapter *, .hud-year *, .hud-title *, .hud-music * { color: var(--hud-fg); text-shadow: none; }
+.chap-years, .chap-of, .hud-year-k, .mus-k, .hud-title span { color: var(--hud-dim); opacity: 1; }
+.chap-col, .chap-zh, .mus-body { border-color: var(--hud-faint); }
+#photoCreditsBtn, .dec-btn, .mus-btn { color: var(--hud-fg); border-color: var(--hud-faint); text-shadow: none; }
 
-/* CJ, 2026-09-24: 「有些小字看不清楚」, twice. Shadows do not solve it: bone text with a blurred ink
-   shadow has nothing to separate from when the wall behind is also pale, which on this street is most
-   of the time. Each HUD corner carries its own scrim instead — a soft ink gradient painted as the
-   block's own background, fading out inside the block so it reads as a darkening, not a panel. A
-   pseudo-element at z-index -1 was tried first and fell behind the canvas. In the opening fog the
-   ground is cream and the text is ink, so the scrims come off there. */
-.hud-chapter {
-  background: radial-gradient(150% 170% at 0% 0%, rgba(43,47,58,0.58), rgba(43,47,58,0.22) 50%, rgba(43,47,58,0) 76%);
-  padding: 18px 40px 26px 26px; margin: -18px 0 0 -26px; border-radius: 0 0 26px 0;
+/* CJ, 2026-09-24: 「按鈕也改下」. The pills were filled tinted lozenges in bone text — heavy, and a
+   second visual language beside the chrome. They are the same hand now: no fill, no blur, a hairline
+   rule, dark type, tracking pulled in. The chosen decade is the only filled one, so state reads at a
+   glance without a second colour. */
+.hud-music button, #photoCreditsBtn {
+  color: var(--hud-fg);
+  background: transparent;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  border: 1px solid var(--hud-faint);
+  border-radius: 3px;
+  letter-spacing: 0.13em;
+  font-weight: 500;
+  padding: 4px 10px 3px 11px;
+  text-shadow: none;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
-.hud-year {
-  background: radial-gradient(160% 180% at 0% 100%, rgba(43,47,58,0.56), rgba(43,47,58,0.20) 52%, rgba(43,47,58,0) 78%);
-  padding: 22px 42px 20px 26px; margin: 0 0 -20px -26px; border-radius: 0 26px 0 0;
+.hud-music button:hover, #photoCreditsBtn:hover {
+  opacity: 1; border-color: var(--hud-fg); background: rgba(36,29,24,0.06);
 }
-.hud-title {
-  background: radial-gradient(160% 180% at 100% 100%, rgba(43,47,58,0.52), rgba(43,47,58,0.18) 52%, rgba(43,47,58,0) 78%);
-  padding: 22px 26px 20px 42px; margin: 0 -26px -20px 0; border-radius: 26px 0 0 0;
+.mus-decades button.on, .mus-mute[aria-pressed="true"] {
+  background: var(--hud-fg); color: #f4efe6; border-color: var(--hud-fg); font-weight: 600;
 }
-.hud-chapter, .hud-year, .hud-title { transition: background 260ms linear; }
-body.in-fog .hud-chapter, body.in-fog .hud-year, body.in-fog .hud-title { background: none; }
+.mus-decades button.on:hover, .mus-mute[aria-pressed="true"]:hover { background: var(--hud-fg); opacity: 1; }
+
+/* tighter, quieter, steadier — the four corners read as one hand */
+.chap-n     { font-size: 25px; font-weight: 700; letter-spacing: 0.01em; }
+.chap-of    { font-size: 12px; font-weight: 500; letter-spacing: 0.10em; }
+.chap-name  { font-size: 11.5px; font-weight: 600; letter-spacing: 0.16em; line-height: 1.45; }
+.chap-years { font-size: 11px; font-weight: 500; letter-spacing: 0.10em; }
+.chap-zh    { font-size: 21px; font-weight: 700; letter-spacing: 0.16em; }
+.hud-year   { font-weight: 600; letter-spacing: 0.02em; }
+.hud-year-k { font-size: 11px; font-weight: 500; letter-spacing: 0.16em; }
+.hud-title  { font-size: 11.5px; font-weight: 600; letter-spacing: 0.16em; }
+.mus-k      { font-size: 10.5px; font-weight: 500; letter-spacing: 0.14em; }
