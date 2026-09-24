@@ -11,6 +11,7 @@ from stylized import bm_box, bm_bar, bm_solid, solid
 from mathutils import Matrix
 
 W, TOP = 4.6, 8.35
+DEPTH = 11.8  # FACE 6.2 to the existing rear building line at world |x| 18
 
 def boxes(name, color, entries, group):
     solid(name, color, lambda bm: [bm_box(bm, size, pos) for size, pos in entries], bevel=0, group=group, smooth=False)
@@ -34,6 +35,9 @@ def arcade(style):
     for x in (-2.18,0,2.18):
         entries += [((.28,.62,2.9),(x,-.16,1.67)),((.44,.8,.18),(x,-.16,.31)),((.45,.78,.16),(x,-.16,3.02))]
     entries += [((W,3.9,.22),(0,1.48,3.98)),((W,.38,.35),(0,0,3.69)),((W,5.6,.12),(0,2.5,.24)),((W,.15,3.5),(0,5,1.99))]
+    # Close the shop behind the arcade, leaving the covered pedestrian passage open.
+    entries += [((.18,DEPTH-3.2,3.58),(x,(DEPTH+3.2)/2,2.01)) for x in (-2.21,2.21)]
+    entries += [((W,DEPTH+.5,.18),(0,(DEPTH-.5)/2,3.91))]
     boxes(style+'_arcade',col,entries,style)
     solid(style+'_arches',col,lambda bm:[arch(bm,x,2.75,.93,.84,.18) for x in (-1.09,1.09)],bevel=0,group=style,smooth=False)
     # Open interior, partition piers and folded shutters, not a lattice over a solid door.
@@ -65,7 +69,11 @@ def upper(style,group,z0=4.1):
     entries=[((W,.42,.85),(0,.17,z0+.425)),((W,.42,.68),(0,.17,z0+3.81))]
     for x,w in ((-2.15,.3),(-.91,.25),(.91,.25),(2.15,.3)):
         entries.append(((w,.42,2.62),(x,.17,z0+2.16)))
-    entries += [((W,4.4,.18),(0,2.0,z0+.09)),((W,.15,4.25),(0,4.25,z0+2.125))]
+    # Continuous floor/soffit, both party walls and rear wall. Unequal neighbours
+    # expose these faces all along the camera path, not just at the entrance.
+    entries += [((W,DEPTH+.44,.18),(0,(DEPTH-.44)/2,z0+.09)),
+                ((W,.18,4.25),(0,DEPTH-.09,z0+2.125))]
+    entries += [((.18,DEPTH,4.25),(x,DEPTH/2,z0+2.125)) for x in (-2.21,2.21)]
     boxes(group+'_wall',col,entries,group)
     windows=[(-1.52,.88),(0,1.5),(1.52,.88)]
     entries=[]
@@ -90,6 +98,13 @@ def upper(style,group,z0=4.1):
     for z,dep,h in ((z0,.42,.16),(z0+3.88,.46,.1),(z0+4.1,.6,.18)):
         entries.append(((W,dep,h),(0,-.14,z)))
     for i in range(21): entries.append(((.09,.18,.12),(-2.2+i*.22,-.36,z0+3.97)))
+    # The front string courses turn the corner; shallow piers break up plaster
+    # flanks without inventing windows through a shared party wall.
+    for x in (-2.22,2.22):
+        for z,h in ((z0,.16),(z0+3.88,.1),(z0+4.1,.18)):
+            entries.append(((.16,DEPTH+.44,h),(x,(DEPTH-.44)/2,z)))
+        for y in (.24,3.2,7.4,DEPTH-.2):
+            entries.append(((.18,.24,3.7),(x,y,z0+2)))
     boxes(group+'_trim','bone',entries,group)
     boxes(group+'_drain','haze',[((.065,.065,4.15),(2.01,-.42,z0+2.075))],group)
 
@@ -106,7 +121,16 @@ def crest(style):
         solid('gable_coping','bone',lambda bm:[bm_bar(bm,(a[0],-.12,a[1]),(b[0],-.12,b[1]),.09) for a,b in zip(profile[2:],profile[3:])],bevel=0,group=group)
         boxes('tablet','ink',[((.7,.04,.4),(0,-.03,TOP+.7))],group)
         solid('scrolls','bone',lambda bm:[bm_bar(bm,(s*(1.12+.22*math.cos(a)),-.12,TOP+.75+.22*math.sin(a)),(s*(1.12+.22*math.cos(a+.4)),-.12,TOP+.75+.22*math.sin(a+.4)),.065) for s in (-1,1) for a in [i*.4 for i in range(15)]],bevel=0,group=group)
-    boxes(group+'_roof','ink',[((W,4.5,.14),(0,2.1,TOP))],group)
+    boxes(group+'_roof','ink',[((W,DEPTH+.44,.14),(0,(DEPTH-.44)/2,TOP))],group)
+    col = 'brick' if style == 'yang' else 'walk'
+    boxes(group+'_parapet_returns',col,
+          [((.22,DEPTH,.48),(x,DEPTH/2,TOP+.24)) for x in (-2.19,2.19)] +
+          [((W,.22,.48),(0,DEPTH-.11,TOP+.24))],group)
+    # Match materials already present in each crest so this costs no new draw call.
+    cap = 'brick' if style == 'yang' else 'bone'
+    boxes(group+'_coping_returns',cap,
+          [((.34,DEPTH+.1,.12),(x,DEPTH/2,TOP+.5)) for x in (-2.19,2.19)] +
+          [((W,.34,.12),(0,DEPTH-.11,TOP+.5))],group)
 
 
 def minnan():
@@ -114,6 +138,14 @@ def minnan():
         for y0,y1,z0,z1 in ((-.6,2.2,4.0,5.25),(2.2,5,5.25,4.0)):
             bm_solid(bm,[(y0,z0),(y1,z1),(y1,z1-.13),(y0,z0-.13)],-2.3,2.3,Matrix.Rotation(math.pi/2,4,'Z'))
     solid('min_roof','brick',roof,bevel=0,group='min')
+    def gable_ends(bm):
+        for x0,x1 in ((-2.3,-2.12),(2.12,2.3)):
+            bm_solid(bm,[(-.6,3.87),(5,3.87),(2.2,5.25)],x0,x1,Matrix.Rotation(math.pi/2,4,'Z'))
+    solid('min_gable_ends','brick',gable_ends,bevel=0,group='min',smooth=False)
+    boxes('min_soffit','haze',[((W,DEPTH+.6,.16),(0,(DEPTH-.6)/2,3.91))], 'min')
+    boxes('min_rear_coping','brick',
+          [((.22,DEPTH-5,.3),(x,(DEPTH+5)/2,4.13)) for x in (-2.19,2.19)] +
+          [((W,.22,.3),(0,DEPTH-.11,4.13))], 'min')
     solid('min_tile_rolls','haze',lambda bm:[bm_bar(bm,(x,-.6,4.04),(x,2.2,5.29),.06) for x in [-2.25+i*.15 for i in range(31)]],bevel=0,group='min')
     boxes('min_purlins','ink',[((W,.16,.16),(0,2.2,5.32)),((W,.15,.18),(0,-.55,3.94))], 'min')
 

@@ -227,7 +227,7 @@
     const col = o.col || (style === 'baroque' ? 'bone' : 'brick');
     const top = 4.2 + 2 * 3.4 - 0.2;                           // roof line
     const bf = o.open ? 7.2 : (o.libDepth ? BACK + o.libDepth + 0.1 : BACK);   // where the body starts
-    bodies.push({ x: s * (bf + DEEP) / 2, z: zc, w: DEEP - bf, d: d - 0.05, h: HA(o.open ? top : 3.8), c: C(o.open ? col : 'haze') });
+    bodies.push({ x: s * (bf + DEEP) / 2, z: zc, w: DEEP - bf, d, h: HA(o.open ? top : 3.8), c: C(col) });
     const reference = (z0 <= -190 && z1 >= -230) || (z0 <= -150 && z1 >= -190 && !o.libDepth);
     facades.push({ side: s, z0, z1, zc, width: d, style, reference, open: !!o.open });
     if (o.open) return;
