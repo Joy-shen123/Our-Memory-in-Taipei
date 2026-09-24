@@ -31,7 +31,7 @@
     { key: 'dadao', start: 2000, end: 2020, years: '2000–2019', label: 'Spring Festival', zh: '大稻埕 · Dadaocheng',
       zRange: [-140, -290], uPrint: 0.0,  traffic: 14,
       palette: { ground: 'haze', roof: 'bone', accent: 'lamp' } },
-    { key: 'tower', start: 2020, end: 2040, years: '2020–',     label: 'The Future',      zh: '台北101 · Taipei 101',
+    { key: 'tower', start: 2020, end: 2027, years: '2020–2027',     label: 'The Future',      zh: '台北101 · Taipei 101',
       zRange: [-290, -460], uPrint: 0.0,  traffic: 30,
       palette: { ground: 'haze', roof: 'bone', accent: 'verm' } },
   ];
