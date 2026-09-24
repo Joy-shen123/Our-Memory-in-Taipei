@@ -2,7 +2,7 @@
 // the 月下老人 queue beat, and the uPrint post pass (woodblock → night photograph).
 
 (function () {
-  const { PALETTE, GRID, ERAS, TILES, CAM, CLOSING, WORDS } = window.DATA;
+  const { PALETTE, GRID, ERAS, TILES, CAM, CLOSING, WORDS, OPENING } = window.DATA;
   const C = k => new THREE.Color(PALETTE[k]);
 
   // ── tunables ──────────────────────────────────────────────────────────────────
@@ -10,6 +10,31 @@
   const FOG_SOFT = 28;        // width of the soft edge, in world units
   const HAZE_DENSITY = 0.0012; // faint distance haze on the far skyline only (issue #13: was 0.0022; CJ, 2026-09-20: "CLOSE THE MIST")
   const DAMP = 5.5;           // scroll damping. higher = snappier
+  // ── the change of era: a real photograph fades through (issue #19) ──────────
+  // CJ, 2026-09-24: 「換時代的那個迷霧太短沒感覺，有其他手法可以表現嗎」, then 「5個都想做都給我
+  // preview下」, then, of the five previews (research/plan-6/transition-5/README.md), the
+  // photograph. It replaces the chapter-cut flash. Then, having scrolled it, 2026-09-24: 「剩下照片
+  // 有點太老有點crippy要拿溫馨熱鬧的照片 照片淡淡的經過就可以了不需要那麼久只是一個過場而已就跟滑鼠一起
+  // 滑過然後淡一點」— so the picture is not held on a timer: its opacity is a function of how far
+  // past the marking the scroll is (PHOTO.window of progress, a sine bell peaking at PHOTO.peak),
+  // so it tracks the hand, holds where the hand stops and comes back when the scroll comes back.
+  // Faint, full-bleed, over in a flick of the wheel; the caption and credit fade with it. The
+  // 500 ms era tween runs underneath as before. A frame at a given progress always looks the same
+  // (no timer, so none of issue #13's lingering flash). &slow=S still slows the page's clock.
+  const QS = new URLSearchParams(location.search);
+  const SLOW = Math.max(1, parseFloat(QS.get('slow')) || 1);
+  const PHOTO = { window: 0.03, peak: 0.25, print: 0.2 };   // the pass spans `window` of scroll progress past the marking (0.03 ≈ 15vh of page, two or three wheel notches); `peak` = opacity at its middle; `print` = how much old-print treatment (0 = the photograph as it is)
+  // One constant per crossing: the file, the caption, the credit, keyed by the chapter entered.
+  // Swapping a picture is editing its line here and dropping the file into asset/photos/
+  // (CREDITS.md records the licence). Two crossings only: a third picture at the top of the
+  // climb was raised and dropped the same day (CJ, 2026-09-24: 「先不用好了先把本來的事情做好」).
+  // Both pictures now in are the first round from research/photos/ (a 1961 newspaper halftone of
+  // 中華商場 and a 2012 永樂市場 façade); CJ wants warm and crowded frames instead (「溫馨熱鬧」) and
+  // sonnet-photos is sourcing them: they replace the two `src` lines below, nothing else changes.
+  const PHOTO_SRC = {
+    dadao: { src: 'asset/photos/chunghwa-1961.webp', caption: '中華商場 · 1961, the year it opened · newspaper photograph', credit: 'photo 涂柏辰 / 國立臺灣歷史博物館 · CC BY 3.0 TW' },
+    tower: { src: 'asset/photos/yongle-2012.webp',   caption: '永樂市場 · 迪化街 Dihua Street · 2012',                 credit: 'photo 玄史生, Wikimedia Commons · CC BY-SA 3.0' },
+  };
   const ERA_MS = 500;         // the world re-renders into the next era over this long
   const LABEL_NEAR = 70;      // anchor labels fade in inside this distance
   // surface pass (issue #3 step 1): the light budget. EXPOSURE is the tone-mapping knob, ENV_I how
@@ -751,6 +776,7 @@
   // aoBake(geo)                                 bakes the height-rule occlusion into a geometry's vertex colours (part and instSet do it)
   // people(items)                               pedestrians through instSet: { x, z, y?, r?, v?, h:{red,dadao,tower} }, h = figure height
   window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset, people };
+  window.SCENE.camera = camera;   // issue #17: photos.js projects its street markers with the scroll camera; it only reads it
 
 
   // ── 張君雅小妹妹 running down the middle of the street, always a little ahead of the camera ──
@@ -920,9 +946,13 @@
 
   // ── era state and the 500ms re-render ────────────────────────────────────────
   let eraIdx = 0, eraT0 = -1e9, eraFrom = 0, eraE = 1;
+  // the page's clock: the frame's rAF time, divided by SLOW (issue #19) so every transition can be
+  // shot in slow motion. Everything timed reads clockNow, never performance.now() directly.
+  let clockNow = performance.now(), clock0 = -1;
+  const ease3 = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;   // ease in-out cubic, k 0..1
   function setEra(i, instant) {
     if (i === eraIdx && !instant) return;
-    const now = performance.now();
+    const now = clockNow;
     parts.forEach(p => { p.fromH = p.mesh.scale.y; p.fromC = p.mesh.material.color.clone(); });
     instSnapshot();
     roadMesh.material.map = roadMaps[ERAS[i].key]; roadMesh.material.needsUpdate = true;
@@ -940,7 +970,7 @@
   let envCur = -1;
   function updateWorld(now) {
     const k = Math.min(1, (now - eraT0) / ERA_MS);
-    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // ease in-out
+    const e = ease3(k);
     eraE = e;
     const era = ERAS[eraIdx], key = era.key;
     parts.forEach(p => {
@@ -1043,13 +1073,18 @@
   // One fullscreen pass. uPrint 1 = woodblock print, 0 = night photograph. Lighting stays on
   // the whole time; posterizing flattens it into print blocks. Grain is shader noise.
   const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
+  // (issue #19) the photograph at a crossing goes through the post pass: uPhoto is the picture,
+  // uPhotoA its opacity over the frame (scroll-driven, updatePhoto), uPhotoFit the cover-fit,
+  // uPhotoOld how much old-print treatment it takes. uPhoto starts as a 1×1 blank.
+  const blankTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); blankTex.needsUpdate = true;
   const post = new THREE.ShaderMaterial({
     uniforms: { tDiffuse: { value: rt.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uPrint: { value: 1 },
                 uTime: { value: 0 }, uInk: { value: C('ink') }, uHaze: { value: C('haze') }, uBone: { value: C('bone') },
-                uFlash: { value: 0 }, uFlashCol: { value: new THREE.Color(1, 1, 1) } },
+                uPhoto: { value: blankTex }, uPhotoA: { value: 0 }, uPhotoOld: { value: 0 }, uPhotoFit: { value: new THREE.Vector2(1, 1) } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
     fragmentShader: `
-      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime, uFlash; uniform vec3 uInk, uHaze, uBone, uFlashCol;
+      uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uPrint, uTime; uniform vec3 uInk, uHaze, uBone;
+      uniform sampler2D uPhoto; uniform float uPhotoA, uPhotoOld; uniform vec2 uPhotoFit;
       varying vec2 vUv;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -1082,9 +1117,17 @@
         // VIGNETTE — restrained
         float d = distance(vUv, vec2(0.5));
         c *= 1.0 - smoothstep(0.45, 1.0, d) * 0.3;
-        // CHAPTER CUT — a flash from the centre of the frame as the camera crosses a year marking
-        float fm = 1.0 - smoothstep(0.12, 0.72, length(vec2(vUv.x - 0.5, (vUv.y - 0.5) * 0.6)));
-        c = mix(c, uFlashCol, uFlash * fm);
+        // PHOTOGRAPH (issue #19) — past a chapter marking a picture of the place surfaces faintly
+        // over the frame and sinks again as the scroll moves on: full-bleed (cover-fit), a touch
+        // of old-print treatment (warm grey and a soft vignette, uPhotoOld), at most uPhotoA.
+        if (uPhotoA > 0.0) {
+          vec2 puv = (vUv - 0.5) * uPhotoFit + 0.5;
+          vec3 p = texture2D(uPhoto, puv).rgb;
+          float g = smoothstep(0.03, 0.97, lum(p));
+          vec3 print = mix(vec3(0.16, 0.14, 0.12), vec3(0.93, 0.90, 0.84), g);
+          print *= 1.0 - smoothstep(0.35, 0.85, d) * 0.4;
+          c = mix(c, mix(p, print, uPhotoOld), uPhotoA);
+        }
         gl_FragColor = vec4(c, 1.0);
       }`,
     depthTest: false, depthWrite: false
@@ -1093,29 +1136,46 @@
   postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-  // ── chapter cut: a flash as the camera crosses each year marking ─────────────
-  // Keyed on progress (so it scrubs both ways), white at the 2000 marking and warm gold at 2020;
-  // it holds briefly and fades so stopping on a marking does not leave the frame lit. Borrowed
-  // from IVRESS's section cuts (research/ivress/README.md).
-  const FLASH_W = 0.012, FLASH_HOLD = 500, FLASH_FADE = 1200;
-  const FLASH_COL = [null, new THREE.Color(1, 1, 1), C('lamp').lerp(new THREE.Color(1, 1, 1), 0.45)];
-  // Issue #13: it fires as the progress crosses a marking, not on coming near one. Keyed on nearness
-  // it also lit while the page sat within FLASH_W of a marking (the blind score's dadao-0.58 frame,
-  // 0.0015 short of the 2020 marking, was the gold flash mid-fade, read as haze), and a stop inside
-  // the band used up the hold so the real crossing then showed nothing. The amplitude still follows
-  // the distance to the marking, so it dies as the camera leaves the band.
-  let flashT0 = -1e9, flashCol = FLASH_COL[1], flashPrev = null;
-  function updateFlash(now) {
-    if (flashPrev != null && flashPrev !== progress) for (let i = 1; i < ERAS.length; i++) {
-      if ((flashPrev - BOUNDS[i]) * (progress - BOUNDS[i]) <= 0) { flashT0 = now; flashCol = FLASH_COL[i]; }
-    }
-    flashPrev = progress;
-    let a = 0;
-    for (let i = 1; i < ERAS.length; i++) a = Math.max(a, 1 - Math.min(1, Math.abs(progress - BOUNDS[i]) / FLASH_W));
-    const t = now - flashT0;
-    const fade = t < FLASH_HOLD ? 1 : Math.max(0, 1 - (t - FLASH_HOLD) / FLASH_FADE);
-    post.uniforms.uFlash.value = a * a * (3 - 2 * a) * fade;
-    post.uniforms.uFlashCol.value.copy(flashCol);
+  // ── the photograph at the crossing (issue #19) ───────────────────────────────
+  // The pictures load at start (the page's own files, nothing fetched elsewhere). Every frame,
+  // updatePhoto() asks how far past a marking the damped scroll progress is: inside PHOTO.window
+  // the picture keyed to that chapter shows at PHOTO.peak × sin(π · d / window), the caption and
+  // credit with it (at most 0.75, never full); outside every window nothing shows. No timer, no
+  // hold: the pass is the scroll's own. A picture whose file has not decoded yet is skipped.
+  let photoKey = null;
+  const photoTex = {};
+  Object.keys(PHOTO_SRC).forEach(k => { photoTex[k] = new THREE.TextureLoader().load(PHOTO_SRC[k].src, t => { t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }); });
+  // caption and credit, top-right under the site title, ink on a paper pill so it reads over the
+  // picture and over the street alike. CC BY and CC BY-SA both require the credit to be visible.
+  const photoNote = (() => {
+    const el = document.createElement('div');
+    el.className = 'hud-photo-note';
+    el.style.cssText = 'position:absolute;right:clamp(20px,4vw,56px);top:calc(clamp(20px,4vw,56px) + 44px);text-align:right;font-size:11px;letter-spacing:0.22em;line-height:1.7;opacity:0;color:var(--ink);text-shadow:none;background:rgba(247,242,232,0.88);padding:6px 10px;border-radius:4px;max-width:min(60vw,560px);';
+    el.innerHTML = '<div class="photo-caption"></div><div class="photo-credit" style="opacity:0.8"></div>';
+    document.querySelector('.hud').appendChild(el);
+    return el;
+  })();
+  const photoAt = () => [{ key: 'dadao', at: BOUNDS[1] }, { key: 'tower', at: BOUNDS[2] }];   // where each pass starts: the two road markings, in scroll progress
+  function photoSelect(key) {
+    photoKey = key;
+    const P = PHOTO_SRC[key], t = photoTex[key], img = t.image;
+    post.uniforms.uPhoto.value = t; post.uniforms.uPhotoOld.value = PHOTO.print;
+    const fa = innerWidth / innerHeight, pa = img.width / img.height;   // cover-fit: the frame is filled, the picture's short sides are cropped
+    post.uniforms.uPhotoFit.value.set(pa > fa ? fa / pa : 1, pa > fa ? 1 : pa / fa);
+    photoNote.children[0].textContent = P.caption; photoNote.children[1].textContent = P.credit;
+  }
+  function updatePhoto() {
+    let key = null, a = 0;
+    photoAt().forEach(s => {
+      const d = progress - s.at;
+      if (d < 0 || d > PHOTO.window) return;
+      const t = photoTex[s.key];
+      if (!t || !t.image || !t.image.width) return;                       // a file not decoded yet: nothing shows
+      key = s.key; a = PHOTO.peak * Math.sin(Math.PI * d / PHOTO.window);
+    });
+    if (key && key !== photoKey) photoSelect(key);
+    post.uniforms.uPhotoA.value = a;
+    photoNote.style.opacity = (0.75 * a / PHOTO.peak).toFixed(2);
   }
 
   // ── HUD: era label, year, anchor labels ──────────────────────────────────────
@@ -1138,8 +1198,9 @@
     eraBox.classList.add('swap');
     swapTimer = setTimeout(() => { apply(); eraBox.classList.remove('swap'); }, 240);
   }
+  // the closing line (issue #16): two beats, each a span with its own fade window, see data.js CLOSING
   const closingEl = document.getElementById('closing');
-  closingEl.textContent = CLOSING.line;
+  const closingParts = CLOSING.parts.map((p, i) => { const el = document.createElement('span'); el.className = 'c' + (i + 1); el.textContent = p.text; el.style.opacity = '0'; closingEl.appendChild(el); return { p, el }; });
   const labelHost = document.getElementById('labels');
   const labels = Object.values(anchors).map(A => {
     const el = document.createElement('div');
@@ -1174,6 +1235,61 @@
   }
   let el;
 
+  // ── the opening: fog, the title in it, clear as you scroll (issue #16) ───────
+  // CJ, 2026-09-24: 「開頭也要迷霧然後顯示our memory in taipei」. The directional veil (FOG_U.frontier,
+  // switched off for the street since 2026-09-20 by the -1e5 write below) and the haze density
+  // are driven over the opening window only: total at scroll 0, gone by OPENING.fogTo, before
+  // the first word. The title (#opening, index.html) waits in the fog in ink and turns bone as
+  // the veil goes, then fades out over titleFrom → titleTo.
+  const sm = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  const openEl = document.getElementById('opening');
+  const fogCol = new THREE.Color(), boneCol = C('bone'), inkCol = C('ink'), titleCol = new THREE.Color();
+  // CJ, 2026-09-24: 「不然先給opening 一個復古色調的背景」. The opening fog carries a warm faded-print
+  // tone instead of plain bone, strongest at scroll 0 and gone with the fog by OPENING.fogTo, so
+  // the street itself keeps the daylight palette untouched.
+  const SEPIA = new THREE.Color('#d8bc93'), OPEN_SEPIA = 0.8;
+  let openState = { fog: 1, title: 1 };
+  // The library items and the canvas-drawn signs opt out of fog (unfog(), scene-red.js sign()) because
+  // the street is mist-free and they never had the veil's uniforms. For the opening every material
+  // has to take the veil, so once, before the warm-up compiles the programs, fog is switched on for
+  // all of them and the veil's two uniforms attached (the sky dome, the mountains and the particle
+  // points stay out).
+  let openFogged = false;
+  function openingFogAll() {
+    if (openFogged) return; openFogged = true;
+    scene.traverse(o => {
+      if (!o.material || o.isPoints || o.material === skyMat || o.material === mountainMat) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+        if (m.fog !== false) return;
+        m.fog = true;
+        const prev = m.onBeforeCompile;
+        m.onBeforeCompile = (shader, r) => { if (prev) prev(shader, r); shader.uniforms.uFrontier = FOG_U.frontier; shader.uniforms.uSoft = FOG_U.soft; };
+        m.needsUpdate = true;
+      });
+    });
+  }
+  function updateOpening(u, camZ) {
+    const fog = 1 - sm(u / OPENING.fogTo), title = 1 - sm((u - OPENING.titleFrom) / (OPENING.titleTo - OPENING.titleFrom));
+    openState = { fog: +fog.toFixed(3), title: +title.toFixed(3) };
+    if (fog > 0.001) {
+      FOG_U.frontier.value = camZ + 40 - (1 - fog) * 800; FOG_U.soft.value = 30; scene.fog.density = HAZE_DENSITY + fog * fog * 0.02;
+      fogCol.copy(skyCur.horizon).lerp(boneCol, 0.55).lerp(SEPIA, fog * OPEN_SEPIA);
+      scene.fog.color.copy(fogCol);
+      skyMat.uniforms.horizon.value.lerp(fogCol, fog);
+      skyMat.uniforms.top.value.lerp(fogCol, fog);
+      mountainMat.color.lerp(fogCol, fog);
+      // the mountains are tone-mapped and the dome is not, so the same fog colour renders darker on
+      // them (grey wedges in the fog); while the veil is up they render raw, like the dome
+      if (mountainMat.toneMapped) { mountainMat.toneMapped = false; mountainMat.needsUpdate = true; }
+    } else {
+      FOG_U.soft.value = FOG_SOFT; scene.fog.density = HAZE_DENSITY;
+      if (!mountainMat.toneMapped) { mountainMat.toneMapped = true; mountainMat.needsUpdate = true; }
+    }
+    openEl.style.opacity = title.toFixed(3);
+    openEl.style.color = '#' + titleCol.copy(inkCol).lerp(boneCol, 1 - fog).getHexString();
+    openEl.style.visibility = title > 0.005 ? 'visible' : 'hidden';
+  }
+
   // ── scroll → progress, damped ────────────────────────────────────────────────
   const maxScroll = () => Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
   let progress = 0, frontier = Infinity, lastT = performance.now(), shownYear = -1, closingA = 0;
@@ -1182,6 +1298,7 @@
     const w = window.innerWidth, h = window.innerHeight, pr = renderer.getPixelRatio();
     renderer.setSize(w, h, false);
     rt.setSize(Math.floor(w * pr), Math.floor(h * pr));
+    if (photoKey) photoSelect(photoKey);                            // the cover-fit follows the frame's aspect
     post.uniforms.uRes.value.set(Math.floor(w * pr), Math.floor(h * pr));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -1194,7 +1311,7 @@
   // Coming back from another tab, the first frame's dt would be the whole absence; dt is clamped
   // to 50 ms and the clocks are reset so neither the camera damping nor the runner's scroll-speed
   // estimate sees a jump.
-  const resetClocks = () => { lastT = performance.now(); lastProg = progress; };
+  const resetClocks = () => { lastT = clock0 < 0 ? performance.now() : clock0 + (performance.now() - clock0) / SLOW; lastProg = progress; };   // on the page's clock, so ?slow= survives a tab return
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resetClocks(); });
   window.addEventListener('pageshow', resetClocks);
   window.addEventListener('focus', resetClocks);
@@ -1237,11 +1354,14 @@
   const NOWARM = new URLSearchParams(location.search).get('nowarm') === '1';
   if (NOWARM) requestAnimationFrame(enableShadows);                 // still once, before the first draw
   const hitch = { max: 0, at: 0 };                                 // the longest frame gap since load, for measuring
-  function frame(now) {
-    const dt = Math.min(0.05, (now - lastT) / 1000);
+  function frame(rafNow) {
+    if (clock0 < 0) clock0 = rafNow;
+    const now = SLOW > 1 ? clock0 + (rafNow - clock0) / SLOW : rafNow;   // issue #19: ?slow=S for shooting transitions
+    clockNow = now;
+    const dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
     if (now - lastT > hitch.max && lastT > 0) { hitch.max = Math.round(now - lastT); hitch.at = +progress.toFixed(3); }
     lastT = now;
-    if (!warm && !NOWARM) { enableShadows(); warmUp(); hitch.max = 0; }
+    if (!warm && !NOWARM) { enableShadows(); openingFogAll(); warmUp(); hitch.max = 0; }
     const target = Math.min(1, Math.max(0, window.scrollY / maxScroll()));
     progress += (target - progress) * (1 - Math.exp(-DAMP * dt));
     if (Math.abs(target - progress) < 0.00005) progress = target;
@@ -1255,26 +1375,29 @@
 
     setEra(eraAtU(progress), false);
     updateWorld(now);
+    updateOpening(progress, camZ);
     if (!streamCurve && TOWER.faceX) buildStreamCurve();
     updateParticles(dt, now, ERAS[eraIdx].key);
     updateMan(progress);
     updateGirl(progress, camZ, dt);
     updateWords(progress);
     updateLabels();
-    closingA = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6));
-    closingEl.style.opacity = closingA.toFixed(2);
+    closingA = Math.min(1, Math.max(0, (progress - CLOSING.showFrom) / (1 - CLOSING.showFrom) * 1.6));   // the labels step aside on this
+    closingParts.forEach(({ p, el }) => { const a = Math.min(1, Math.max(0, (progress - p.from) / (p.to - p.from))); el.style.opacity = a.toFixed(2); el.classList.toggle('in', a > 0.02); });
 
     const y = Math.round(yearAtU(progress));
     if (y !== shownYear) { shownYear = y; yearEl.textContent = String(y); }
 
     post.uniforms.uTime.value = now / 1000;
-    updateFlash(now);
+    updatePhoto();
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
     renderer.setRenderTarget(null);
     renderer.render(postScene, postCam);
+    frameMs += (performance.now() - rafNow - frameMs) * 0.05;       // the frame's own CPU time (update + draw submission), smoothed; a cost the display cap cannot hide (issue #19)
     requestAnimationFrame(frame);
   }
+  let frameMs = 0;
 
   // ── demo insurance: ?year=1930 jumps straight there, no damping, fog already cleared ──
   function jumpToYear(y) {
@@ -1291,7 +1414,10 @@
 
   // a tiny probe for testing; harmless in the demo
   window.__fog = { get progress() { return progress; }, get year() { return shownYear; }, get era() { return ERAS[eraIdx].key; }, people: peopleCalls,
+                   slow: SLOW, PHOTO, PHOTO_SRC, get frameMs() { return +frameMs.toFixed(2); },
+                   get photo() { return { key: photoKey, a: +post.uniforms.uPhotoA.value.toFixed(3), note: +photoNote.style.opacity, window: PHOTO.window, peak: PHOTO.peak, at: photoAt().map(s => ({ key: s.key, at: +s.at.toFixed(4), d: +(progress - s.at).toFixed(4) })), loaded: Object.keys(photoTex).filter(k => photoTex[k].image && photoTex[k].image.width), fit: post.uniforms.uPhotoFit.value.toArray().map(v => +v.toFixed(3)), caption: photoNote.children[0].textContent, credit: photoNote.children[1].textContent }; },
                    get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get man() { return Object.assign({ x: +man.position.x.toFixed(2), y: +man.position.y.toFixed(2), z: +man.position.z.toFixed(2), soles: +man.position.y.toFixed(2), hands: +(man.position.y + MAN_HANDS).toFixed(2), faceX: TOWER.faceX ? +TOWER.faceX(man.position.y).toFixed(2) : null, screen: (() => { const v = man.position.clone().project(camera); return [Math.round((v.x + 1) / 2 * innerWidth), Math.round((1 - v.y) / 2 * innerHeight)]; })() }, manState); }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
+                   get opening() { return openState; },
                    get shadow() { let c = 0, r = 0, t = 0, black = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m && m.vertexColors && o.geometry && !o.geometry.attributes.color) black++; } });
                      return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, uncoloured: black, map: !!key.shadow.map, size: key.shadow.mapSize.x,
                               box: [key.shadow.camera.left, key.shadow.camera.right], pos: key.position.toArray().map(v => +v.toFixed(1)), target: key.target.position.toArray().map(v => +v.toFixed(1)), camZ: +camera.position.z.toFixed(1) }; } };
