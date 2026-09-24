@@ -277,24 +277,363 @@
   [-1, 1].forEach(s => { for (let i = 0; i < 4; i++) benches.push(at(s * 16.2, -391 - i * 4, tw(0.52))); });
   instSet(benchGeo, vcMat(), benches);
 
-  // ── flag poles on the plaza edge: bone pole, bone flag; one vermilion flag built from parts ──
-  const flagGeo = compound([
-    { w: 0.12, h: 9, d: 0.12, col: 'bone' },
-    { x: 0.75, y: 8, w: 1.4, h: 0.8, d: 0.08, col: 'bone' }], 9);
-  const flags = [];
-  [-1, 1].forEach(s => [8.6, 11.6, 14.6].forEach((x, i) => { if (!(s > 0 && i === 1)) flags.push(at(s * x, -406.6, tw(9))); }));
-  instSet(flagGeo, vcMat(), flags);
-  part(11.6, 0, -406.6, 0.12, 0.12, TW(9, 'bone'));
-  part(12.35, 8, -406.6, 1.4, 0.08, TW(0.8, 'verm'));
+  // ═══ the signage (2026-09-24, docs/briefs/FOCUS-signs.md), on scene-red.js's rule and code ═══
+  // CJ, 2026-09-24: 「有點累先把招牌跟布條還有些應該是立體不應該是字牌的東西弄好」. The rule from
+  // chapter 1: if it would cast its own shadow in real life, it is not a plane. Chapter 3 had no
+  // signage at all, and its flags and traffic lights were stiff boxes. Now, all 2020–2027:
+  //   字牌     mounted letters on the podiums: TAIPEI 101 over the mall entrance, 臺北市政府 on the
+  //            City Hall, the malls' names (微風信義, 統一時代, BELLAVITA, 遠百信義 A13, ATT 4 FUN);
+  //   店招牌   horizontal light boxes for the retail at the plaza edge, standing off the mall walls;
+  //   旗幟     cloth flags on every lamp post of the boulevard, held top and bottom, waving; the
+  //            plaza flag poles fly cloth instead of a box;
+  //   路牌     bilingual road plates on the signal poles, and the signals themselves: a mast arm
+  //            over the road with two heads, a countdown pedestrian head on every pole;
+  //   公車站   the smart stop board with routes and arrival minutes, a 公車站 flag on top, and a
+  //            paper poster on the shelter's panel (paper stays flat);
+  //   a 信義商圈 map totem at the plaza corner.
+  // Every face is painted into one runtime atlas; faces, hardware (vertex colours) and the lit
+  // lenses are one merged mesh each, four draw calls for the whole chapter, tower era only.
+  const CJK = '-apple-system, "PingFang TC", "Heiti TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif';
+  const lib = libGroup(['tower']);
+  const SIGNS = (() => {
+    const AW = 2048, AH = 2048, PX = 150;                                         // atlas size, pixels per metre
+    const cv = document.createElement('canvas'); cv.width = AW; cv.height = AH;
+    const g = cv.getContext('2d');
+    let ax = 0, ay = 0, rowH = 0;
+    const alloc = (w, h) => {
+      w = Math.ceil(w); h = Math.ceil(h);
+      if (ax + w > AW) { ax = 0; ay += rowH + 4; rowH = 0; }
+      if (ay + h > AH) console.warn('sign atlas full');
+      const r = { x: ax, y: ay, w, h }; ax += w + 4; rowH = Math.max(rowH, h); return r;
+    };
+    const uvOf = r => [r.x / AW, (r.x + r.w) / AW, 1 - (r.y + r.h) / AH, 1 - r.y / AH];
+    const P = k => PALETTE[k] || k;
+    const font = (px, w) => `${w || 700} ${px}px ${CJK}`;
+    function fit(text, px, maxW, weight) { g.font = font(px, weight); const tw = g.measureText(text).width; if (tw > maxW) g.font = font(Math.floor(px * maxW / tw), weight); }
+    const centre = () => { g.textAlign = 'center'; g.textBaseline = 'middle'; };
+    const FG = { verm: 'bone', lamp: 'ink', bone: 'verm', ink: 'lamp', haze: 'ink', sky: 'ink', walk: 'verm', leaf: 'bone', brick: 'bone' };
 
-  // ── traffic lights at the crossing: haze post, ink head leaning over the road, verm + lamp lamps ──
-  // drawn for the east kerb (head offset toward -x); the west pair is rotated π so the head faces the road
-  const lightGeo = compound([
-    { w: 0.16, h: 4.6, d: 0.16, col: 'haze' },
-    { x: -0.3, y: 3.3, w: 0.45, h: 1.3, d: 0.45, col: 'ink' },
-    { x: -0.3, y: 4.25, w: 0.3, h: 0.28, d: 0.5, col: 'verm' },
-    { x: -0.3, y: 3.7, w: 0.3, h: 0.28, d: 0.5, col: 'lamp' }], 4.6);
-  instSet(lightGeo, vcMat(), [[6.6, -326.5], [6.6, -333.5], [-6.6, -326.5], [-6.6, -333.5]].map(([x, z]) => at(x, z, tw(4.6), 1, 1, x < 0 ? Math.PI : 0)));
+    // ── the faces, painted into the atlas ────────────────────────────────────────
+    // a light-box face: the diffuser lit from behind, a thin inner line, the text
+    function lightFace(text, wm, hm, bg) {
+      const r = alloc(wm * PX, hm * PX), { x, y, w, h } = r;
+      g.fillStyle = P(bg); g.fillRect(x, y, w, h);
+      const grd = g.createRadialGradient(x + w / 2, y + h / 2, 0, x + w / 2, y + h / 2, Math.max(w, h) * 0.7);
+      grd.addColorStop(0, 'rgba(255,255,255,0.22)'); grd.addColorStop(1, 'rgba(0,0,0,0.10)');
+      g.fillStyle = grd; g.fillRect(x, y, w, h);
+      g.strokeStyle = P(FG[bg] || 'ink'); g.lineWidth = Math.max(2, Math.min(w, h) * 0.03); g.strokeRect(x + g.lineWidth * 2, y + g.lineWidth * 2, w - g.lineWidth * 4, h - g.lineWidth * 4);
+      g.fillStyle = P(FG[bg] || 'ink'); centre(); fit(text, h * 0.6, w * 0.88); g.fillText(text, x + w / 2, y + h / 2 + h * 0.03);
+      return uvOf(r);
+    }
+    // 路牌: Taipei's bilingual plate, white on blue, the English under the Chinese
+    function plateFace(zh, en, wm, hm) {
+      const r = alloc(wm * PX, hm * PX), { x, y, w, h } = r;
+      g.fillStyle = '#1e56a0'; g.fillRect(x, y, w, h);
+      g.strokeStyle = '#f4f4f0'; g.lineWidth = 2; g.strokeRect(x + 4, y + 4, w - 8, h - 8);
+      g.fillStyle = '#f4f4f0'; centre();
+      fit(zh, h * (en ? 0.5 : 0.62), w * 0.86); g.fillText(zh, x + w / 2, y + h * (en ? 0.36 : 0.52));
+      if (en) { fit(en, h * 0.22, w * 0.86, 500); g.fillText(en, x + w / 2, y + h * 0.76); }
+      return uvOf(r);
+    }
+    // the pedestrian signal's face: the countdown over the green walking man
+    function pedFace(n) {
+      const r = alloc(0.3 * PX, 0.62 * PX), { x, y, w, h } = r;
+      g.fillStyle = '#111418'; g.fillRect(x, y, w, h);
+      g.fillStyle = '#39d353'; centre(); g.font = font(h * 0.34, 900); g.fillText(String(n), x + w / 2, y + h * 0.26);
+      const cx = x + w / 2, cy = y + h * 0.7, u = h * 0.028;
+      g.beginPath(); g.arc(cx, cy - 5.2 * u, 1.3 * u, 0, 7); g.fill();
+      g.lineWidth = 1.6 * u; g.strokeStyle = '#39d353'; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx, cy - 3.6 * u); g.lineTo(cx, cy); g.lineTo(cx - 2.2 * u, cy + 3.6 * u); g.moveTo(cx, cy); g.lineTo(cx + 2.4 * u, cy + 2.4 * u); g.lineTo(cx + 2.0 * u, cy + 4.4 * u);
+      g.moveTo(cx, cy - 3 * u); g.lineTo(cx - 2.4 * u, cy - 1 * u); g.moveTo(cx, cy - 3 * u); g.lineTo(cx + 2.4 * u, cy - 2.6 * u); g.stroke();
+      return uvOf(r);
+    }
+    // the smart stop board (智慧站牌): the stop's name over route numbers with arrival minutes
+    function stopFace(name, routes) {
+      const r = alloc(0.56 * PX, 0.9 * PX), { x, y, w, h } = r;
+      g.fillStyle = '#f4f4f0'; g.fillRect(x, y, w, h);
+      g.fillStyle = '#1e56a0'; g.fillRect(x, y, w, h * 0.2);
+      g.fillStyle = '#f4f4f0'; centre(); fit(name, h * 0.11, w * 0.9); g.fillText(name, x + w / 2, y + h * 0.1);
+      g.fillStyle = '#111418'; g.fillRect(x + 4, y + h * 0.22, w - 8, h * 0.76);
+      routes.forEach(([no, eta], i) => {
+        const yy = y + h * (0.3 + i * 0.13);
+        g.textAlign = 'left'; g.fillStyle = '#ffb347'; fit(no, h * 0.085, w * 0.5, 700); g.fillText(no, x + 10, yy);
+        g.textAlign = 'right'; g.fillStyle = '#39d353'; fit(eta, h * 0.075, w * 0.4, 500); g.fillText(eta, x + w - 10, yy);
+      });
+      return uvOf(r);
+    }
+    // a lamp-post flag: vertical characters on a coloured cloth, a paler hem top and bottom
+    function flagFace(text, bg, fg) {
+      const r = alloc(0.55 * PX, 1.5 * PX), { x, y, w, h } = r;
+      g.fillStyle = P(bg); g.fillRect(x, y, w, h);
+      g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(x, y, w, 6); g.fillRect(x, y + h - 6, w, 6);
+      g.fillStyle = P(fg); centre();
+      const chars = [...text], cs = Math.min(w * 0.78, h * 0.86 / chars.length);
+      g.font = font(Math.floor(cs), 800);
+      chars.forEach((c, i) => g.fillText(c, x + w / 2, y + h / 2 + (i - (chars.length - 1) / 2) * cs * 1.04));
+      return uvOf(r);
+    }
+    // a plain cloth for the plaza flags: a colour, a shade band at the hoist, an optional word
+    function clothFace(bg, text) {
+      const r = alloc(1.4 * PX * 0.6, 0.8 * PX * 0.6), { x, y, w, h } = r;
+      g.fillStyle = P(bg); g.fillRect(x, y, w, h);
+      g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x, y, w * 0.08, h);
+      if (text) { g.fillStyle = P(FG[bg] || 'ink'); centre(); fit(text, h * 0.6, w * 0.8, 900); g.fillText(text, x + w / 2, y + h / 2); }
+      return uvOf(r);
+    }
+    // paper: the 跨年 fireworks poster on the shelter's panel, the tower drawn as its segments
+    function posterFace() {
+      const r = alloc(1.0 * PX, 1.4 * PX), { x, y, w, h } = r;
+      g.fillStyle = '#1b2447'; g.fillRect(x, y, w, h);
+      for (let i = 0; i < 40; i++) { g.fillStyle = i % 3 ? 'rgba(255,179,71,0.8)' : 'rgba(244,244,240,0.7)'; const a = (i * 2.399) % 6.283, d = 10 + (i * 37) % 48; g.beginPath(); g.arc(x + w * 0.5 + Math.cos(a) * d, y + h * 0.3 + Math.sin(a) * d * 0.8, 2, 0, 7); g.fill(); }
+      g.fillStyle = '#5fb0bf';
+      for (let i = 0; i < 8; i++) { const sw = w * 0.12 + i * 1.2, sh = h * 0.045; g.fillRect(x + w / 2 - sw / 2, y + h * 0.82 - (i + 1) * sh, sw, sh - 1); }
+      g.fillRect(x + w / 2 - 1.5, y + h * 0.36, 3, h * 0.1);
+      g.fillStyle = '#f4f4f0'; centre(); fit('跨年 TAIPEI 101', h * 0.09, w * 0.9, 900); g.fillText('跨年 TAIPEI 101', x + w / 2, y + h * 0.9);
+      fit("12.31 NEW YEAR'S EVE", h * 0.05, w * 0.9, 500); g.fillText("12.31 NEW YEAR'S EVE", x + w / 2, y + h * 0.96);
+      return uvOf(r);
+    }
+    // the map totem's face: the district's blocks, the road, a you-are-here dot, the title
+    function mapFace() {
+      const r = alloc(0.8 * PX, 2.2 * PX), { x, y, w, h } = r;
+      g.fillStyle = '#f4f4f0'; g.fillRect(x, y, w, h);
+      g.fillStyle = '#1e56a0'; g.fillRect(x, y, w, h * 0.14);
+      g.fillStyle = '#f4f4f0'; centre(); fit('信義商圈', h * 0.06, w * 0.9, 900); g.fillText('信義商圈', x + w / 2, y + h * 0.05);
+      fit('XINYI DISTRICT MAP', h * 0.03, w * 0.9, 600); g.fillText('XINYI DISTRICT MAP', x + w / 2, y + h * 0.105);
+      g.fillStyle = '#d9d4c8'; g.fillRect(x + 8, y + h * 0.17, w - 16, h * 0.62);
+      g.fillStyle = '#9fb6c9';
+      [[0.1, 0.2, 0.3, 0.12], [0.6, 0.2, 0.3, 0.12], [0.1, 0.38, 0.3, 0.18], [0.6, 0.38, 0.3, 0.18], [0.1, 0.62, 0.3, 0.12], [0.6, 0.62, 0.3, 0.12]].forEach(([bx, by, bw, bh]) => g.fillRect(x + w * bx, y + h * by, w * bw, h * bh));
+      g.fillStyle = '#5fb0bf'; g.fillRect(x + w * 0.38, y + h * 0.4, w * 0.24, h * 0.14);   // 101's block
+      g.fillStyle = '#f4f4f0'; g.fillRect(x + w * 0.45, y + h * 0.17, w * 0.1, h * 0.62);   // the road
+      g.fillStyle = '#d9483b'; g.beginPath(); g.arc(x + w * 0.5, y + h * 0.7, 6, 0, 7); g.fill();
+      g.fillStyle = '#2b2f3a'; fit('您在此處 You are here', h * 0.03, w * 0.9, 600); g.fillText('您在此處 You are here', x + w / 2, y + h * 0.84);
+      fit('台北101 · 新光三越 · 微風信義', h * 0.025, w * 0.9, 500); g.fillText('台北101 · 新光三越 · 微風信義', x + w / 2, y + h * 0.92);
+      return uvOf(r);
+    }
+
+    // ── geometry accumulators ────────────────────────────────────────────────────
+    const lit = { pos: [], uv: [], idx: [] }, flat = { pos: [], uv: [], idx: [] };
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    function quad(acc, c, right, up, w, h, uv) {
+      const b = acc.pos.length / 3, [u0, u1, v0, v1] = uv;
+      [[-1, -1, u0, v0], [1, -1, u1, v0], [1, 1, u1, v1], [-1, 1, u0, v1]].forEach(([sx, sy, u, v]) => {
+        const p = c.clone().addScaledVector(right, sx * w / 2).addScaledVector(up, sy * h / 2);
+        acc.pos.push(p.x, p.y, p.z); acc.uv.push(u, v);
+      });
+      acc.idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    }
+    const hw = { pos: [], nor: [], col: [] }, glow = { pos: [], nor: [], col: [] };
+    const unit = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
+    const M = new THREE.Matrix4(), NM = new THREE.Matrix3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), Z = V3(0, 0, 1), UP = V3(0, 1, 0);
+    function pushBox(acc, m, col) {
+      const p = unit.attributes.position, n = unit.attributes.normal, c = C(col), v = new THREE.Vector3();
+      NM.getNormalMatrix(m);
+      for (let i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(m); acc.pos.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(n, i).applyMatrix3(NM).normalize(); acc.nor.push(v.x, v.y, v.z);
+        acc.col.push(c.r, c.g, c.b);
+      }
+    }
+    const box = (cx, cy, cz, sx, sy, sz, col, rotY, acc) => { Q.setFromAxisAngle(UP, rotY || 0); M.compose(V3(cx, cy, cz), Q, S.set(sx, sy, sz)); pushBox(acc || hw, M, col); };
+    function bar(p0, p1, t, col, acc) {
+      const d = p1.clone().sub(p0), len = d.length();
+      Q.setFromUnitVectors(Z, d.normalize());
+      M.compose(p0.clone().add(p1).multiplyScalar(0.5), Q, S.set(t, t, len)); pushBox(acc || hw, M, col);
+    }
+    // a cloth grid from the top edge a → b, h tall, sagging by `sag`, bellying along n, with wrinkles
+    function cloth(a, b, h, sag, n, uv, free) {
+      const [u0, u1, v0, v1] = uv, NX = 16, NY = 4, base = flat.pos.length / 3, ph = (a.x * 3.1 + a.z * 1.7) % 6.28;
+      for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) {
+        const t = i / NX, v = j / NY, bow = free ? t : 4 * t * (1 - t);           // free: the fly end droops; else both ends held
+        const p = a.clone().lerp(b, t);
+        p.y += -sag * bow * (1 + 0.35 * v) - h * v;
+        const wr = (0.035 * Math.sin(t * Math.PI * 5 + ph) + 0.02 * Math.sin(t * Math.PI * 13 + ph * 2)) * (0.3 + 0.7 * (free ? t : v)) * (0.4 + bow);
+        p.addScaledVector(n, wr + 0.05 * bow * v);
+        flat.pos.push(p.x, p.y, p.z); flat.uv.push(u0 + (u1 - u0) * t, v1 - (v1 - v0) * v);
+      }
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = base + j * (NX + 1) + i;
+        flat.idx.push(k, k + NX + 1, k + 1, k + 1, k + NX + 1, k + NX + 2);
+      }
+    }
+    let count = 0;
+
+    // ── the kinds ────────────────────────────────────────────────────────────────
+    // 店招牌: a horizontal light box flat on a wall, standing off on two brackets. side = sign of
+    // the wall's x (the road is toward -side), wallX its |x|, z the centre along the street.
+    function hbox(text, side, wallX, z, y0, w, h, bg) {
+      const D = 0.14, x = side * (wallX - 0.1 - D / 2), yc = y0 + h / 2;
+      box(x, yc, z, D, h, w, 'haze');
+      quad(lit, V3(x - side * (D / 2 + 0.012), yc, z), V3(0, 0, side > 0 ? 1 : -1), UP, w - 0.05, h - 0.05, lightFace(text, w - 0.05, h - 0.05, bg));
+      [yc + h / 2, yc - h / 2].forEach(yy => box(x - side * 0.01, yy, z, D + 0.03, 0.03, w + 0.03, 'bone'));
+      [z - w / 2, z + w / 2].forEach(zz => box(x - side * 0.01, yc, zz, D + 0.03, h + 0.03, 0.03, 'bone'));
+      [z - w * 0.35, z + w * 0.35].forEach(zz => bar(V3(side * wallX, yc, zz), V3(x, yc, zz), 0.035, 'ink'));
+      count++;
+    }
+    // 字牌: characters mounted off a wall on studs. c = the text's centre on the wall, nrm the
+    // wall's outward normal (unit), right the reading direction seen from outside. Each glyph is
+    // a cut-out (alpha-tested, so its shadow is glyph-shaped) in four layers for the letter's depth.
+    const glyphCache = {};
+    function glyph(ch, col) {
+      const k = ch + col; if (glyphCache[k]) return glyphCache[k];
+      const r = alloc(128, 128), { x, y } = r;
+      g.clearRect(x, y, 128, 128); g.fillStyle = P(col); centre(); g.font = font(118, 900);
+      g.fillText(ch, x + 64, y + 68);
+      return (glyphCache[k] = uvOf(r));
+    }
+    function letters(text, c, nrm, right, size, col, sideCol) {
+      const chars = [...text], n = chars.length;
+      const wide = ch => /[A-Za-z0-9 ]/.test(ch) ? 0.62 : 1.0;                     // Latin glyphs are narrower than CJK
+      const widths = chars.map(ch => size * wide(ch) * 1.06), total = widths.reduce((a, b) => a + b, 0);
+      let u = -total / 2;
+      chars.forEach((ch, i) => {
+        const cc = c.clone().addScaledVector(right, u + widths[i] / 2); u += widths[i];
+        if (ch === ' ') return;
+        for (let l = 0; l < 4; l++) quad(flat, cc.clone().addScaledVector(nrm, 0.05 + l * 0.015), right, UP, size, size, glyph(ch, l < 3 ? sideCol : col));
+        const s = cc.clone().addScaledVector(nrm, 0.025);
+        box(s.x, s.y, s.z, Math.abs(nrm.x) > 0.5 ? 0.05 : 0.04, 0.04, Math.abs(nrm.z) > 0.5 ? 0.05 : 0.04, 'ink');   // the stud
+      });
+      count++;
+    }
+    // 路牌 on a pole at (x, z), y its centre; alongX = the plate reads along the street
+    function plate(x, y, z, zh, en, alongX) {
+      const w = 1.0, h = 0.34, uv = plateFace(zh, en, w, h), s = Math.sign(-x) || 1;
+      const c = alongX ? V3(x + s * (w / 2 + 0.06), y, z) : V3(x, y, z + w / 2 + 0.06);
+      const r = alongX ? V3(s, 0, 0) : V3(0, 0, -1), nrm = alongX ? V3(0, 0, 1) : V3(1, 0, 0);
+      box(c.x, y, c.z, alongX ? w + 0.04 : 0.03, h + 0.04, alongX ? 0.03 : w + 0.04, 'haze');
+      quad(flat, c.clone().addScaledVector(nrm, 0.028), r, UP, w, h, uv);
+      quad(flat, c.clone().addScaledVector(nrm, -0.028), r.clone().negate(), UP, w, h, uv);
+      bar(V3(x, y + 0.12, z), c.clone().setY(y + 0.12), 0.03, 'haze'); bar(V3(x, y - 0.12, z), c.clone().setY(y - 0.12), 0.03, 'haze');
+    }
+    // a signal pole at a crossing corner. facing = the z direction its vehicle heads look (+1
+    // toward the camera coming down -z); mast = carry an arm over the road with two heads. Every
+    // pole gets the countdown pedestrian head facing across the road, a push button, its plates.
+    function signal(x, z, facing, mast, plates, secs) {
+      const side = Math.sign(x);
+      box(x, 3.1, z, 0.24, 6.2, 0.24, 'haze'); box(x, 6.24, z, 0.3, 0.08, 0.3, 'haze');
+      if (mast) {
+        bar(V3(x, 6.05, z), V3(side * 1.6, 5.85, z), 0.14, 'haze'); bar(V3(x, 5.0, z), V3(side * 4.2, 5.9, z), 0.05, 'haze');   // the arm and its stay
+        [side * 2.6, side * 5.2].forEach(hx => {
+          const hy = 5.15, D = 0.34, f = z + facing * (D / 2 + 0.015);
+          box(hx, hy, z, 0.42, 1.2, D, 'ink');
+          bar(V3(hx, hy + 0.6, z), V3(hx, 5.9, z), 0.05, 'ink');
+          [['verm', 0.36], ['lamp', 0], ['leaf', -0.36]].forEach(([c, dy]) => {
+            box(hx, hy + dy, f, 0.28, 0.28, 0.03, c, 0, glow);
+            box(hx, hy + dy + 0.17, f + facing * 0.06, 0.34, 0.03, 0.16, 'ink');                        // visor
+          });
+        });
+      }
+      const pf = pedFace(secs), px = x - side * 0.27, D = 0.26;
+      box(px, 2.75, z, D, 0.66, 0.32, 'ink');
+      quad(lit, V3(px - side * (D / 2 + 0.012), 2.75, z), V3(0, 0, -side), UP, 0.28, 0.6, pf);
+      box(x - side * 0.17, 1.3, z, 0.1, 0.16, 0.12, 'lamp');                                            // the push button
+      plates.forEach(([zh, en, y, alongX]) => plate(x, y, z, zh, en, alongX));
+      count++;
+    }
+    // 公車站: the smart board on a pole, the stop's flag on top
+    function busStop(x, z, name, routes) {
+      const uv = stopFace(name, routes);
+      box(x, 1.55, z, 0.09, 3.1, 0.09, 'haze');
+      box(x, 2.3, z + 0.06, 0.6, 0.98, 0.04, 'ink');
+      quad(lit, V3(x, 2.3, z + 0.09), V3(1, 0, 0), UP, 0.56, 0.9, uv);
+      quad(flat, V3(x, 2.3, z + 0.03), V3(-1, 0, 0), UP, 0.56, 0.9, uv);
+      const fl = plateFace('公車站', 'Bus Stop', 0.5, 0.3);
+      box(x, 3.05, z, 0.54, 0.34, 0.03, 'haze');
+      quad(flat, V3(x, 3.05, z + 0.02), V3(1, 0, 0), UP, 0.5, 0.3, fl);
+      quad(flat, V3(x, 3.05, z - 0.02), V3(-1, 0, 0), UP, 0.5, 0.3, fl);
+      count++;
+    }
+    // paper: a poster flat on a wall facing -side x (the one kind that is a plane)
+    function poster(side, wallX, z, y, w, h) {
+      quad(flat, V3(side * (wallX - 0.02), y + h / 2, z), V3(0, 0, side > 0 ? 1 : -1), UP, w, h, posterFace());
+      count++;
+    }
+    // 旗幟 on a lamp post at (x, z): two arms toward the road, the cloth between them, waving
+    function flag(x, z, text, bg, fg) {
+      const side = Math.sign(x), uv = flagFace(text, bg, fg), [u0, u1, v0, v1] = uv;
+      const y0 = 3.5, h = 1.5, w = 0.55, xin = x - side * 0.16, xout = xin - side * w;
+      [y0 + h + 0.05, y0 - 0.05].forEach(yy => bar(V3(x, yy, z), V3(xout - side * 0.05, yy, z), 0.035, 'ink'));
+      box(x - side * 0.02, y0 + h / 2, z, 0.06, h + 0.3, 0.12, 'ink');                        // the clamp on the post
+      const NX = 3, NY = 10, base = flat.pos.length / 3, ph = (z * 0.37) % 6.28;
+      for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) {
+        const t = i / NX, v = j / NY, held = 4 * v * (1 - v);
+        const wave = (0.035 * Math.sin(v * 6.5 + ph) + 0.02 * Math.sin(t * 4 + v * 11 + ph)) * held;
+        flat.pos.push(xin - side * w * t, y0 + h - h * v, z + wave); flat.uv.push(u0 + (u1 - u0) * t, v1 - (v1 - v0) * v);
+      }
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = base + j * (NX + 1) + i;
+        flat.idx.push(k, k + NX + 1, k + 1, k + 1, k + NX + 1, k + NX + 2);
+      }
+      count++;
+    }
+    // a plaza flag pole: the pole, a finial, a cloth flying toward +x from the top, held at the hoist
+    function polePlag(x, z, bg, text) {
+      box(x, 4.5, z, 0.12, 9, 0.12, 'bone'); box(x, 9.06, z, 0.16, 0.12, 0.16, 'bone');
+      cloth(V3(x + 0.08, 8.9, z), V3(x + 1.5, 8.9, z), 0.8, 0.3, V3(0, 0, 1), clothFace(bg, text), true);
+      count++;
+    }
+    // the map totem at the plaza corner: a steel case with the map on both faces
+    function totem(x, z) {
+      const uv = mapFace();
+      box(x, 1.25, z, 0.86, 2.5, 0.16, 'ink'); box(x, 0.05, z, 1.0, 0.1, 0.4, 'ink');
+      quad(lit, V3(x, 1.3, z + 0.092), V3(1, 0, 0), UP, 0.8, 2.2, uv);
+      quad(lit, V3(x, 1.3, z - 0.092), V3(-1, 0, 0), UP, 0.8, 2.2, uv);
+      count++;
+    }
+
+    function finish() {
+      const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 8;
+      const mk = (acc, mat) => {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.pos, 3));
+        if (acc.uv) { geo.setAttribute('uv', new THREE.Float32BufferAttribute(acc.uv, 2)); geo.setIndex(acc.idx); geo.computeVertexNormals(); }
+        else { geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(acc.col, 3)); }
+        const m = new THREE.Mesh(geo, withFog(mat)); m.castShadow = m.receiveShadow = !mat.isMeshBasicMaterial; lib.add(m); return m;
+      };
+      const off = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 };   // faces never fight the case or wall behind
+      mk(lit, new THREE.MeshLambertMaterial(Object.assign({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.3, alphaTest: 0.5 }, off)));
+      mk(flat, new THREE.MeshLambertMaterial(Object.assign({ map: tex, side: THREE.DoubleSide, alphaTest: 0.5 }, off)));
+      mk(hw, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      if (glow.pos.length) mk(glow, new THREE.MeshBasicMaterial({ vertexColors: true }));
+    }
+    return { hbox, letters, signal, busStop, poster, flag, polePlag, totem, finish, V3, get count() { return count; } };
+  })();
+  window.__xinyiSigns = () => SIGNS.count;
+  const V = SIGNS.V3;
+
+  // ── 字牌: the buildings' names, mounted letters ──
+  SIGNS.letters('TAIPEI 101', V(TX, 5.85, TZ + 13.02), V(0, 0, 1), V(1, 0, 0), 0.9, 'ink', 'haze');             // the podium's front, over the entrance canopy: dark steel letters on the pale wall
+  SIGNS.letters('臺北市政府', V(-46, 47, -480), V(0, 0, 1), V(1, 0, 0), 3.4, 'bone', 'haze');                     // City Hall's centre block, the horizon
+  SIGNS.letters('微風信義 BREEZE', V(-17, 13.6, -394), V(1, 0, 0), V(0, 0, -1), 1.3, 'verm', 'brick');            // the west mall at the plaza
+  SIGNS.letters('統一時代', V(-17, 13.4, -416), V(1, 0, 0), V(0, 0, -1), 1.4, 'sky', 'ink');                       // under the XINYI screen
+  SIGNS.letters('BELLAVITA', V(17, 14.2, -416), V(-1, 0, 0), V(0, 0, 1), 1.3, 'bone', 'haze');
+  SIGNS.letters('遠百信義 A13', V(17, 15.8, -438), V(-1, 0, 0), V(0, 0, 1), 1.3, 'lamp', 'brick');
+  SIGNS.letters('ATT 4 FUN', V(-17, 15.8, -438), V(1, 0, 0), V(0, 0, -1), 1.3, 'verm', 'brick');
+  // ── 店招牌: the retail at the plaza edge, light boxes off the mall walls at the first floor ──
+  [['星巴克 STARBUCKS', -400.5, 'leaf'], ['屈臣氏', -396.5, 'sky'], ['UNIQLO', -392.6, 'verm']].forEach(([t, z, bg]) => SIGNS.hbox(t, 1, A11.x0, z, 4.7, 3.4, 0.7, bg));   // A11's wing face, over the entrance canopy
+  [['春水堂', -399.5, 'bone'], ['全家 FamilyMart', -395.5, 'leaf'], ['鼎泰豐', -391.5, 'verm'], ['麥當勞', -387.6, 'lamp']].forEach(([t, z, bg]) => SIGNS.hbox(t, -1, 17, z, 4.4, 3.4, 0.7, bg));   // the west mall's road face
+  [['誠品生活', -412, 'walk'], ['富邦銀行', -420, 'sky']].forEach(([t, z, bg]) => SIGNS.hbox(t, 1, 17, z, 4.4, 5.0, 0.8, bg));
+  [['無印良品 MUJI', -412.5, 'bone'], ['7-ELEVEN', -419.5, 'leaf']].forEach(([t, z, bg]) => SIGNS.hbox(t, -1, 17, z, 4.4, 4.6, 0.8, bg));
+  // ── the crossings: 松高路 at -330, 松壽路 at -390, on 松智路. Taiwan drives on the right, so
+  //    the mast arm faces each approach from its far-right corner; the other corners get plain poles.
+  const ROAD = ['松智路', 'Songzhi Rd.'];
+  [[-330, '松高路', 'Songgao Rd.', 18], [-390, '松壽路', 'Songshou Rd.', 9]].forEach(([z, zh, en, n]) => {
+    const near = z + 3.5, far = z - 3.5;
+    SIGNS.signal(-6.4, far, +1, true, [[zh, en, 3.4, true], [ROAD[0], ROAD[1], 3.0, false]], n);    // faces the camera's traffic
+    SIGNS.signal(6.4, near, -1, true, [[zh, en, 3.4, true]], n + 3);                                // faces the oncoming lane
+    SIGNS.signal(6.4, far, +1, false, [[ROAD[0], ROAD[1], 3.0, false]], n);
+    SIGNS.signal(-6.4, near, -1, false, [[zh, en, 3.4, true]], n + 3);
+  });
+  // ── the bus stop at the shelter (east sidewalk, z -340): the smart board, the poster on the panel ──
+  SIGNS.busStop(6.9, -336.6, '松智松高路口', [['信義幹線', '進站中'], ['藍5', '3 分'], ['20', '8 分'], ['22', '12 分'], ['33', '15 分']]);
+  SIGNS.poster(1, 9.05, -340.4, 0.85, 1.0, 1.4);
+  // ── 旗幟 on every lamp post of the boulevard (the engine's lamps stand at x ±8.5, z 40 − 12k) ──
+  const FLAGS = [['信義商圈', 'verm', 'bone'], ['臺北101跨年', 'sky', 'ink'], ['TAIPEI', 'lamp', 'ink'], ['信義區', 'leaf', 'bone']];
+  let fi = 0;
+  for (let z = -296; z >= -380; z -= 12) [-1, 1].forEach(s => { const f = FLAGS[fi++ % FLAGS.length]; SIGNS.flag(s * 8.5, z, f[0], f[1], f[2]); });
+  // ── the plaza flag poles fly cloth: bone flags, one vermilion 101 flag on the east ──
+  [-1, 1].forEach(s => [8.6, 11.6, 14.6].forEach((x, i) => SIGNS.polePlag(s * x, -406.6, s > 0 && i === 1 ? 'verm' : 'bone', s > 0 && i === 1 ? '101' : null)));
+  SIGNS.totem(9.7, -386.4);
+  SIGNS.finish();
 
   // ── the approach: bus shelter (parts), taxis and scooters (compound sets) ─────
   (() => { // bus shelter on the east sidewalk
