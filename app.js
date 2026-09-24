@@ -446,6 +446,7 @@
     }
     scene.add(mesh);
     const set = { mesh, items, from: items.map(() => 0) };
+    if (opts && opts.rise) set.riseT0 = clockNow;                // a late model (models.js): grow out of the ground over ERA_MS instead of popping in
     instSets.push(set);
     return set;
   }
@@ -453,8 +454,10 @@
   function instSnapshot() { instSets.forEach(set => set.items.forEach((it, i) => { set.from[i] = it.cur == null ? 0 : it.cur; })); }
   function instUpdate(e, key) {
     instSets.forEach(set => {
+      let es = e;
+      if (set.riseT0 != null) { const k = Math.min(1, (clockNow - set.riseT0) / ERA_MS); es = Math.min(e, ease3(k)); if (k >= 1) delete set.riseT0; }
       set.items.forEach((it, i) => {
-        const to = it.h[key] || 0, h = set.from[i] + (to - set.from[i]) * e;
+        const to = it.h[key] || 0, h = set.from[i] + (to - set.from[i]) * es;
         it.cur = h;
         Q.setFromAxisAngle(Y, it.r || 0);
         const on = h > 0.01;                                     // absent items vanish entirely, no flat footprint
@@ -710,6 +713,17 @@
     g.visible = eras.indexOf(ERAS[eraIdx].key) >= 0;   // the scene files run after the first setEra, so start in the right state
     return g;
   }
+  // rise(obj): a model that arrives after the first frame (models.js's late groups) grows from its base
+  // over ERA_MS, the era tween's own move, so nothing pops in ahead of the camera.
+  const risers = [];
+  function rise(obj) { risers.push({ obj, t0: clockNow, sy: obj.scale.y }); obj.scale.y = 0.0001; }
+  function updateRisers(now) {
+    for (let i = risers.length - 1; i >= 0; i--) {
+      const r = risers[i], k = Math.min(1, (now - r.t0) / ERA_MS);
+      r.obj.scale.y = Math.max(0.0001, r.sy * ease3(k));
+      if (k >= 1) risers.splice(i, 1);
+    }
+  }
   const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; if (m.isMeshStandardMaterial) { m.envMapIntensity = ENV_I; litMats.push(m); } m.needsUpdate = true; }); } });
   const libBox = new THREE.Box3(), libSize = new THREE.Vector3();
   function findAsset(id) {
@@ -777,7 +791,7 @@
   // lam(col, extra?)                            lit() by palette key, surface family chosen from the key
   // aoBake(geo)                                 bakes the height-rule occlusion into a geometry's vertex colours (part and instSet do it)
   // people(items)                               pedestrians through instSet: { x, z, y?, r?, v?, h:{red,dadao,tower} }, h = figure height
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset, people };
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset, people, rise };
   window.SCENE.camera = camera;   // issue #17: photos.js projects its street markers with the scroll camera; it only reads it
 
 
@@ -1001,6 +1015,7 @@
     sky.position.copy(camera.position);
     liftTops();
     instUpdate(e, key);
+    updateRisers(now);
     updateWindows(key);
     key.intensity = mixCur.lamp;
     hemi.intensity = mixCur.hemi;
@@ -1027,11 +1042,35 @@
     f = Math.min(1, f);
     return f * f * (3 - 2 * f);
   }
+  // The phone frame (fault 5, CJ 2026-09-24: 「手機的鏡頭能轉嗎 不然都看不到畫面」). PerspectiveCamera.fov is the
+  // vertical angle, so a 390x844 phone (aspect 0.46) at the keyframes' 50° saw 24° of street sideways against 73°
+  // at 1440x900. Portrait only, the keyframes untouched, a landscape frame pixel-identical: the fov is lifted so
+  // the frame's CORNER sits at the same angle off-axis as the 16:10 desktop corner, i.e. the same edge stretch the
+  // desktop already has (tan(v/2) scales by sqrt((1+A²)/(1+a²)), A = REF_ASPECT), `match` of the way, capped at
+  // MAX_FOV. Full compensation (a 116° vertical) is a fisheye; this is not. match 0.6 is where it landed
+  // (2026-09-25): 66° vertical / 34° sideways at the 50° keyframes; at 1 (77° / 40°) the near lantern and the
+  // arcade column at the frame edge had started to stretch in the Dadaocheng frame.
+  // The pitch is NOT touched. A lens shift that slid the horizon down the frame was tried and measured (a raycast
+  // grid over the frame, sky / road / street): at 1994 the phone showed sky 30 / road 36 / street 34 before any
+  // change, and with the lift kept no horizon setting gets sky and road both under a quarter — sliding the
+  // horizon only trades one for the other, and the balance point is where the keyframes already have it. What the
+  // portrait frame lacks vertically is the price of widening it; the lever that would change that is a
+  // portrait-only camera position, which is a framing decision, not a correction.
+  // window.__fog.portrait reads the result; PORTRAIT is live-tunable there.
+  const PORTRAIT = { REF_ASPECT: 1.6, match: 0.6, MAX_FOV: 85 };
+  let portraitState = { fov: 0, hfov: 0 };
+  const hfovOf = (v, a) => 2 * Math.atan(Math.tan(v * Math.PI / 360) * a) * 180 / Math.PI;
   function placeCamera(u) {
     posCurve.getPoint(u, pTmp);
     tgtCurve.getPoint(u, tTmp);
     const s = u * (fovs.length - 1), i = Math.min(fovs.length - 2, Math.floor(s)), f = s - i;
-    camera.fov = fovs[i] + (fovs[i + 1] - fovs[i]) * f;
+    let fov = fovs[i] + (fovs[i + 1] - fovs[i]) * f;
+    const a = camera.aspect, portrait = a < 1;
+    if (portrait) {
+      const lifted = 2 * Math.atan(Math.tan(fov * Math.PI / 360) * Math.sqrt((1 + PORTRAIT.REF_ASPECT * PORTRAIT.REF_ASPECT) / (1 + a * a))) * 180 / Math.PI;
+      fov += (Math.min(PORTRAIT.MAX_FOV, lifted) - fov) * PORTRAIT.match;
+    }
+    camera.fov = fov;
     camera.position.copy(pTmp);
     camera.lookAt(tTmp);
     const k = parallaxFade(u);
@@ -1039,6 +1078,7 @@
     camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
     camera.position.addScaledVector(camRight, driftX * k).addScaledVector(camUp, driftY * k);
     camera.updateProjectionMatrix();
+    portraitState = { fov: +fov.toFixed(1), hfov: +hfovOf(fov, a).toFixed(1) };
     return pTmp.z;
   }
   // scroll progress u at which the camera reaches world z, by bisection.
@@ -1074,7 +1114,10 @@
   // ── the uPrint post pass: posterize, grain, outline, vignette ────────────────
   // One fullscreen pass. uPrint 1 = woodblock print, 0 = night photograph. Lighting stays on
   // the whole time; posterizing flattens it into print blocks. Grain is shader noise.
-  const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
+  // Fault 6 (CJ, 2026-09-25: 「這個招牌怪怪的」): with no stencil, r149 gives this target a 16-bit depth renderbuffer, and at
+  // 30 m that cannot tell a steel bar 2.5 cm behind a sign face from the face — the Lux neon's cage (lux.py neon_frame)
+  // bled through the 樂聲戲院 board as dashed diagonals. stencilBuffer asks for DEPTH24_STENCIL8: 24 bits of depth.
+  const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true, stencilBuffer: true });
   // (issue #19) the photograph at a crossing goes through the post pass: uPhoto is the picture,
   // uPhotoA its opacity over the frame (scroll-driven, updatePhoto), uPhotoFit the cover-fit,
   // uPhotoOld how much old-print treatment it takes. uPhoto starts as a 1×1 blank.
@@ -1156,7 +1199,17 @@
   // hold: the pass is the scroll's own. A picture whose file has not decoded yet is skipped.
   let photoKey = null;
   const photoTex = {};
-  Object.keys(PHOTO_SRC).forEach(k => { photoTex[k] = new THREE.TextureLoader().load(PHOTO_SRC[k].src, t => { t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }); });
+  // Fault 1 (CJ, 2026-09-24: 「東西太多loading太久」): the two pictures (300 KB) are not in the first request. They load
+  // when the scroll is PHOTO_LEAD short of the first marking or, whichever comes first, PHOTO_IDLE_MS after the load event;
+  // a pass whose picture is not decoded yet is skipped, as before.
+  const PHOTO_LEAD = 0.12, PHOTO_IDLE_MS = 2500;
+  let photosLoading = false;
+  function loadPhotos() {
+    if (photosLoading) return; photosLoading = true;
+    Object.keys(PHOTO_SRC).forEach(k => { photoTex[k] = new THREE.TextureLoader().load(PHOTO_SRC[k].src, t => { t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }); });
+  }
+  const photoIdle = () => setTimeout(loadPhotos, PHOTO_IDLE_MS);
+  if (document.readyState === 'complete') photoIdle(); else window.addEventListener('load', photoIdle);
   // caption and credit, top-right under the site title, ink on a paper pill so it reads over the
   // picture and over the street alike. CC BY and CC BY-SA both require the credit to be visible.
   const photoNote = (() => {
@@ -1178,6 +1231,7 @@
   }
   function updatePhoto() {
     let key = null, a = 0;
+    if (!photosLoading && progress >= photoAt()[0].at - PHOTO_LEAD) loadPhotos();
     photoAt().forEach(s => {
       const d = progress - s.at;
       if (d < 0 || d > PHOTO.window) return;
@@ -1204,6 +1258,7 @@
       const zh = era.zh.split(' · ');                                  // '西門町 · Ximending' → vertical 西門町, romanised name under the years
       chapNEl.textContent = String(ERAS.indexOf(era) + 1).padStart(2, '0');
       eraLabelEl.textContent = era.label; eraYearsEl.textContent = era.years + (zh[1] ? ' · ' + zh[1] : ''); eraZhEl.textContent = zh[0];
+      measureLabelMin();                                             // the block's height follows its text (fault 5: the anchor label sits under it on a phone)
     };
     clearTimeout(swapTimer);
     if (instant) { eraBox.classList.remove('swap'); apply(); return; }
@@ -1222,6 +1277,13 @@
     return { A, el, shownKey: '', name: el.children[0], en: el.children[1], cap: el.children[2] };
   });
   const wp = new THREE.Vector3();
+  // on a portrait phone the label is clamped into the left column, under the chapter block (fault 5: at 110 px it
+  // sat on the block's last line); measured once per resize, since the block's height depends on the wrap
+  let labelMinY = 110;
+  const wp2 = new THREE.Vector3();
+  const chapterEl = document.querySelector('.hud-chapter');
+  function measureLabelMin() { labelMinY = innerWidth < innerHeight && chapterEl ? Math.max(110, chapterEl.getBoundingClientRect().bottom + 14) : 110; }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measureLabelMin);   // and the web font, which wraps it differently
   function updateLabels() {
     const key = ERAS[eraIdx].key;
     labels.forEach(L => {
@@ -1245,7 +1307,12 @@
       el.style.opacity = vis.toFixed(2);
       el.classList.toggle('on', vis > 0.6);
       const lx = Math.min(innerWidth - Math.min(380, innerWidth * 0.7 + 20), (wp.x + 1) / 2 * innerWidth);
-      const ly = Math.max(110, (1 - wp.y) / 2 * innerHeight);
+      let ly = (1 - wp.y) / 2 * innerHeight;
+      if (innerWidth < innerHeight) {                                    // fault 5: the left-column clamp put the label beside the roofline, over sky; centre it on the building's face instead
+        const base = wp2.set(L.A.x, 0, L.A.z).project(camera);
+        ly = (ly + (1 - base.y) / 2 * innerHeight) / 2 - L.el.offsetHeight / 2;
+      }
+      ly = Math.max(labelMinY, ly);
       el.style.transform = `translate(${lx.toFixed(0)}px, ${ly.toFixed(0)}px)`;
     });
   }
@@ -1260,11 +1327,10 @@
   const sm = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   const openEl = document.getElementById('opening');
   // the HUD blocks that sit over the opening fog and have to darken with the title
-  // the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」): #guide (index.html, style.css .hud-guide) is a
-  // dim with a swipe-up arrow over the opening screen, display: none except under 480px. Its opacity follows the fog, so it
-  // clears in the same window and is gone by OPENING.fogTo; while it is on, the title is bone so it reads through the dim.
+  // the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」, then 「首頁壓按不要 箭頭要」): #guide
+  // (index.html, style.css .hud-guide) is a swipe-up arrow over the opening screen, no dim, display: none except under 480px.
+  // Its opacity follows the fog, so it clears in the same window and is gone by OPENING.fogTo.
   const guideEl = document.getElementById('guide');
-  let guideOn = false;
   const fogCol = new THREE.Color(), boneCol = C('bone'), inkCol = C('ink'), titleCol = new THREE.Color();
   // CJ, 2026-09-24: 「不然先給opening 一個復古色調的背景」. The opening fog carries a warm faded-print
   // tone instead of plain bone, strongest at scroll 0 and gone with the fog by OPENING.fogTo, so
@@ -1308,7 +1374,7 @@
       if (!mountainMat.toneMapped) { mountainMat.toneMapped = true; mountainMat.needsUpdate = true; }
     }
     openEl.style.opacity = title.toFixed(3);
-    openEl.style.color = '#' + (guideOn ? boneCol : titleCol.copy(inkCol).lerp(boneCol, 1 - fog)).getHexString();
+    openEl.style.color = '#' + titleCol.copy(inkCol).lerp(boneCol, 1 - fog).getHexString();
     openEl.style.visibility = title > 0.005 ? 'visible' : 'hidden';
     // CJ, 2026-09-24: 「我比較希望是換這邊的顏色」, then 「那些小字的顏色不對」. The HUD is bone
     // (#f7f2e8) everywhere, a 1.6:1 contrast on the opening's faded-print fog. The title already
@@ -1331,7 +1397,7 @@
     post.uniforms.uRes.value.set(Math.floor(w * pr), Math.floor(h * pr));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    guideOn = !!guideEl && getComputedStyle(guideEl).display !== 'none';   // the phone guide is a media query; read it once per resize, not per frame
+    measureLabelMin();
   }
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });
@@ -1447,7 +1513,7 @@
                    slow: SLOW, PHOTO, PHOTO_SRC, get frameMs() { return +frameMs.toFixed(2); },
                    get photo() { return { key: photoKey, a: +post.uniforms.uPhotoA.value.toFixed(3), note: +photoNote.style.opacity, window: PHOTO.window, peak: PHOTO.peak, at: photoAt().map(s => ({ key: s.key, at: +s.at.toFixed(4), d: +(progress - s.at).toFixed(4) })), loaded: Object.keys(photoTex).filter(k => photoTex[k].image && photoTex[k].image.width), fit: post.uniforms.uPhotoFit.value.toArray().map(v => +v.toFixed(3)), caption: photoNote.children[0].textContent, credit: photoNote.children[1].textContent }; },
                    get camZ() { return camera.position.z; }, get drift() { return [driftX, driftY, parallaxFade(progress)]; }, get warm() { return warm; }, hitch, get scrollY() { return window.scrollY; }, get man() { return Object.assign({ x: +man.position.x.toFixed(2), y: +man.position.y.toFixed(2), z: +man.position.z.toFixed(2), soles: +man.position.y.toFixed(2), hands: +(man.position.y + MAN_HANDS).toFixed(2), faceX: TOWER.faceX ? +TOWER.faceX(man.position.y).toFixed(2) : null, screen: (() => { const v = man.position.clone().project(camera); return [Math.round((v.x + 1) / 2 * innerWidth), Math.round((1 - v.y) / 2 * innerHeight)]; })() }, manState); }, get print() { return mixCur.print; }, BOUNDS, jumpToYear,
-                   get opening() { return openState; },
+                   get opening() { return openState; }, get portrait() { return portraitState; }, PORTRAIT, get labelMinY() { return labelMinY; }, get camera() { return camera; }, get labels() { return labels; },
                    get shadow() { let c = 0, r = 0, t = 0, black = 0; scene.traverse(o => { if (o.isMesh) { t++; if (o.castShadow) c++; if (o.receiveShadow) r++; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m && m.vertexColors && o.geometry && !o.geometry.attributes.color) black++; } });
                      return { enabled: renderer.shadowMap.enabled, lightCasts: key.castShadow, meshes: t, casters: c, receivers: r, uncoloured: black, map: !!key.shadow.map, size: key.shadow.mapSize.x,
                               box: [key.shadow.camera.left, key.shadow.camera.right], pos: key.position.toArray().map(v => +v.toFixed(1)), target: key.target.position.toArray().map(v => +v.toFixed(1)), camZ: +camera.position.z.toFixed(1) }; } };
