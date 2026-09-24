@@ -292,6 +292,10 @@
     const a = findAsset(id); if (!a) return null;
     const probe = a.build(window.NostalgiaCore); probe.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(probe), k = scale || 1, maxz = b.max.z * k, hw = (b.max.x - b.min.x) * k / 2;
+    // street furniture (a phone booth, scooters, a cabinet, a standee) stands on the pavement with
+    // its back to the wall, not in it, and is not a wall a sign can be fixed to; a front is the wall
+    const loose = ['prop', 'arcade', 'vehicle'].indexOf(a.category) >= 0 || id === 'bbcall-ad-standee';
+    if (loose) return asset(id, lib, side * (9.35 + b.min.z * k), z, side > 0 ? -Math.PI / 2 : Math.PI / 2, scale);
     WALLS.push({ side, z0: z - hw, z1: z + hw, top: b.max.y * k });
     return asset(id, lib, side * (9.2 + maxz), z, side > 0 ? -Math.PI / 2 : Math.PI / 2, scale);
   }
@@ -302,7 +306,7 @@
   const body = (side, z, len, h, col) => {
     const nx = Math.max(1, Math.round(len / 6)), tw = len / nx, ny = Math.max(1, Math.round((h - 0.6) / 3.3));
     const r = side > 0 ? -Math.PI / 2 : Math.PI / 2, c = C(col);
-    WALLS.push({ side, z0: z - len / 2, z1: z + len / 2, top: ny * 3.3 + 0.8 });        // to the roof parapet's top
+    WALLS.push({ side, z0: z - len / 2, z1: z + len / 2, top: ny * 3.3 + 0.8, floors: ny, body: true });   // to the roof parapet's top
     for (let i = 0; i < nx; i++) {
       const zz = z + len / 2 - tw * (i + 0.5);
       tiles.ground.push({ x: side * 9.4, z: zz, y: 0, r, w: tw / 6, d: 1, h: hOf(1), c });
@@ -379,6 +383,116 @@
   front('phone-shop-window', 1, -134); body(1, -134, 9, 11, 'haze');
   // a body behind the Red House plaza edge and beyond 萬年 so the row does not end in a field
   body(-1, -140, 8, 9, 'bone'); body(1, -142, 8, 10, 'walk');
+
+  // ═══ the city behind the street (2026-09-24) ════════════════════════════════════════════════
+  // CJ, 2026-09-24: 「紅樓旁邊是空的」— beside the Red House the camera looked out over the engine's
+  // green ground plane. Walking the chapter (0.02 … 0.34) found the same everywhere the street wall
+  // had a hole or the roofs were low enough to see over: a lawn behind the phone booth, open ground
+  // west of 樂聲, blank side walls at the Red House plaza and in the pedestrian zone. Real Ximending
+  // is dense low blocks, 巷 alleys and the 西門町 pedestrian streets, never open ground. So:
+  //   1. the street wall's holes of 4 m or more get shophouses; narrower ones stay as alleys, and
+  //      the rows behind close them;
+  //   2. two rows of blocks behind each side, and around the Red House's cross wing (south of the
+  //      plaza, north of the wing, and closing the east), built the Arcane way: simple boxes, every
+  //      face painted from ximen-fronts.webp (shops at street level, grille-cage storeys above), so
+  //      no side wall is blank; one merged mesh for the faces, one for the boxes and roof sheds;
+  //   3. the at-grade railway behind 中華商場 (to 1989), seen down the market's cross streets;
+  //   4. paving over the green plane for the whole chapter.
+  // Heights stay low (CJ, 2026-09-21: 「盡量矮點」): three to five storeys behind, four to seven on
+  // the far row that closes the horizon.
+  // 1. the street wall's holes
+  body(1, 50.5, 15, 7.2, 'bone'); body(1, 9.75, 7.5, 7.2, 'haze');                  // the opening; behind the phone booth and scooters
+  body(1, -86.5, 11, 7.2, 'walk'); body(1, -110, 4, 10.5, 'bone'); body(1, -125.75, 7.5, 10.5, 'walk');   // the plaza's south edge; the pedestrian zone
+  body(-1, -52.25, 12.5, 7.2, 'haze'); body(-1, -75.75, 4.5, 7.2, 'bone'); body(-1, -88.5, 5, 7.2, 'walk');   // west, past 中華商場, either side of 樂聲
+  body(-1, -113.5, 5, 10.5, 'haze'); body(-1, -134, 4, 10.5, 'bone');
+  (() => {
+    const FW = 1536, FH = 844, CW = 384, CH = 211, FL = 3.3;
+    let seed = 1990; const rr = () => (seed = (seed * 16807) % 2147483647) / 2147483647;   // its own stream: the engine's rnd() feeds every later placement, other chapters included
+    const face = { pos: [], uv: [], idx: [] }, box = { pos: [], nor: [], col: [] };
+    let gi = 3, si = 0;
+    const cell = k => { const cx = (k % 4) * CW, cy = Math.floor(k / 4) * CH; return [cx / FW, (cx + CW) / FW, 1 - (cy + CH) / FH, 1 - cy / FH]; };
+    // a painted wall with outward normal out (horizontal): from p, its bottom-left corner as seen
+    // from outside, along r = up x out, w wide, floors high, in 6 m modules; ground floor from the
+    // shop cells unless noShops, storeys from the rest. 5 cm proud of the wall.
+    function paint(p, out, w, floors, noShops) {
+      const n = Math.max(1, Math.round(w / 6)), mw = w / n, up = new THREE.Vector3(0, 1, 0);
+      const r = new THREE.Vector3().crossVectors(up, out), nrm = out.clone().multiplyScalar(-0.05);
+      for (let i = 0; i < n; i++) for (let f = 0; f < floors; f++) {
+        const [u0, u1, v0, v1] = cell(f === 0 && !noShops ? (gi++ % 8) : 8 + (si++ * 5 % 8));
+        const b = face.pos.length / 3;
+        [[i * mw, f * FL, u0, v0], [(i + 1) * mw, f * FL, u1, v0], [(i + 1) * mw, (f + 1) * FL, u1, v1], [i * mw, (f + 1) * FL, u0, v1]].forEach(([a, y, u, v]) => {
+          const q = p.clone().addScaledVector(r, a).sub(nrm); q.y = y; face.pos.push(q.x, q.y, q.z); face.uv.push(u, v);
+        });
+        face.idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      }
+    }
+    // an axis-aligned box into the vertex-coloured mesh
+    function cube(x0, x1, y0, y1, z0, z1, col) {
+      const c = C(col), P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+      [[0, 3, 2, 1, [0, 0, -1]], [4, 5, 6, 7, [0, 0, 1]], [0, 4, 7, 3, [-1, 0, 0]], [1, 2, 6, 5, [1, 0, 0]], [3, 7, 6, 2, [0, 1, 0]], [0, 1, 5, 4, [0, -1, 0]]].forEach(([a, b2, c2, d, nn]) => {
+        [a, b2, c2, a, c2, d].forEach(k => { box.pos.push(...P[k]); box.nor.push(...nn); box.col.push(c.r, c.g, c.b); });
+      });
+    }
+    // one building: footprint x0..x1, z0..z1, floors; every side painted; a tank or a rooftop shed
+    const V0 = (x, z) => new THREE.Vector3(x, 0, z);
+    function building(x0, x1, z0, z1, floors, noShops) {
+      const top = floors * FL, V = (x, z) => new THREE.Vector3(x, 0, z);
+      cube(x0, x1, 0, top, z0, z1, ['walk', 'haze', 'bone'][Math.floor(rr() * 3)]);
+      cube(x0 - 0.1, x1 + 0.1, top, top + 0.7, z0 - 0.1, z1 + 0.1, 'walk');          // the roof parapet
+      paint(V(x0, z0), new THREE.Vector3(-1, 0, 0), z1 - z0, floors, noShops);           // faces -x
+      paint(V(x1, z1), new THREE.Vector3(1, 0, 0), z1 - z0, floors, noShops);            // faces +x
+      paint(V(x0, z1), new THREE.Vector3(0, 0, 1), x1 - x0, floors, noShops);            // faces +z
+      paint(V(x1, z0), new THREE.Vector3(0, 0, -1), x1 - x0, floors, noShops);           // faces -z
+      const cx = (x0 + x1) / 2 + (rr() - 0.5) * (x1 - x0) * 0.4, cz = (z0 + z1) / 2 + (rr() - 0.5) * (z1 - z0) * 0.4;
+      if (rr() < 0.55) { cube(cx - 0.8, cx + 0.8, top + 0.7, top + 1.6, cz - 0.8, cz + 0.8, 'ink'); cube(cx - 0.9, cx + 0.9, top + 1.6, top + 3.0, cz - 0.9, cz + 0.9, 'haze'); }   // water tank on its stand
+      else { const w = 2 + rr() * 2; cube(cx - w, cx + w, top + 0.7, top + 3.0, cz - 1.8, cz + 1.8, rr() < 0.5 ? 'sky' : 'haze'); cube(cx - w - 0.2, cx + w + 0.2, top + 3.0, top + 3.15, cz - 2, cz + 2, rr() < 0.5 ? 'verm' : 'haze'); }   // 頂樓加蓋, the tin rooftop room
+    }
+    // a row of buildings along the street, x0..x1 deep, from zA down to zB, floors lo..hi
+    function row(x0, x1, zA, zB, lo, hi, noShops) {
+      let z = zA;
+      while (z - 4 > zB) {
+        const w = Math.min(z - zB, 6 + Math.floor(rr() * 3) * 3);
+        building(x0, x1, z - w, z, lo + Math.floor(rr() * (hi - lo + 1)), noShops);
+        z -= w;
+      }
+    }
+    // 2. behind the east street wall, and around the Red House (octagon at x 16.6, z -70; its cross
+    //    wing runs to x ~53 between z -58.5 and -81.5; the plaza is z -54 … -64 in front of it)
+    row(19.4, 29.4, 58, -50, 3, 5); row(19.4, 29.4, -92, -146, 3, 5);
+    row(31, 41, 58, -46, 4, 7, true);
+    for (let x = 29.4; x < 58; x += 9.5) { building(x, x + 9, -56, -46, 3 + Math.floor(rr() * 2)); building(x, x + 9, -94, -84, 3 + Math.floor(rr() * 3)); }   // north of the wing, south of the plaza (the view CJ saw)
+    row(58, 68, -46, -146, 4, 7, true);                                                // closing the east behind the Red House
+    // behind the west street wall: 中華商場 backs onto the railway; the row starts past it
+    row(-34, -24, 58, -146, 3, 5); row(-46, -36, 58, -146, 4, 7, true);
+    // the side walls of every street building: a flank facing the Red House plaza, an alley or the
+    // market's end was a blank shopfront.glb side. Where two buildings touch the paint is inside
+    // the neighbour and never seen.
+    WALLS.filter(w => w.body).forEach(w => {
+      const xa = w.side * 9.4, xb = w.side * 18.6, lo = Math.min(xa, xb), hi = Math.max(xa, xb);
+      paint(V0(lo, w.z1), new THREE.Vector3(0, 0, 1), hi - lo, w.floors, true);        // north flank
+      paint(V0(hi, w.z0), new THREE.Vector3(0, 0, -1), hi - lo, w.floors, true);       // south flank
+    });
+    // the paint, the boxes
+    const TL = new THREE.TextureLoader(), t = n => { const x = TL.load('asset/textures/' + n + '.webp'); x.anisotropy = 8; return x; };
+    const fg = new THREE.BufferGeometry();
+    fg.setAttribute('position', new THREE.Float32BufferAttribute(face.pos, 3)); fg.setAttribute('uv', new THREE.Float32BufferAttribute(face.uv, 2));
+    fg.setIndex(face.idx); fg.computeVertexNormals();
+    const fm = new THREE.Mesh(fg, withFog(new THREE.MeshLambertMaterial({ map: t('ximen-fronts'), normalMap: t('ximen-fronts-n'), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.Float32BufferAttribute(box.pos, 3)); bg.setAttribute('normal', new THREE.Float32BufferAttribute(box.nor, 3)); bg.setAttribute('color', new THREE.Float32BufferAttribute(box.col, 3));
+    const bm = new THREE.Mesh(bg, withFog(new THREE.MeshLambertMaterial({ vertexColors: true })));
+    [fm, bm].forEach(m => { m.receiveShadow = true; m.castShadow = true; lib.add(m); });
+    window.__cityBehind = { faces: face.idx.length / 6, boxes: box.pos.length / 108 };
+  })();
+  // 3. the railway behind 中華商場: ballast and two tracks, at grade until the 1989 undergrounding
+  part(-20, 0, 0, 6.4, 92, only(RED, 0.25, 'haze'));
+  [-18.8, -21.2].forEach(xt => {
+    [-0.72, 0.72].forEach(dx => F(xt + dx, 0, 0.25, 0.08, 92, 0.15, 'ink'));
+    for (let z = 45.6; z > -46; z -= 0.75) F(xt, z, 0.25, 2.4, 0.22, 0.09, 'brick');
+  });
+  // 4. paving over the green: the chapter's ground outside the street is lanes and yards, not field
+  part(44.7, 0, -43, 70.6, 206, only(RED, 0.03, 'walk'));
+  part(-44.7, 0, -43, 70.6, 206, only(RED, 0.03, 'walk'));
 
   // ═══ the signs — built as what they are (realism pass, 2026-09-24) ════════════════════════
   // CJ, 2026-09-24: 「上面那些招牌還是很粗糙啊 路牌招牌 紅布條不像紅布條 字牌都應該是要現實的招牌
