@@ -27,13 +27,19 @@
   //    start (seconds) jumps to the chorus, CJ 2026-09-23 「use chorus」. A start belongs to that upload, not the
   //    song (an intro card shifts everything): the five set on 2026-09-24 were read off the upload's own on-screen
   //    lyrics, frame by frame (lyric video, karaoke tape, subtitled MVs), and 吻別, an album master with no lyrics
-  //    on screen, off the album's timed lyrics, checked against the audio's own repeat structure. ──
+  //    on screen, off the album's timed lyrics, checked against the audio's own repeat structure.
+  //    Fault 3 (CJ, 2026-09-24: 「youtube音樂廣告太多」): no page can strip adverts from a YouTube embed and this one does
+  //    not try; the adverts are the uploader's and the rights holder's. What changed is the upload: where the same
+  //    recording exists on the artist's official channel or an auto-generated "- Topic" channel, that upload is used
+  //    (two songs; the other six had no such upload of the same recording, or already sit on one). A replacement's
+  //    start was re-found for that upload by cross-correlating its audio against the old upload's (onset envelopes,
+  //    whole song and three 40 s windows agreeing to 0.01 s), then the old chorus point moved by that offset. ──
   const YT_VIDEOS = {
     '1980s': [
-      { id: 'CRqwLPDSTkA', title: '望春風', artist: '鄧麗君', year: 1980, channel: 'Henry Chen (fan upload, may be taken down)', start: 56 },
+      { id: 'v2zjxM4wtZc', title: '望春風', artist: '鄧麗君', year: 1980, channel: '鄧麗君 Teresa Teng テレサ・テン (official artist channel; 福建名曲專輯)', start: 55 },   // the same recording as the fan upload it replaces, 0.44 s earlier: 56 → 55.56
       { id: 'ZGRrJY7VELU', title: '台北的天空', artist: '王芷蕾', year: 1985, channel: 'Timeless Music (official lyric video)', start: 42 },   // 「台北的天空 有我年輕的笑容」 fades in at 42.5
       { id: 'lTxZmhAoSGU', title: '我的未來不是夢', artist: '張雨生', year: 1988, channel: '滾石唱片 ROCK RECORDS', start: 100 },
-      { id: 'ZYkxIi8H13w', title: '大約在冬季', artist: '齊秦', year: 1987, channel: '齊秦經典 Classic Chyi Chin', fallback: true, start: 40 },   // 「沒有妳的日子裡」 lights up at 40.2; the hook 「妳問我何時歸故里」 follows at 53
+      { id: 'KueFDMWV5ps', title: '大約在冬季', artist: '齊秦', year: 1987, channel: 'Qin Qi - Topic (album master, 摘金寶典)', fallback: true, start: 39 },   // the MV's 「沒有妳的日子裡」 at 40.2 sits at 39.33 here (the MV runs 0.87 s late); the hook follows at 52
     ],
     '1990s': [
       { id: 'L3xC-dlVS5c', title: '吻別', artist: '張學友', year: 1993, channel: '張學友 Jacky Cheung (Topic)', start: 82 },   // 「我的世界開始下雪」 at 1:22.3; 「我和你吻別」 follows at 1:38
