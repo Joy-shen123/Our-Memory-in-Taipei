@@ -13,6 +13,7 @@
 # linear (the page applies gamma in its post pass), so a painted hex shows as that hex.
 # Deterministic: a fixed seed, so a re-run paints the same street.
 
+import json
 import math
 import os
 import random
@@ -504,16 +505,19 @@ def shops_atlas(r):
     cv = Canvas(W, H)
     g = GROUND[:]; u = UPPER[:]
     r.shuffle(g)
-    layout = []
+    layout, names = [], []
     for b in range(5):
         bx, by = (b % 2) * BW, (b // 2) * BH
         ground = [g[(b * 5 + k) % len(g)] for k in range(5)]
         if b == 4:
             ground[2] = ['點心世界', 'noodles']      # 點心世界, the market's best-known sign, on 信棟 (block 5)
         paint_block_strip(cv, bx, by, ground, (CW, CH), r, False)
+        slot = {'ground': [n for n, _ in ground]}
         for f in (1, 2):
             ups = [u[(b * 7 + f * 5 + k) % len(u)] for k in range(5)]
             paint_block_strip(cv, bx, by + f * CH, ups, (CW, CH), r, True)
+            slot['floor%d' % (f + 1)] = [n for n, _ in ups]
+        names.append(slot)
         layout.append((bx, by))
     # the unused sixth slot: concrete, so a stray UV shows wall, not a hole
     cv.rect((BW, 2 * BH, 2 * BW, 3 * BH), 'walk', 128, 0.95)
@@ -533,6 +537,7 @@ def shops_atlas(r):
         for f in range(3):
             img = multiply(img, (bx, by + f * CH, bx + BW, by + (f + 1) * CH), storey_light)
     grime(img, r, (0, 0, W, H), n=260)
+    shops_atlas.names = names
     return img, cv.h
 
 
@@ -781,6 +786,10 @@ def main():
     r = random.Random(1990)
     img, h = shops_atlas(r)
     save(img, 'chunghwa-shops.webp', 72)
+    # what each painted unit is, so scene-red.js hangs the right sign in front of it:
+    # slots[s] = { ground, floor2, floor3 }, 5 names each, north → south; plus the east side
+    with open(os.path.join(OUT, 'chunghwa-shops.json'), 'w') as f:
+        json.dump({'slots': shops_atlas.names, 'east': [[n for n, _ in pair] for pair in EAST_GROUND]}, f, ensure_ascii=False, indent=1)
     # no normal map: the shop fronts render unlit, their light is painted
     img, h = ends_atlas(r)
     save(img, 'chunghwa-ends.webp', 80)
