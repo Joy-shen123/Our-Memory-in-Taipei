@@ -1114,7 +1114,10 @@
   // ── the uPrint post pass: posterize, grain, outline, vignette ────────────────
   // One fullscreen pass. uPrint 1 = woodblock print, 0 = night photograph. Lighting stays on
   // the whole time; posterizing flattens it into print blocks. Grain is shader noise.
-  const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true });
+  // Fault 6 (CJ, 2026-09-25: 「這個招牌怪怪的」): with no stencil, r149 gives this target a 16-bit depth renderbuffer, and at
+  // 30 m that cannot tell a steel bar 2.5 cm behind a sign face from the face — the Lux neon's cage (lux.py neon_frame)
+  // bled through the 樂聲戲院 board as dashed diagonals. stencilBuffer asks for DEPTH24_STENCIL8: 24 bits of depth.
+  const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true, stencilBuffer: true });
   // (issue #19) the photograph at a crossing goes through the post pass: uPhoto is the picture,
   // uPhotoA its opacity over the frame (scroll-driven, updatePhoto), uPhotoFit the cover-fit,
   // uPhotoOld how much old-print treatment it takes. uPhoto starts as a 1×1 blank.
