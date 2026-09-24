@@ -29,33 +29,83 @@
   else if (loader) console.error('meshopt_decoder.js is missing: the packed glbs need it (load it after GLTFLoader.js)');
   const cache = {};
 
-  // group 1 = Spring Festival (z -140 … -290), group 2 = The Future (z -290 on). Everything else,
-  // and anything shared with chapter 1 (props, lamp, tree, girl), is in the first request.
-  const LATE = { 'dihua-min': 1, 'dihua-yang': 1, 'dihua-baroque': 1, 'dihua-zone2': 1, 'dadao-entrance': 1, 'stall': 1, 'temple': 1, 'yongle': 1, 'tower101': 2 };
+  // Three requests, not eighteen (CJ, 2026-09-25: 「載很久」). Eighteen separate glbs queued on
+  // GitHub Pages: a 2 KB bollard.glb was taking 5.7 seconds because it was waiting its turn, not
+  // because it was large. tools/bundle-models.mjs merges them into one file per load group, each
+  // model's contents re-parented under a node carrying its old file name — so load('props', …)
+  // still hands back something whose children are the same nodes they always were.
+  //
+  // group 0 = the first request (chapter 1 and everything shared), group 1 = Spring Festival
+  // (z -140 … -290), group 2 = The Future (z -290 on). A late group's fetch starts when the scroll
+  // gets near (LATE_AT) or LATE_IDLE_MS after the load event, whichever comes first; its models
+  // rise out of the ground over the era tween instead of popping in.
+  const BUNDLES = {
+    'bundle-core':  { group: 0, names: ['bollard','chunghwa','girl','lamp','lux','props','red-house','shopfront','tree'] },
+    'bundle-dadao': { group: 1, names: ['dihua-min','dihua-yang','dihua-baroque','dihua-zone2','dadao-entrance','stall','temple','yongle'] },
+    'bundle-tower': { group: 2, names: ['tower101'] },
+  };
+  const BUNDLE_OF = {};                                   // model name → bundle file name
+  Object.keys(BUNDLES).forEach(b => BUNDLES[b].names.forEach(n => BUNDLE_OF[n] = b));
+
   const LATE_AT = [0, 0.04, 0.30];      // scroll fraction that releases a group early (chapter 2 begins at 0.347, chapter 3 at 0.582)
   const LATE_IDLE_MS = 1500;            // after the load event, group 1 starts anyway; group 2 follows it
   const held = { 1: [], 2: [] }, released = { 1: false, 2: false }, inflight = { 1: 0, 2: 0 };
+  const bundles = {};                   // bundle name → { gltf } | { waiting: [names] }
+  let coreReady = false;
+  const coreWaiters = [];
 
   function load(name, cb) {
     if (!loader) { console.error('THREE.GLTFLoader is missing: load GLTFLoader.js after three.min.js'); return; }
     const e = cache[name];
     if (e && e.gltf) { cb(e.gltf); return; }
     if (e) { e.waiting.push(cb); return; }
-    cache[name] = { waiting: [cb], group: LATE[name] || 0 };
-    if (LATE[name] && !released[LATE[name]]) { held[LATE[name]].push(name); return; }
+    const bundleName = BUNDLE_OF[name];
+    if (!bundleName) { console.error(name + ' is in no bundle: add it to tools/bundle-models.mjs'); return; }
+    const g = BUNDLES[bundleName].group;
+    cache[name] = { waiting: [cb], group: g };
+    if (g && !released[g]) { if (held[g].indexOf(name) < 0) held[g].push(name); return; }
     fetch(name);
   }
+
+  // fetch(name) loads name's bundle if it is not already in, then hands every model waiting on
+  // that bundle its own node out of it.
   function fetch(name) {
-    const g = cache[name].group;
+    const bundleName = BUNDLE_OF[name], b = bundles[bundleName];
+    if (b && b.gltf) { deliver(bundleName); return; }
+    if (b) return;                                        // already in flight; deliver() will catch it
+    const g = BUNDLES[bundleName].group;
+    bundles[bundleName] = { loading: true };
     if (g) inflight[g]++;
-    loader.load('asset/models/' + name + '.glb', gltf => {
-      gltf.scene.userData.late = g > 0;                                  // a late group: rise, do not pop
-      const w = cache[name].waiting;
-      cache[name] = { gltf, waiting: [], group: g };
-      w.forEach(f => f(gltf));
+    loader.load('asset/models/' + bundleName + '.glb', gltf => {
+      bundles[bundleName] = { gltf };
+      deliver(bundleName);
+      if (g === 0) { coreReady = true; coreWaiters.splice(0).forEach(f => f()); }
       done(g);
-    }, undefined, err => { console.error(name + '.glb failed to load', err); done(g); });
+    }, undefined, err => {
+      console.error(bundleName + '.glb failed to load', err);
+      bundles[bundleName] = { failed: true };
+      if (g === 0) { coreReady = true; coreWaiters.splice(0).forEach(f => f()); }
+      done(g);
+    });
   }
+
+  function deliver(bundleName) {
+    const b = bundles[bundleName];
+    if (!b || !b.gltf) return;
+    const g = BUNDLES[bundleName].group;
+    BUNDLES[bundleName].names.forEach(n => {
+      const e = cache[n];
+      if (!e || e.gltf) return;
+      const scene = b.gltf.scene.getObjectByName(n);
+      if (!scene) { console.error(n + ' is missing from ' + bundleName + '.glb'); return; }
+      scene.userData.late = g > 0;                        // a late group: rise, do not pop
+      const one = { scene, animations: b.gltf.animations };
+      const w = e.waiting;
+      cache[n] = { gltf: one, waiting: [], group: g };
+      w.forEach(f => f(one));
+    });
+  }
+
   function done(g) { if (g && --inflight[g] === 0 && g === 1) release(2); }
   function release(g) {
     if (released[g]) return;
@@ -75,6 +125,11 @@
   const idle = () => setTimeout(() => release(1), LATE_IDLE_MS);
   if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 
+  // onCoreReady(cb): the opening veil waits on this, so nobody watches the street assemble itself
+  // out of black boxes (CJ, 2026-09-25: 「為什麼第一次跑的時候還是破圖加黑屏」). Chapter 1 only —
+  // the veil must never wait on chapter 3.
+  function onCoreReady(cb) { if (coreReady) cb(); else coreWaiters.push(cb); }
+
   const isLate = o => { for (let p = o; p; p = p.parent) if (p.userData && p.userData.late) return true; return false; };
 
   function lambertize(root) {
@@ -88,7 +143,18 @@
     return root;
   }
 
-  const node = (root, name) => root.getObjectByName(name) || null;
+  // node(root, name): three.js's GLTFLoader makes node names unique within a file, so once the
+  // models share one bundle the three dihua styles' 'main' becomes main, main_1, main_2. The
+  // search is scoped to one model's wrapper, where the name is unambiguous, so a _N suffix is
+  // the same node and we take it (CJ, 2026-09-25: the bundling fault).
+  function node(root, name) {
+    const exact = root.getObjectByName(name);
+    if (exact) return exact;
+    const re = new RegExp('^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '_\\d+$');
+    let found = null;
+    root.traverse(o => { if (!found && o.name && re.test(o.name)) found = o; });
+    return found;
+  }
 
   function prims(root) {
     const out = [];
@@ -132,6 +198,7 @@
   }
   const scaleH = (h, H) => { const o = {}; Object.keys(h).forEach(k => o[k] = h[k] * H); return o; };
 
-  window.MODELS = { load, lambertize, node, prims, unitGeo, instance,
+  window.MODELS = { load, lambertize, node, prims, unitGeo, instance, onCoreReady,
+                    get coreReady() { return coreReady; },
                     get late() { return { released: { ...released }, held: { 1: held[1].slice(), 2: held[2].slice() }, inflight: { ...inflight } }; } };
 })();

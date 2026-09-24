@@ -21,3 +21,6 @@ research/transcripts/
 render/
 *.blend
 *.blend1
+
+# bundling: the per-model sources are inputs, the bundles are what ships
+tools/node_modules/

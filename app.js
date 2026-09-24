@@ -1356,8 +1356,26 @@
       });
     });
   }
+  // The veil does not lift until chapter 1's models are in. Before this, a viewer who scrolled
+  // straight away watched the street build itself out of black boxes while the glbs arrived one
+  // at a time — CJ, 2026-09-25: 「為什麼第一次跑的時候還是破圖加黑屏」. The title is held with it,
+  // because a title on a cream field is what a loading screen should look like, and because a lone
+  // veil with nothing on it reads as a page that failed. Chapter 1 only: the veil must never wait
+  // on Dadaocheng or on the tower.
+  let veilHeld = true, veilFreed = 0;
+  if (window.MODELS && MODELS.onCoreReady) MODELS.onCoreReady(() => { veilHeld = false; veilFreed = performance.now(); });
+  else veilHeld = false;
+  const VEIL_EASE_MS = 420;
+  function veilFloor() {
+    if (veilHeld) return 1;
+    if (!veilFreed) return 0;
+    const t = (performance.now() - veilFreed) / VEIL_EASE_MS;
+    return t >= 1 ? 0 : 1 - sm(t);
+  }
+
   function updateOpening(u, camZ) {
-    const fog = 1 - sm(u / OPENING.fogTo), title = 1 - sm((u - OPENING.titleFrom) / (OPENING.titleTo - OPENING.titleFrom));
+    const floor = veilFloor();
+    const fog = Math.max(floor, 1 - sm(u / OPENING.fogTo)), title = Math.max(floor, 1 - sm((u - OPENING.titleFrom) / (OPENING.titleTo - OPENING.titleFrom)));
     openState = { fog: +fog.toFixed(3), title: +title.toFixed(3) };
     if (fog > 0.001) {
       FOG_U.frontier.value = camZ + 40 - (1 - fog) * 800; FOG_U.soft.value = 30; scene.fog.density = HAZE_DENSITY + fog * fog * 0.02;
