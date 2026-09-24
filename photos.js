@@ -183,12 +183,16 @@
     const now = performance.now(), dt = Math.min(0.05, (now - lastNow) / 1000); lastNow = now;
     const era = f.era, u = f.progress, W = innerWidth, H = innerHeight;
     const closing = Math.min(1, Math.max(0, (u - CLOSING_FROM) / 0.05));   // markers step aside for the closing line, like the labels
+    // CJ, 2026-09-24: 「興趣點在首頁點的到」. While the opening fog is up (app.js updateOpening, __fog.opening.fog > 0)
+    // the title fills a phone's frame and the street behind it is a wash: no marker is drawn or takes a tap until
+    // the fog has cleared. When it clears (OPENING.fogTo) is data.js's, not this file's.
+    const veiled = !!(f.opening && f.opening.fog > 0);
     const farK = W < H ? 1.6 : 1;   // a portrait phone sees a narrow slice of the street: let the markers fade in while the building is still ahead and in frame
     let curVis = 0;
     for (let i = 0; i < SPOTS.length; i++) {
       const s = SPOTS[i], el = s.el;
       let vis = 0, sx = 0, sy = 0;
-      if (s.eras.indexOf(era) >= 0) {
+      if (!veiled && s.eras.indexOf(era) >= 0) {
         wp.set(s.x, s.y, s.z).project(cam);
         const dist = Math.hypot(s.x - cam.position.x, s.z - cam.position.z);
         const inFront = wp.z < 1 && Math.abs(wp.x) < 0.98 && Math.abs(wp.y) < 0.98;
