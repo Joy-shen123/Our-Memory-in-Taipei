@@ -446,6 +446,7 @@
     }
     scene.add(mesh);
     const set = { mesh, items, from: items.map(() => 0) };
+    if (opts && opts.rise) set.riseT0 = clockNow;                // a late model (models.js): grow out of the ground over ERA_MS instead of popping in
     instSets.push(set);
     return set;
   }
@@ -453,8 +454,10 @@
   function instSnapshot() { instSets.forEach(set => set.items.forEach((it, i) => { set.from[i] = it.cur == null ? 0 : it.cur; })); }
   function instUpdate(e, key) {
     instSets.forEach(set => {
+      let es = e;
+      if (set.riseT0 != null) { const k = Math.min(1, (clockNow - set.riseT0) / ERA_MS); es = Math.min(e, ease3(k)); if (k >= 1) delete set.riseT0; }
       set.items.forEach((it, i) => {
-        const to = it.h[key] || 0, h = set.from[i] + (to - set.from[i]) * e;
+        const to = it.h[key] || 0, h = set.from[i] + (to - set.from[i]) * es;
         it.cur = h;
         Q.setFromAxisAngle(Y, it.r || 0);
         const on = h > 0.01;                                     // absent items vanish entirely, no flat footprint
@@ -710,6 +713,17 @@
     g.visible = eras.indexOf(ERAS[eraIdx].key) >= 0;   // the scene files run after the first setEra, so start in the right state
     return g;
   }
+  // rise(obj): a model that arrives after the first frame (models.js's late groups) grows from its base
+  // over ERA_MS, the era tween's own move, so nothing pops in ahead of the camera.
+  const risers = [];
+  function rise(obj) { risers.push({ obj, t0: clockNow, sy: obj.scale.y }); obj.scale.y = 0.0001; }
+  function updateRisers(now) {
+    for (let i = risers.length - 1; i >= 0; i--) {
+      const r = risers[i], k = Math.min(1, (now - r.t0) / ERA_MS);
+      r.obj.scale.y = Math.max(0.0001, r.sy * ease3(k));
+      if (k >= 1) risers.splice(i, 1);
+    }
+  }
   const unfog = g => g.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.fog = false; if (m.isMeshStandardMaterial) { m.envMapIntensity = ENV_I; litMats.push(m); } m.needsUpdate = true; }); } });
   const libBox = new THREE.Box3(), libSize = new THREE.Vector3();
   function findAsset(id) {
@@ -777,7 +791,7 @@
   // lam(col, extra?)                            lit() by palette key, surface family chosen from the key
   // aoBake(geo)                                 bakes the height-rule occlusion into a geometry's vertex colours (part and instSet do it)
   // people(items)                               pedestrians through instSet: { x, z, y?, r?, v?, h:{red,dadao,tower} }, h = figure height
-  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset, people };
+  window.SCENE = { part, instSet, only, C, boxGeo, withFog, lit, lam, aoBake, scene, GRID, ERAS, anchors, PALETTE, rnd, TOWER, walkX, libGroup, asset, findAsset, people, rise };
   window.SCENE.camera = camera;   // issue #17: photos.js projects its street markers with the scroll camera; it only reads it
 
 
@@ -1001,6 +1015,7 @@
     sky.position.copy(camera.position);
     liftTops();
     instUpdate(e, key);
+    updateRisers(now);
     updateWindows(key);
     key.intensity = mixCur.lamp;
     hemi.intensity = mixCur.hemi;
@@ -1156,7 +1171,17 @@
   // hold: the pass is the scroll's own. A picture whose file has not decoded yet is skipped.
   let photoKey = null;
   const photoTex = {};
-  Object.keys(PHOTO_SRC).forEach(k => { photoTex[k] = new THREE.TextureLoader().load(PHOTO_SRC[k].src, t => { t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }); });
+  // Fault 1 (CJ, 2026-09-24: 「東西太多loading太久」): the two pictures (300 KB) are not in the first request. They load
+  // when the scroll is PHOTO_LEAD short of the first marking or, whichever comes first, PHOTO_IDLE_MS after the load event;
+  // a pass whose picture is not decoded yet is skipped, as before.
+  const PHOTO_LEAD = 0.12, PHOTO_IDLE_MS = 2500;
+  let photosLoading = false;
+  function loadPhotos() {
+    if (photosLoading) return; photosLoading = true;
+    Object.keys(PHOTO_SRC).forEach(k => { photoTex[k] = new THREE.TextureLoader().load(PHOTO_SRC[k].src, t => { t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }); });
+  }
+  const photoIdle = () => setTimeout(loadPhotos, PHOTO_IDLE_MS);
+  if (document.readyState === 'complete') photoIdle(); else window.addEventListener('load', photoIdle);
   // caption and credit, top-right under the site title, ink on a paper pill so it reads over the
   // picture and over the street alike. CC BY and CC BY-SA both require the credit to be visible.
   const photoNote = (() => {
@@ -1178,6 +1203,7 @@
   }
   function updatePhoto() {
     let key = null, a = 0;
+    if (!photosLoading && progress >= photoAt()[0].at - PHOTO_LEAD) loadPhotos();
     photoAt().forEach(s => {
       const d = progress - s.at;
       if (d < 0 || d > PHOTO.window) return;
