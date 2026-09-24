@@ -1,12 +1,16 @@
 // music.js — the decade music player (issue #4). Loaded after app.js and the scene files.
 //
-// One YouTube IFrame player sits inside the bottom-left control as a small MV box (YouTube's terms
-// want it visible, 200 px or larger, so it is never hidden while it plays). Each decade maps to a
-// list of videos (table below); the scroll year (window.__fog.year) picks the decade, a decade change
-// loads that decade's current video with a hard cut, and pressing the button of the decade already
-// playing advances to its next video. A video that ends or errors moves on to the next in its list.
-// The tower chapter (2020 onward) keeps the 2010s list. A manual choice holds until the scroll moves
-// into a decade other than the chosen one, then the scroll takes over again.
+// One YouTube IFrame player sits inside the bottom-left control, unseen: the control is an audio bar
+// (CJ, 2026-09-24: 「左下角youtube 變成音訊條可以拉就好」) — play / pause, the track, elapsed and total
+// time, and a scrub bar you can drag. The player's iframe stays in the DOM at 200 × 200 (the size its
+// own script expects) inside a 1 × 1 clipped, transparent box, never display: none (some browsers stop
+// the audio); the bar polls its clock on a 250 ms timer, not on the render loop, and drives it with
+// seekTo / playVideo / pauseVideo. Each decade maps to a list of videos (table below); the scroll year
+// (window.__fog.year) picks the decade, a decade change loads that decade's current video with a hard
+// cut, and pressing the button of the decade already playing advances to its next video. A video that
+// ends or errors moves on to the next in its list. The tower chapter (2020 onward) keeps the 2010s list.
+// A manual choice holds until the scroll moves into a decade other than the chosen one, then the scroll
+// takes over again. Every song starts at its chorus (`start`, CJ 2026-09-23 「use chorus」).
 //
 // Fallback: when the YouTube API cannot load (offline), or YouTube refuses to play (it answers error
 // 153 to a double-clicked file:// page, which sends no HTTP referrer), the four synthesised loops
@@ -83,7 +87,11 @@
     root: document.getElementById('music'), toggle: document.getElementById('musMute'), decade: document.getElementById('musDecade'),
     track: document.getElementById('musTrack'), status: document.getElementById('musStatus'), box: document.getElementById('musBox'), embed: document.getElementById('musEmbed'),
     buttons: Array.from(document.querySelectorAll('#music [data-decade]')),
+    // the bar: one set of elements for both paths, YouTube and the local <audio>
+    play: document.getElementById('musPlay'), scrub: document.getElementById('musScrub'), fill: document.getElementById('musFill'), knob: document.getElementById('musKnob'),
+    now: document.getElementById('musNow'), dur: document.getElementById('musDur'),
   };
+  let userPaused = false;               // the visitor pressed pause: a decade change loads the next song but does not start it
 
   // ── YouTube ─────────────────────────────────────────────────────────────────
   let yt = null, ytReady = false, ytState = -1, ytTimer = 0, ytLoadedId = '';
@@ -103,8 +111,8 @@
       const d = cur >= 0 ? cur : decadeOfYear(currentYear()), v = videoOf(d);
       try {
         yt = new YT.Player(el.embed, {
-          width: '100%', height: '100%', videoId: v ? v.id : undefined,
-          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 1, iv_load_policy: 3, start: v && v.start ? Math.floor(v.start) : 0 },
+          width: '200', height: '200', videoId: v ? v.id : undefined,   // the player's own minimum; the box around it clips it to nothing (style.css .mus-hide)
+          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 0, disablekb: 1, iv_load_policy: 3, start: v && v.start ? Math.floor(v.start) : 0 },
           events: {
             onReady: () => {
               clearTimeout(ytTimer); ytReady = true; mode = 'youtube'; ytLoadedId = v ? v.id : '';
@@ -145,7 +153,7 @@
     const v = videoOf(d); if (!v) return;
     ytLoadedId = v.id;
     const spec = { videoId: v.id, startSeconds: v.start ? Math.floor(v.start) : 0 };
-    if (gestured && !(muted && isPhone())) yt.loadVideoById(spec); else yt.cueVideoById(spec);
+    if (gestured && !userPaused && !(muted && isPhone())) yt.loadVideoById(spec); else yt.cueVideoById(spec);   // cued: it waits at its chorus for play
   }
 
   // ── local fallback: two <audio> loops, alternating ──────────────────────────
@@ -171,9 +179,9 @@
   function localGo(d, instant) {
     const from = players[active], to = players[1 - active];
     load(to, d);
-    if (unlocked) { cue(to, d); tryPlay(to); }
+    if (unlocked) { cue(to, d); if (!userPaused) tryPlay(to); }
     active = 1 - active;
-    if (instant || !unlocked) { to.volume = unlocked ? VOLUME : 0; from.volume = 0; from.pause(); fade = null; }
+    if (instant || !unlocked || userPaused) { to.volume = unlocked ? VOLUME : 0; from.volume = 0; from.pause(); fade = null; }
     else fade = { from, to, t0: performance.now() };
   }
   function stepFade() {
@@ -252,6 +260,75 @@
   if (el.toggle) el.toggle.addEventListener('click', ev => { ev.stopPropagation(); if (justGestured) { justGestured = false; if (muted) setMuted(false); return; } toggle(); });
   el.buttons.forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); setDecade(b.dataset.decade); }));
 
+  // ── the bar: play / pause, the clock, the scrubber ─────────────────────────
+  // Position and length come from whichever path plays: the YouTube player's getCurrentTime / getDuration or the
+  // active <audio>'s currentTime / duration. A 250 ms timer reads them (the render loop stays untouched); while a
+  // drag is on, the bar shows the finger's position instead and seeks on release.
+  const TICK_MS = 250, STEP_S = 5;
+  let dragging = false, dragFrac = 0, lastNow = '', lastDur = '';
+  const ytLive = () => mode === 'youtube' && ytReady && yt && typeof yt.getCurrentTime === 'function';
+  function clock() {
+    if (ytLive()) { const d = +yt.getDuration() || 0; return { t: Math.max(0, +yt.getCurrentTime() || 0), d }; }
+    if (mode === 'local') { const p = players[active]; const d = isFinite(p.duration) ? p.duration : 0; return { t: p.currentTime || 0, d }; }
+    return { t: 0, d: 0 };
+  }
+  const isPlaying = () => mode === 'youtube' ? (ytState === 1 || ytState === 3) : mode === 'local' && unlocked && !players[active].paused;
+  const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function seek(t) {
+    if (ytLive()) yt.seekTo(t, true);                                     // a paused player stays paused, a playing one plays on from there
+    else if (mode === 'local') { const p = players[active]; try { p.currentTime = t; } catch (e) { /* no metadata yet */ } }
+  }
+  function playPause() {
+    if (mode === 'youtube') {
+      if (!ytReady) return;
+      if (isPlaying()) { userPaused = true; yt.pauseVideo(); }
+      else { userPaused = false; if (muted && isPhone()) setMuted(false); else yt.playVideo(); }
+    } else if (mode === 'local') {
+      if (!unlocked) { unlock(); return; }
+      const p = players[active];
+      if (p.paused) { userPaused = false; if (p.ended) cue(p, cur); tryPlay(p); } else { userPaused = true; p.pause(); }
+    }
+    render();
+  }
+  function tick() {
+    const c = clock(), frac = dragging ? dragFrac : c.d > 0 ? Math.min(1, c.t / c.d) : 0;
+    const now = fmt(dragging ? dragFrac * c.d : c.t), dur = fmt(c.d);
+    if (el.now && now !== lastNow) { el.now.textContent = now; lastNow = now; }
+    if (el.dur && dur !== lastDur) { el.dur.textContent = dur; lastDur = dur; }
+    const pct = (frac * 100).toFixed(2) + '%';
+    if (el.fill) el.fill.style.width = pct;
+    if (el.knob) el.knob.style.left = pct;
+    if (el.scrub) el.scrub.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+    if (el.root) el.root.classList.toggle('playing', isPlaying());
+  }
+  setInterval(tick, TICK_MS);
+  if (el.play) el.play.addEventListener('click', ev => { ev.stopPropagation(); if (justGestured) { justGestured = false; return; } playPause(); });   // the click that woke the page already started it
+  if (el.scrub) {
+    const fracOf = ev => { const r = el.scrub.getBoundingClientRect(); return r.width > 0 ? Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) : 0; };
+    el.scrub.addEventListener('pointerdown', ev => {
+      if (ev.button !== undefined && ev.button !== 0) return;
+      dragging = true; dragFrac = fracOf(ev); el.root.classList.add('scrubbing');
+      try { el.scrub.setPointerCapture(ev.pointerId); } catch (e) { /* no capture, the move still lands here */ }
+      ev.preventDefault(); tick();
+    });
+    el.scrub.addEventListener('pointermove', ev => { if (!dragging) return; dragFrac = fracOf(ev); tick(); });
+    const release = ev => {
+      if (!dragging) return;
+      dragging = false; el.root.classList.remove('scrubbing');
+      if (ev.type !== 'pointercancel') { dragFrac = fracOf(ev); const c = clock(); if (c.d > 0) seek(dragFrac * c.d); }
+      tick();
+    };
+    el.scrub.addEventListener('pointerup', release); el.scrub.addEventListener('pointercancel', release);
+    el.scrub.addEventListener('keydown', ev => {
+      const c = clock(); if (c.d <= 0) return;
+      const k = ev.key; let t = null;
+      if (k === 'ArrowLeft' || k === 'ArrowDown') t = c.t - STEP_S; else if (k === 'ArrowRight' || k === 'ArrowUp') t = c.t + STEP_S; else if (k === 'Home') t = 0; else if (k === 'End') t = c.d - 1;
+      else if (k === ' ' || k === 'Enter') { ev.preventDefault(); playPause(); return; }
+      if (t === null) return;
+      ev.preventDefault(); ev.stopPropagation(); seek(Math.max(0, Math.min(c.d, t))); tick();
+    });
+  }
+
   function render() {
     const di = cur >= 0 ? cur : decadeOfYear(currentYear()), d = DECADES[di], v = videoOf(di), t = localOf(di);
     const onYT = mode === 'youtube', n = onYT ? d.videos.length : d.local.length, i = onYT ? d.vi : d.li;
@@ -265,7 +342,8 @@
       el.toggle.setAttribute('aria-pressed', started && !muted ? 'true' : 'false');
     }
     el.buttons.forEach(b => { const on = b.dataset.decade === d.key; b.classList.toggle('on', on); b.title = on && n > 1 ? (onYT ? 'Next video' : 'Next song') : ''; });
-    if (el.root) { el.root.dataset.mode = mode; el.root.classList.toggle('muted', muted); el.root.classList.toggle('locked', onYT ? !gestured : mode === 'local' && !unlocked); }
+    if (el.play) { const on = isPlaying(); el.play.setAttribute('aria-pressed', on ? 'true' : 'false'); el.play.setAttribute('aria-label', on ? 'Pause' : 'Play'); }
+    if (el.root) { el.root.dataset.mode = mode; el.root.classList.toggle('muted', muted); el.root.classList.toggle('playing', isPlaying()); el.root.classList.toggle('locked', onYT ? !gestured : mode === 'local' && !unlocked); }
   }
 
   // ── per-frame: follow the scroll year ───────────────────────────────────────
@@ -333,6 +411,8 @@
     get fading() { return !!fade; }, get volumes() { return players.map(p => +p.volume.toFixed(2)); }, get failed() { return failed; },
     get state() { return players.map(p => ({ src: (p.getAttribute('src') || '').split('/').pop(), paused: p.paused, ready: p.readyState, err: p.error && p.error.code, t: +p.currentTime.toFixed(1), dur: +(p.duration || 0).toFixed(0), muted: p.muted })); },
     get embed() { const f = document.querySelector('#music iframe'); return f ? { src: f.src.slice(0, 60), w: f.clientWidth, h: f.clientHeight } : null; },
-    setDecade, nextVideo, nextLocal, toggle, setMuted, YT_VIDEOS, DECADES,
+    get position() { return +clock().t.toFixed(2); }, get duration() { return +clock().d.toFixed(2); }, get paused() { return userPaused; },
+    get bar() { return { now: el.now && el.now.textContent, dur: el.dur && el.dur.textContent, fill: el.fill && el.fill.style.width, playing: isPlaying() }; },
+    setDecade, nextVideo, nextLocal, toggle, setMuted, seek, playPause, YT_VIDEOS, DECADES,
   };
 })();
