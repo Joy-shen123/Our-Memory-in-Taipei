@@ -31,7 +31,7 @@ const position = async(p,u) => {
    result.shots[z]=await position(p,u);
    await p.screenshot({path:path.join(out,`zone${z}-${phase}.png`)});
   }
-  if(phase==='after') {
+  if(phase==='after' || (phase==='before' && zone===1)) {
    for(let pass=1;pass<=2;pass++) for(const u of [.38,.44,.52]) {
     await position(p,u);
     const sample=await p.evaluate(()=>new Promise(resolve=>{let start=null,n=0;const f=t=>{if(start===null)start=t;else n++;if(t-start>=1500)resolve({fps:1000*n/(t-start),frames:n,elapsed:t-start});else requestAnimationFrame(f)};requestAnimationFrame(f)}));

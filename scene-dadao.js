@@ -18,7 +18,7 @@
 
   // ── geometries, base at y = 0 unless noted ──────────────────────────────────
   const cylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); cylGeo.translate(0, 0.5, 0);
-  const sphGeo = new THREE.SphereGeometry(0.5, 8, 6); sphGeo.translate(0, 0.5, 0);
+  const sphGeo = new THREE.SphereGeometry(0.5, 20, 12); sphGeo.translate(0, 0.5, 0);
 
   // ── signage text: characters drawn to a canvas with the system font ────────
   function textTex(str, bg, fg, vertical) {
@@ -64,7 +64,7 @@
   const crests = { min: [], yang: [], baroque: [] };
   // Dedicated models for complete bays inside zone 2; boundaries and other zones stay fixed.
   const zone2 = { arcade: [], min: [], yang: [], baroque: [], yang_crest: [], baroque_crest: [], storey: [] };
-  let zone2Bay = 0;
+  const referenceBayIndex = { 1: 0, 2: 0 };
   // A deterministic brick bond in palette-relative values. Planar UVs are generated on
   // the dedicated model only; original shared assets/materials remain untouched.
   const brickCanvas = document.createElement('canvas');
@@ -107,8 +107,8 @@
     if (o.open) return;
     const floors = Math.min(3, Math.max(1, o.floors || (o.tall ? 3 : 2)));
     const it = { x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) };
-    if (z0 <= -190 && z1 >= -230) {
-      const index = zone2Bay++;
+    if ((z0 <= -190 && z1 >= -230) || (z0 <= -150 && z1 >= -190 && !o.libDepth)) {
+      const index = referenceBayIndex[z0 <= -190 ? 2 : 1]++;
       // Ground + one upper floor, with an occasional real additional floor. The arcade
       // head stays at 4.1 m: stretching the whole asset would stretch every doorway.
       zone2.arcade.push(it);
@@ -351,28 +351,90 @@
   }
 
   // ── parked at the kerb, north of the festival only: scooters and bicycles, the library
-  //    tricycle and blue truck ──
+  //    blue truck. The historical tricycle is inappropriate for the 2000–2019 chapter. ──
   const veh = [];
   [{ x: 5.9, z0: -153, z1: -196 }, { x: -5.9, z0: -158, z1: -196 }].forEach(k => {
     for (let z = k.z0; z > k.z1; z -= 1.8) {
-      if (k.x < 0 && (Math.abs(z + 168) < 2.2 || Math.abs(z + 186) < 2.6)) continue;   // the tricycle and the truck
+      if (k.x < 0 && (Math.abs(z + 168) < 2.2 || Math.abs(z + 186) < 2.6)) continue;   // unloading spaces; preserve the seeded layout
       const r = rnd();
       if (r < 0.35) { rnd(); bikes.push({ x: k.x, y: 0, z, w: 1, d: 1, r: (rnd() - 0.5) * 0.3 + (k.x > 0 ? Math.PI : 0), h: HA(1) }); }   // a bicycle (props.glb)
       else if (r < 0.75) veh.push({ x: k.x, y: 0, z, w: 0.5, d: 1.7, r: (rnd() - 0.5) * 0.2, c: C(rnd() < 0.85 ? 'haze' : 'bone'), h: HA(0.85) });
     }
   });
   for (let i = 0; i < 8; i++) bikes.push({ x: -21.6 + (rnd() - 0.5) * 0.8, y: 0.8, z: -232 + i * 6, w: 1, d: 1, r: 0.35 + rnd() * 0.3, h: HA(1) });   // bicycles on the promenade
-  asset('sanlunche', lib, -5.7, -168, 0);
   asset('blue-mini-truck', lib, -5.6, -186, Math.PI);
+  MODELS.load('dadao-entrance', gltf => {
+    const scooters = [];
+    for (let i = 0; i < 20; i++) {
+      const s = i % 2 ? 1 : -1, z = -155 - Math.floor(i / 2) * 3.6;
+      if (s < 0 && z < -182) continue;
+      scooters.push({ x: s * 6.05, y: WALK, z, r: s * .85, w: 1, d: 1, h: HA(1) });
+    }
+    MODELS.instance(MODELS.node(gltf.scene, 'scooter'), scooters);
+    MODELS.instance(MODELS.node(gltf.scene, 'portal'), [{ x: 0, z: -150, w: 1, d: 1, h: H(1, 1, 0) }]);
+  });
 
   // ── 年貨大街: the entrance archway, lantern strings over the road, banners, stalls both
   //    sides with red price boards, the two library stalls ──
   const fest = [], stalls = [];
-  asset('nianhuo-archway', lib, 0, -150, 0, 1.6);
-  for (let k = 0; k < 8; k++) {
-    const z = -198 - k * 12;
-    fest.push({ x: 0, y: 7.4, z, w: 12.9, d: 0.04, r: 0, c: C('ink'), h: HA(0.04) });
-    for (let i = 0; i <= 10; i++) lant.push({ x: -5 + i, y: 6.9, z, w: 0.5, d: 0.5, r: 0, c: C('verm'), h: HA(0.5) });
+  // Reviewed issue-18-archway before adapting its temporary portal proportions. The
+  // undated zodiac mascot is omitted; the wrap uses the page's existing palette.
+  signPart('台北年貨大街', 'verm', 'bone', false, 'z', 0, 6.95, -149.39, 1.02, ['red', 'dadao']);
+  [-1, 1].forEach(s => signPart('迎春納福', 'verm', 'lamp', true, 'z', s * 6.35, 1.5, -149.28, 3.7, ['red', 'dadao']));
+
+  // Lantern addendum: build-time catenaries, sampled as one merged wire mesh. The
+  // main branch's scene-red.js cloth uses the same fixed subdivided-mesh approach
+  // (its sag is parabolic); here use the requested cosh curve with 7.5% span sag.
+  const wirePos = [], wireIdx = [], caps = [], cords = [];
+  function wireSegment(a, b, radius = .018) {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+    const tangent = B.clone().sub(A).normalize();
+    const n = new THREE.Vector3(0, 0, 1).cross(tangent).normalize();
+    const v = tangent.clone().cross(n), base = wirePos.length / 3;
+    for (const p of [A, B]) for (let j = 0; j < 4; j++) {
+      const q = p.clone().addScaledVector(n, Math.cos(j * Math.PI / 2) * radius).addScaledVector(v, Math.sin(j * Math.PI / 2) * radius);
+      wirePos.push(q.x, q.y, q.z);
+    }
+    for (let j = 0; j < 4; j++) { const k = (j + 1) % 4; wireIdx.push(base + j, base + k, base + j + 4, base + k, base + k + 4, base + j + 4); }
+  }
+  // Derived pink/purple stay within the approved palette rather than adding a new scheme.
+  const lanternColors = [C('verm').lerp(C('bone'), .5), C('sky'), C('leaf'), C('lamp').lerp(C('bone'), .45), C('lamp'), C('verm').lerp(C('sky'), .6), C('bone')];
+  const span = 12.4, ca = 20.8, end = Math.cosh(span / 2 / ca);
+  const wireY = x => 8.15 + ca * (Math.cosh(x / ca) - end);
+  // Three parallel rows per run; close spacing reads as a canopy over the entire street.
+  for (let run = 0; run < 11; run++) for (let row = 0; row < 3; row++) {
+    const z = -154 - run * 12 - row * 3.8;
+    if (z < -287) continue;
+    for (let j = 0; j < 24; j++) {
+      const x0 = -span / 2 + span * j / 24, x1 = -span / 2 + span * (j + 1) / 24;
+      wireSegment([x0, wireY(x0), z], [x1, wireY(x1), z]);
+    }
+    for (let i = 0; i < 11; i++) {
+      const x = -5.5 + i * 1.1, y = wireY(x), size = .44 + (i % 3) * .035;
+      lant.push({ x, y: y - .24 - size, z, w: size, d: size, h: HA(size), c: lanternColors[(i + row * 2 + run) % lanternColors.length] });
+      cords.push({ x, y: y - .24, z, w: .018, d: .018, h: HA(.24) });
+      caps.push({ x, y: y - .27, z, w: .16, d: .16, h: HA(.045) });
+      caps.push({ x, y: y - .24 - size, z, w: .14, d: .14, h: HA(.04) });
+      cords.push({ x, y: y - .42 - size, z, w: .025, d: .025, h: HA(.18) });
+    }
+  }
+  const wireGeo = new THREE.BufferGeometry();
+  instSet(boxGeo, lam('ink'), cords); instSet(cylGeo, lam('lamp'), caps);
+
+  function clothBanner(text, z) {
+    const { tex } = textTex(text, 'verm', 'bone', false), pos = [], uv = [], idx = [], n = 32;
+    for (let j = 0; j < 3; j++) for (let i = 0; i <= n; i++) {
+      const t = i / n, v = j / 2, x = (t - .5) * 10.3;
+      const sag = ca * (Math.cosh(x / ca) - Math.cosh(5.15 / ca));
+      pos.push(x, 8.45 + sag * (1 + .18 * v) - .9 * v, z + .035 * Math.sin(t * Math.PI * 12) * v);
+      uv.push(t, 1 - v);
+    }
+    for (let j = 0; j < 2; j++) for (let i = 0; i < n; i++) { const k = j * (n + 1) + i; idx.push(k, k + n + 1, k + 1, k + 1, k + n + 1, k + n + 2); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = lam('bone', { map: tex, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, window.SCENE.withFog(m)); libGroup(ALL).add(mesh);
+    // Tie the corners to the façade line; no unsupported floating billboard.
+    for (const s of [-1, 1]) for (const y of [7.55, 8.45]) wireSegment([s * 5.15, y, z], [s * 6.2, y + .18, z]);
   }
   const priceTexts = ['一斤100', '大特價', '試吃', '烏魚子', '開心果', '肉乾', '香菇', '年菜'];
   let boardN = 0;
@@ -386,8 +448,11 @@
     fest.push({ x: x - side * 0.85, y: 0.95, z: z - 0.9, w: 0.05, d: 0.6, r: 0, c: C(k % 2 ? 'verm' : 'bone'), h: HA(0.36) });
   } });
   shops.forEach(s => fest.push({ x: s.fx - s.s * 0.05, y: 1.9, z: s.z, w: 0.06, d: s.span * 0.6, r: 0, c: C('verm'), h: HA(0.9) }));   // 春聯 on the shop walls
-  signPart('年貨大街', 'verm', 'bone', false, 'z', 0, 8.1, -193, 1.5, ALL);
-  signPart('恭喜發財', 'verm', 'bone', false, 'z', 0, 8.1, -252, 1.5, ALL);
+  clothBanner('年貨大街', -193);
+  clothBanner('恭喜發財', -252);
+  // Finalize once, before instSet bakes its per-vertex AO attribute.
+  wireGeo.setAttribute('position', new THREE.Float32BufferAttribute(wirePos, 3)); wireGeo.setIndex(wireIdx); wireGeo.computeVertexNormals(); wireGeo.computeBoundingSphere();
+  instSet(wireGeo, lam('ink'), [{ x: 0, z: 0, w: 1, d: 1, h: HA(1) }]);
   asset('nianhuo-stall', lib, 4.2, -226.5, -Math.PI / 2);
   asset('new-year-market-stall', lib, -4.2, -232.5, Math.PI / 2);
 
@@ -407,7 +472,7 @@
   instSet(boxGeo, lam('bone'), goods, { colors: true });
   instSet(cylGeo, lam('bone'), jars, { colors: true });
   instSet(boxGeo, lam('bone', { emissive: C('lamp'), emissiveIntensity: 0.18 }), signs, { colors: true });
-  instSet(sphGeo, lam('verm', { emissive: C('verm'), emissiveIntensity: 0.4 }), lant, { colors: true });
+  instSet(sphGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), lant, { colors: true });
   instSet(boxGeo, lam('bone'), fest, { colors: true });
   MODELS.load('stall', gltf => MODELS.instance(gltf.scene, stalls, { emissive: 0.5 }));
   MODELS.load('props', gltf => {
@@ -416,5 +481,6 @@
     MODELS.instance(MODELS.node(gltf.scene, 'bicycle'), bikes);
   });
   people(figs);
-  instSet(boxGeo, lam('haze'), veh, { colors: true });
+  // Legacy vehicle descriptors still consume the same random sequence; the detailed
+  // scooters above replace their box geometry without moving any other seeded props.
 })();
