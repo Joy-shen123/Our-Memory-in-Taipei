@@ -1218,7 +1218,11 @@
       const dist = Math.hypot(L.A.x - camera.position.x, L.A.z - camera.position.z);
       const inFront = wp.z < 1 && Math.abs(wp.x) < 1.1;
       const near = Math.min(1, Math.max(0, (LABEL_NEAR - dist) / 30));
-      const vis = s.built && inFront ? near * eraE * (1 - closingA) : 0;   // labels step aside for the closing line
+      // labels step aside for the closing line. On a portrait phone the label is pinned to the left column, the
+      // same column the closing line takes (lx below clamps it there), so there it is gone before the first
+      // beat rises in; on a landscape screen the label sits by the building, clear of the line, and keeps closingA
+      const aside = innerWidth < innerHeight ? Math.min(1, Math.max(0, (progress - (CLOSING.parts[0].from - 0.03)) / 0.02)) : closingA;
+      const vis = s.built && inFront ? near * eraE * (1 - aside) : 0;
       if (L.shownKey !== key) { // reveal the caption word by word (per character, this is 中文)
         L.shownKey = key;
         L.name.textContent = L.A.tile.name.en;

@@ -121,5 +121,5 @@
   .pp-name { font-size: 20px; }
   .pp-cap { font-size: 13px; }
   .pc-body { padding: 18px 16px 20px; }
-  #photoCreditsBtn { top: auto; bottom: 56px; right: 20px; }   /* under the title, which sits bottom-right on a phone */
+  #photoCreditsBtn { top: auto; bottom: 72px; right: 20px; }   /* bottom-right on a phone, on the music button's row (style.css .hud-music bottom 72px); the title and the year share the row below */
 }
