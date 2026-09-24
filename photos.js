@@ -136,10 +136,10 @@
   function esc(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
   // ── open / close. The scroll is never touched; the panel is fixed and the page keeps scrolling. ──
-  let current = null, opener = null, gone = 0;
+  let current = null, opener = null, gone = 0, openedAtY = 0;
   function open(s, btn) {
     if (!credits.hidden) closeCredits();
-    current = s; opener = btn; gone = 0;
+    current = s; opener = btn; gone = 0; openedAtY = window.scrollY;
     P.img.src = DIR + s.img; P.img.width = s.w; P.img.height = s.h; P.img.alt = s.en + ' ' + s.zh + ', ' + s.when;
     P.fig.classList.toggle('tall', s.h > s.w);
     P.when.textContent = s.when; P.name.textContent = s.en; P.zh.textContent = s.zh; P.cap.textContent = s.caption;
@@ -160,7 +160,7 @@
     if (refocus && opener && !opener.hidden) opener.focus({ preventScroll: true });
     opener = null;
   }
-  function openCredits() { close(false); credits.hidden = false; requestAnimationFrame(() => credits.classList.add('show')); credits.querySelector('.pp-close').focus({ preventScroll: true }); }
+  function openCredits() { close(false); openedAtY = window.scrollY; credits.hidden = false; requestAnimationFrame(() => credits.classList.add('show')); credits.querySelector('.pp-close').focus({ preventScroll: true }); }
   function closeCredits(refocus) {
     if (credits.hidden) return;
     credits.classList.remove('show');
@@ -172,6 +172,18 @@
   credBtn.addEventListener('click', () => credits.hidden ? openCredits() : closeCredits(true));
   credits.querySelector('.pp-close').addEventListener('click', () => closeCredits(true));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!credits.hidden) closeCredits(true); else close(true); } });
+  // CJ, 2026-09-24: 「會卡住」. On a phone the sheet covers most of the frame and the × is one small target, so the
+  // page's own gestures close it as well: scrolling on (past a thumb's jitter), a tap anywhere outside, Escape above.
+  // A tap on another marker or on the credits button is not a dismiss: those open their own thing.
+  const anyOpen = () => !panel.hidden || !credits.hidden;
+  const dismiss = () => { if (!credits.hidden) closeCredits(false); close(false); };
+  window.addEventListener('scroll', () => { if (anyOpen() && Math.abs(window.scrollY - openedAtY) > 40) dismiss(); }, { passive: true });
+  document.addEventListener('pointerdown', e => {
+    if (!anyOpen() || !e.isPrimary) return;
+    const t = e.target;
+    if (!(t instanceof Element) || panel.contains(t) || credits.contains(t) || t.closest('.spot, #photoCreditsBtn')) return;
+    dismiss();
+  });
 
   // ── per frame: project each marker with the scroll camera, fade by frame and distance ──
   const wp = new THREE.Vector3();
