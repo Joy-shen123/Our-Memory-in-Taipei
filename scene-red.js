@@ -285,10 +285,14 @@
   // ═══ the shopfronts between: the teammate's Ximending library, with building bodies behind ═
   const lib = libGroup(['red']);
   // place a library storefront with its front on the sidewalk's outer edge (|x| = 9.2)
+  // WALLS: every real street face a sign can be fixed to, { side, z0, z1, top }, filled here by
+  // front() and body(). CJ, 2026-09-24: 「有些招牌懸空了」— the signs below test it (SIGNS.anchor).
+  const WALLS = [];
   function front(id, side, z, scale) {
     const a = findAsset(id); if (!a) return null;
     const probe = a.build(window.NostalgiaCore); probe.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(probe), maxz = b.max.z * (scale || 1);
+    const b = new THREE.Box3().setFromObject(probe), k = scale || 1, maxz = b.max.z * k, hw = (b.max.x - b.min.x) * k / 2;
+    WALLS.push({ side, z0: z - hw, z1: z + hw, top: b.max.y * k });
     return asset(id, lib, side * (9.2 + maxz), z, side > 0 ? -Math.PI / 2 : Math.PI / 2, scale);
   }
   // a building body behind the storefront, x 9.4 outward. Issue #5: tiled from shopfront.glb
@@ -298,6 +302,7 @@
   const body = (side, z, len, h, col) => {
     const nx = Math.max(1, Math.round(len / 6)), tw = len / nx, ny = Math.max(1, Math.round((h - 0.6) / 3.3));
     const r = side > 0 ? -Math.PI / 2 : Math.PI / 2, c = C(col);
+    WALLS.push({ side, z0: z - len / 2, z1: z + len / 2, top: ny * 3.3 + 0.8 });        // to the roof parapet's top
     for (let i = 0; i < nx; i++) {
       const zz = z + len / 2 - tw * (i + 0.5);
       tiles.ground.push({ x: side * 9.4, z: zz, y: 0, r, w: tw / 6, d: 1, h: hOf(1), c });
@@ -521,12 +526,34 @@
       M.compose(p0.clone().add(p1).multiplyScalar(0.5), Q, S.set(t, t, len)); pushBox(acc || hw, M, col);
     }
     let count = 0;
+    // anchor(side, z, y0, h, halfW): the wall this sign is fixed to. Keeps the sign where it is if
+    // a face stands behind the whole of it (with 0.2 m to the face's end) and tall enough to take
+    // the top arm; else moves it along the street to the nearest real face within 4 m, lowering
+    // or shortening it to fit under that face's top; else there is nothing to carry it and it goes.
+    const log = { moved: [], dropped: [] };
+    function anchor(text, side, z, y0, h, halfW) {
+      let best = null, bd = 1e9;
+      WALLS.forEach(w => {
+        if (w.side !== side) return;
+        const lo = w.z0 + halfW + 0.2, hi = w.z1 - halfW - 0.2; if (hi < lo) return;
+        const zz = Math.min(hi, Math.max(lo, z)), d = Math.abs(zz - z);
+        if (d < bd - 1e-6 || (Math.abs(d - bd) < 1e-6 && w.top > best.w.top)) { bd = d; best = { w, z: zz }; }
+      });
+      if (!best || bd > 4) { log.dropped.push(text + ' @' + z); return null; }
+      const top = best.w.top - 0.15;
+      let yy = y0, hh = h;
+      if (yy + hh > top) { yy = Math.max(2.5, top - hh); hh = Math.min(hh, top - yy); }
+      if (hh < Math.min(0.8, h) - 1e-6) { log.dropped.push(text + ' @' + z + ' (wall ' + best.w.top.toFixed(1) + ' m)'); return null; }
+      if (bd > 1e-6 || yy !== y0 || hh !== h) log.moved.push(text + ' z ' + z + '→' + best.z.toFixed(1) + (yy !== y0 ? ', y ' + y0 + '→' + yy.toFixed(2) : ''));
+      return { z: best.z, y0: yy, h: hh };
+    }
 
     // ── the kinds ────────────────────────────────────────────────────────────────
     // 直式招牌: a vertical light box sticking out of a wall. side +1 east (-x is the road), wallX the
     // wall's |x|, z along the street, y0..y0+h. It reads from both directions along the street.
     function vbox(text, side, wallX, z, y0, h, bg, opts) {
       opts = opts || {};
+      if (opts.anchor !== false) { const a = anchor(text, side, z, y0, h, 0.12); if (!a) return; ({ z, y0, h } = a); }
       const w = opts.w || 0.55, D = 0.14, gap = opts.gap || 0.12;
       const xin = side * (wallX - gap), xout = side * (wallX - gap - w), xc = (xin + xout) / 2, yc = y0 + h / 2;
       box(xc, yc, z, w, h, D, 'haze');                                                     // the case
@@ -539,12 +566,13 @@
       // arms and a strut to the wall, a plate on the wall
       [y0 + h - 0.12, y0 + 0.12].forEach(yy => bar(V3(side * wallX, yy, z), V3(xin, yy, z), 0.04, 'ink'));
       bar(V3(side * wallX, y0 + 0.12, z), V3(xc, y0 + h - 0.12, z), 0.03, 'ink');
-      box(side * (wallX - 0.01), y0 + h / 2, z, 0.02, h * 0.9, 0.2, 'ink');
+      box(side * (wallX - 0.01), y0 + h / 2, z, 0.02, h * 0.9, opts.plate || 0.2, 'ink');   // the plate the arms are bolted to
       if (opts.neon !== false) box(xout - side * 0.03, yc, z, 0.025, h - 0.1, D + 0.05, opts.neon || 'lamp', 0, glow);   // the neon down the outer edge
       count++;
     }
     // 店招牌: a horizontal light box flat on a wall facing the road, standing off on brackets
-    function hbox(text, side, wallX, z, y0, w, h, bg) {
+    function hbox(text, side, wallX, z, y0, w, h, bg, opts) {
+      if (!(opts && opts.anchor === false)) { const a = anchor(text, side, z, y0, h, w / 2); if (!a) return; ({ z, y0, h } = a); }
       const D = 0.14, x = side * (wallX - 0.1 - D / 2), yc = y0 + h / 2;
       box(x, yc, z, D, h, w, 'haze');
       quad(lit, V3(x - side * (D / 2 + 0.012), yc, z), V3(0, 0, side > 0 ? 1 : -1), V3(0, 1, 0), w - 0.05, h - 0.05, lightFace(text, w - 0.05, h - 0.05, bg, false));
@@ -621,7 +649,8 @@
       count++;
     }
     // paper: flat on a wall, facing the road (posters are the one kind that is a plane)
-    function poster(text, sub, side, wallX, z, y, w, h, bg, blob) {
+    function poster(text, sub, side, wallX, z, y, w, h, bg, blob, opts) {
+      if (!(opts && opts.anchor === false)) { const a = anchor(text, side, z, y, h, w / 2); if (!a) return; z = a.z; }
       const uv = paperFace(text, sub, w, h, bg, blob);
       quad(flat, V3(side * (wallX - 0.02), y + h / 2, z), V3(0, 0, side > 0 ? 1 : -1), V3(0, 1, 0), w, h, uv);
       count++;
@@ -638,6 +667,7 @@
       return (glyphCache[k] = uvOf(r));
     }
     function letters(text, side, wallX, zc, y0, size, col, sideCol) {
+      { const a = anchor(text, side, zc, y0, size, [...text].length * size * 0.53); if (!a) return; zc = a.z; y0 = a.y0; }
       const chars = [...text], n = chars.length, step = size * 1.05;
       chars.forEach((ch, i) => {
         const z = zc + side * ((i - (n - 1) / 2) * step), right = V3(0, 0, side > 0 ? 1 : -1);
@@ -670,9 +700,10 @@
       mk(hw, new THREE.MeshLambertMaterial({ vertexColors: true }));
       if (glow.pos.length) mk(glow, new THREE.MeshBasicMaterial({ vertexColors: true }));
     }
-    return { vbox, hbox, letters, roadBanner, parapetBanner, streetSign, roundSign, busStop, poster, card, finish, get count() { return count; } };
+    return { log, vbox, hbox, letters, roadBanner, parapetBanner, streetSign, roundSign, busStop, poster, card, finish, get count() { return count; } };
   })();
   window.__ximenSigns = () => SIGNS.count;
+  window.__signAnchor = SIGNS.log;
   const BGS = ['verm', 'lamp', 'bone', 'sky', 'leaf', 'ink', 'walk', 'haze'];
   const bgAt = i => BGS[i % BGS.length];
 
@@ -688,14 +719,23 @@
       const S = J.slots[SLOT[b]];
       S.ground.forEach((name, k) => {
         const zc = z + L / 2 - 0.95 - 1.9 * k;
-        SIGNS.hbox(name, -1, 6.03, zc, FLOOR - 0.86, 1.7, 0.46, name === '點心世界' ? 'lamp' : bgAt(n++));
+        SIGNS.hbox(name, -1, 6.03, zc, FLOOR - 0.86, 1.7, 0.46, name === '點心世界' ? 'lamp' : bgAt(n++), { anchor: false });   // on the fascia beam, the whole block long
       });
-      [['floor2', 4.0], ['floor3', 7.3]].forEach(([f, y0], fi) => S[f].forEach((name, k) => {
-        if (name === '住家') return;
-        const zc = z + L / 2 - 0.95 - 1.9 * k;
-        const col = COLS.reduce((a, c) => Math.abs((z - c) - zc) < Math.abs((z - a) - zc) ? c : a, COLS[0]);
-        SIGNS.vbox(name, -1, 6.125, z - col + (fi ? 0.18 : -0.18), y0, 1.9, bgAt(n++), { w: 0.5, gap: 0.05 });
-      }));
+      // upstairs: on the corridor's columns, and only the three interior ones: a box on a corner
+      // column stands out over the cross street, in front of the next block's end wall, and read
+      // as hanging in the air (CJ 「有些招牌懸空了」). At most two per column and floor, one each
+      // side of it, the arms and a plate as wide as the column bolted to its face.
+      const INNER = COLS.slice(1, 4);
+      [['floor2', 4.0], ['floor3', 7.3]].forEach(([f, y0]) => {
+        const used = {};
+        S[f].forEach((name, k) => {
+          if (name === '住家') return;
+          const zc = z + L / 2 - 0.95 - 1.9 * k;
+          const col = INNER.reduce((a, c) => Math.abs((z - c) - zc) < Math.abs((z - a) - zc) ? c : a, INNER[0]);
+          const u = used[col] = (used[col] || 0) + 1; if (u > 2) { SIGNS.log.dropped.push(name + ' (third on one column)'); return; }
+          SIGNS.vbox(name, -1, 6.125, z - col + (u === 1 ? -0.13 : 0.13) * (zc > z - col ? -1 : 1), y0, 1.9, bgAt(n++), { w: 0.5, gap: 0.03, anchor: false, plate: 0.46 });
+        });
+      });
     });
     // tied along a parapet inside one block (never across a cross street): block, floor top, colours
     [['中華商場 歲末大拍賣', 1, 4.35, 'verm', 'lamp'], ['訂做制服 學生服 一日交件', 4, 7.65, 'verm', 'bone'], ['跳樓大拍賣 全面八折', 6, 4.35, 'lamp', 'verm']]
@@ -728,7 +768,7 @@
   POST(1, 9.1, [['張雨生', '天天想你', -5.6, 'sky', 'lamp'], ['小虎隊', '青蘋果樂園', -10.4, 'lamp', 'verm']]);                                            // the 1990 record shop
   POST(1, 9.1, [['灌籃高手', '全套出租', -19.6, 'verm', 'bone'], ['城市獵人', '最新一集', -24.4, 'bone', 'sky']]);                                          // the 1991 comic rental
   // the market piers: film posters pasted on the concrete, 1987–1990
-  [['悲情城市', '1989 侯孝賢'], ['賭神', '1989'], ['喋血雙雄', '1989'], ['旺角卡門', '1988'], ['七匹狼', '1989'], ['倩女幽魂', '1987']].forEach(([t, sub], i) => SIGNS.poster(t, sub, -1, 6.125, MARKET.blockZ[i + 1], 0.9, 0.44, 0.66, bgAt(i + 2), bgAt(i + 5)));   // the middle pier of blocks 2–7
+  [['悲情城市', '1989 侯孝賢'], ['賭神', '1989'], ['喋血雙雄', '1989'], ['旺角卡門', '1988'], ['七匹狼', '1989'], ['倩女幽魂', '1987']].forEach(([t, sub], i) => SIGNS.poster(t, sub, -1, 6.125, MARKET.blockZ[i + 1], 0.9, 0.44, 0.66, bgAt(i + 2), bgAt(i + 5), { anchor: false }));   // the middle pier of blocks 2–7
   // the mid-90s bodies further down
   POST(-1, 9.3, [['四大天王', '演唱會 1995', -79, 'lamp', 'verm'], ['張惠妹', '姊妹 1996', -83, 'verm', 'lamp']]);
   POST(1, 9.1, [['灌籃高手', '完結篇', -102.5, 'sky', 'verm'], ['任賢齊', '心太軟 1998', -117.5, 'bone', 'sky'], ['神奇寶貝', '1998 全套', -123, 'lamp', 'verm']]);
