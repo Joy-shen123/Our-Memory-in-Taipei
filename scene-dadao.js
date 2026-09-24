@@ -95,8 +95,8 @@
     function light(text, bg, fg, vertical, axis, x, y, z, h, eras, mount) {
       const b = batch(eras, z), D = .14;
       const w = vertical ? Math.min(.75, Math.max(.4, h / (text.length + .5))) : h * (text.length + .5);
-      const side = Math.sign(x) || 1, gap = .16, cy = y + h / 2;
-      const wall = mount == null ? Math.abs(x) + (axis === 'z' ? w / 2 : D / 2) + gap : mount;
+      const side = Math.sign(x) || 1, gap = mount ? .3 : .16, cy = y + h / 2;
+      const wall = mount ? mount.wall : Math.abs(x) + (axis === 'z' ? w / 2 : D / 2) + gap;
       const inside = side * (wall - gap), outside = inside - side * w;
       const cx = axis === 'z' ? (inside + outside) / 2 : side * (wall - gap - D / 2);
       box(b.hw, cx, cy, z, axis === 'z' ? w : D, h, axis === 'z' ? D : w, 'haze');
@@ -116,7 +116,7 @@
         for (const zz of [z - w / 2, z + w / 2]) box(b.hw, cx, cy, zz, D + .05, h + .03, .035, 'bone');
         for (const zz of [z - w * .35, z + w * .35]) bar(b.hw, V(side * wall, cy, zz), V(cx, cy, zz), .04);
       }
-      records.push({ text, axis, side, x: cx, z, y, h, w, wall, gap, kind: 'lightbox' });
+      records.push({ text, axis, side, x: cx, z, y, h, w, wall, gap, host: mount && mount.host, kind: 'lightbox' });
     }
     // Printing attached to an existing physical portal, and actual price cards, stays flat.
     function print(text, bg, fg, vertical, axis, x, y, z, h, eras) {
@@ -155,13 +155,14 @@
           const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(a.pos, 3));
           if (a.uv) { geo.setAttribute('uv', new THREE.Float32BufferAttribute(a.uv, 2)); geo.setIndex(a.idx); geo.computeVertexNormals(); }
           else { geo.setAttribute('normal', new THREE.Float32BufferAttribute(a.nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(a.col, 3)); }
-          const mesh = new THREE.Mesh(geo, window.SCENE.withFog(material)); mesh.castShadow = key !== 'glow'; mesh.receiveShadow = key !== 'glow'; group.add(mesh);
+          const mesh = new THREE.Mesh(geo, window.SCENE.withFog(material)); mesh.castShadow = key !== 'glow'; mesh.receiveShadow = key !== 'glow'; mesh.userData.dadaoSign = true; group.add(mesh);
         }
       }
     }
     return { light, print, finish, records };
   })();
-  const lightBox = (...args) => SIGNAGE.light(...args);
+  const signRequests = [], facades = [];
+  const lightBox = (...args) => signRequests.push(args);
   const appliedPrint = (...args) => SIGNAGE.print(...args);
 
   // ── the shophouse bays: one arcade system on both sides ─────────────────────
@@ -227,10 +228,12 @@
     const top = 4.2 + 2 * 3.4 - 0.2;                           // roof line
     const bf = o.open ? 7.2 : (o.libDepth ? BACK + o.libDepth + 0.1 : BACK);   // where the body starts
     bodies.push({ x: s * (bf + DEEP) / 2, z: zc, w: DEEP - bf, d: d - 0.05, h: HA(o.open ? top : 3.8), c: C(o.open ? col : 'haze') });
+    const reference = (z0 <= -190 && z1 >= -230) || (z0 <= -150 && z1 >= -190 && !o.libDepth);
+    facades.push({ side: s, z0, z1, zc, width: d, style, reference, open: !!o.open });
     if (o.open) return;
     const floors = Math.min(3, Math.max(1, o.floors || (o.tall ? 3 : 2)));
     const it = { x: s * FACE, z: zc, r: s > 0 ? -Math.PI / 2 : Math.PI / 2, w: d / 4.6, d: 1, h: HA(1), c: C(col) };
-    if ((z0 <= -190 && z1 >= -230) || (z0 <= -150 && z1 >= -190 && !o.libDepth)) {
+    if (reference) {
       const index = referenceBayIndex[z0 <= -190 ? 2 : 1]++;
       // Ground + one upper floor, with an occasional real additional floor. The arcade
       // head stays at 4.1 m: stretching the whole asset would stretch every doorway.
@@ -306,8 +309,22 @@
       const a = window.SCENE.findAsset(id);
       const depth = a ? 3.9 : 0;                                // storefront depth, room behind the front for the body
       bay(-1, zw, zw - w, style, Object.assign({ libDepth: depth, goods: false }, o));
-      const g = asset(id, lib, 0, zc, Math.PI / 2, sc);
-      if (g) { const sz = g.userData.size; g.position.x = -(BACK - 0.1) - sz.x / 2 + 0.01; g.updateMatrixWorld(true); }
+      // Keep the storefront's original bounds/placement, but replace its loose signs
+      // with the same facade-mounted, batched light boxes as the rest of this row.
+      const inherited = [], core = window.NostalgiaCore, verticalSign = core.verticalSign;
+      if (zw > -190) core.verticalSign = function (text, opts) {
+        const sign = verticalSign.call(this, text, opts); inherited.push({ sign, text }); return sign;
+      };
+      let g;
+      try { g = asset(id, lib, 0, zc, Math.PI / 2, sc); }
+      finally { core.verticalSign = verticalSign; }
+      if (g) {
+        const sz = g.userData.size; g.position.x = -(BACK - 0.1) - sz.x / 2 + 0.01; g.updateMatrixWorld(true);
+        inherited.forEach(({ sign, text }) => {
+          const pos = sign.getWorldPosition(new THREE.Vector3()); sign.removeFromParent();
+          lightBox(text, 'verm', 'bone', true, 'z', -FACE, 4.45, pos.z, 2.1, ALL);
+        });
+      }
     }
     if (o.sign) lightBox(o.sign, o.signCol === 'lamp' ? 'lamp' : 'bone', 'ink', true, 'z', -(FACE - 0.55), 4.4, zc, 2.6, ALL);
     if (o.drawers) { // 百子櫃 — the herb shop's wall of little drawers, drawn to a canvas, as the shop wall
@@ -596,6 +613,39 @@
   brickSplit(boxGeo, bodies);
   instSet(boxGeo, lam('bone'), goods, { colors: true });
   instSet(cylGeo, lam('bone'), jars, { colors: true });
+  // A sign request is resolved against the bay that actually carries it. In zone 1,
+  // projecting boxes bolt to masonry pilasters; low Min roofs use arcade piers.
+  // Horizontal shop strips sit on the lintel at the back of the covered passage.
+  // No facade at that position means no sign, rather than an imaginary wall.
+  const occupied = new Set();
+  signRequests.forEach(args => {
+    let [text, bg, fg, vertical, axis, x, y, z, h, eras] = args;
+    if (z <= -190 || z > -150) { SIGNAGE.light(...args); return; }
+    const host = facades.find(f => f.side === Math.sign(x) && z <= f.z0 && z >= f.z1 && !f.open);
+    if (!host) return;
+    let wall;
+    if (axis === 'z') {
+      const low = host.reference && host.style === 'min';
+      const edges = host.reference ? [-2.18, 2.18] : [2.1];
+      const slots = edges.map(edge => host.zc + host.side * edge * host.width / 4.6);
+      slots.sort((a, b) => Math.abs(a - z) - Math.abs(b - z));
+      z = slots.find(slot => !occupied.has(host.side + ':' + slot));
+      if (z === undefined) return; // one case per pilaster, never overlapping duplicates
+      occupied.add(host.side + ':' + z);
+      y = low ? .85 : 4.45; h = Math.min(h, low ? 1.85 : 2.6);
+      wall = FACE - (low ? .47 : host.reference ? .30 : .35);
+    } else if (y < 4) {
+      z = host.zc; y = 3.12; h = .32;
+      wall = host.reference ? FACE + 2.72 : FACE + 3.10;
+      const key = host.side + ':lintel:' + z;
+      if (occupied.has(key)) return;
+      occupied.add(key);
+    } else {
+      z = host.zc; y = 4.4; h = .32; wall = FACE - .04;
+    }
+    SIGNAGE.light(text, bg, fg, vertical, axis, x, y, z, h, eras,
+      { wall, host: { side: host.side, z0: host.z0, z1: host.z1, style: host.style } });
+  });
   SIGNAGE.finish();
   window.__dadaoSigns = () => ({ count: SIGNAGE.records.length, records: SIGNAGE.records });
   instSet(sphGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), lant, { colors: true });
