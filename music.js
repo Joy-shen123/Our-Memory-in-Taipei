@@ -84,7 +84,12 @@
   let cur = -1;                         // decade index currently chosen for playback
   let manual = null;                    // { decade } while a button choice holds
   let gestured = false;                 // the page has had its first click, tap or key
-  let muted = store.get(LS_MUTE) === '1';
+  // Fault 4 (CJ, 2026-09-24: 「手機幫我default msuic off」): on a phone the music starts off, every visit. The first
+  // tap or swipe no longer arms the player (gesture() and the YouTube onReady already hold back while muted on a
+  // phone); the control stays where it is, reads Click to play / Sound off, and one tap on it or on the play button
+  // turns the sound on (setMuted(false) plays). A stored choice is honoured on desktop only: a phone visit is one
+  // visit, and a page that starts a phone's speaker on the first swipe is the thing this rule exists to stop.
+  let muted = isPhone() ? true : store.get(LS_MUTE) === '1';
   let lastScrollDecade = -1;
   let privateOn = false;                // asset/music/private/ replaced the loops
 
@@ -260,7 +265,8 @@
     render();
   }
   function toggle() {
-    if (mode === 'local' && !unlocked) unlock(); else setMuted(!muted);
+    if (mode === 'local' && !unlocked) { if (muted) setMuted(false); unlock(); }   // Click for sound means sound: a phone starts muted (fault 4), and this press must not leave it silent
+    else setMuted(!muted);
   }
   window.addEventListener('keydown', ev => { if ((ev.key === 'm' || ev.key === 'M') && !ev.repeat && !ev.metaKey && !ev.ctrlKey && !ev.altKey && !justGestured) toggle(); });
   if (el.toggle) el.toggle.addEventListener('click', ev => { ev.stopPropagation(); if (justGestured) { justGestured = false; if (muted) setMuted(false); return; } toggle(); });
@@ -290,7 +296,7 @@
       if (isPlaying()) { userPaused = true; yt.pauseVideo(); }
       else { userPaused = false; if (muted && isPhone()) setMuted(false); else yt.playVideo(); }
     } else if (mode === 'local') {
-      if (!unlocked) { unlock(); return; }
+      if (!unlocked) { if (muted && isPhone()) setMuted(false); unlock(); return; }   // as on the YouTube branch: play on a muted phone means sound on
       const p = players[active];
       if (p.paused) { userPaused = false; if (p.ended) cue(p, cur); tryPlay(p); } else { userPaused = true; p.pause(); }
     }
