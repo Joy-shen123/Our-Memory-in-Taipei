@@ -11,3 +11,4 @@ __pycache__/
 research/*/shots/
 research/**/candidates/
 research/refs/
+research/**/shots-src/
