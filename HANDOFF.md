@@ -248,6 +248,7 @@ CJ, 2026-09-24: 「換時代的那個迷霧太短沒感覺，有其他手法可�
 6. The base-shot keyframe (CAM[4] in `data.js`, camera y 3 at z -372 looking at y 50) puts the 101 podium below the frame. Lower the target (y 40) or move the camera back (z -380) if the podium should show.
 7. The wharf is only seen peripherally. A keyframe that glances west at z ≈ -200 would show it.
 8. Mobile: 390x844 checked 2026-09-21 in headless Chrome. Not yet checked on a real phone: the touch fallback and the 1.5 pixel-ratio cap.
+8a. The phone opening (fault 2, 2026-09-24, CJ: 「手機版黑霧拿掉」, then 「首頁壓按不要 箭頭要」): the dim band over the opening is gone and stays gone in any lighter form; the swipe-up arrow and its SCROLL word stay, in ink with a 2 px bone stroke (`style.css` `.hud-guide`, `.guide-arrow`, `.guide-word`) so they read on the cream fog and over the girl as the fog thins. `app.js` no longer forces the wordmark bone on the phone; it is ink in the fog everywhere. Screenshots `~/Desktop/perf-and-ads/opening-before|after2-390x844-0|0.02.png` (arrow frozen mid-swipe on both sides).
 9. `research/` (untracked on main as of 2026-09-22): the three.js survey, the IVRESS teardown and the 15 render-style test pages with shots. `research/README.md` indexes it and links the two shareable artifacts. Commit it or leave it local; nothing on the page loads from it.
 
 ## Not done on purpose

@@ -1286,11 +1286,10 @@
   const sm = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
   const openEl = document.getElementById('opening');
   // the HUD blocks that sit over the opening fog and have to darken with the title
-  // the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」): #guide (index.html, style.css .hud-guide) is a
-  // dim with a swipe-up arrow over the opening screen, display: none except under 480px. Its opacity follows the fog, so it
-  // clears in the same window and is gone by OPENING.fogTo; while it is on, the title is bone so it reads through the dim.
+  // the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」, then 「首頁壓按不要 箭頭要」): #guide
+  // (index.html, style.css .hud-guide) is a swipe-up arrow over the opening screen, no dim, display: none except under 480px.
+  // Its opacity follows the fog, so it clears in the same window and is gone by OPENING.fogTo.
   const guideEl = document.getElementById('guide');
-  let guideOn = false;
   const fogCol = new THREE.Color(), boneCol = C('bone'), inkCol = C('ink'), titleCol = new THREE.Color();
   // CJ, 2026-09-24: 「不然先給opening 一個復古色調的背景」. The opening fog carries a warm faded-print
   // tone instead of plain bone, strongest at scroll 0 and gone with the fog by OPENING.fogTo, so
@@ -1334,7 +1333,7 @@
       if (!mountainMat.toneMapped) { mountainMat.toneMapped = true; mountainMat.needsUpdate = true; }
     }
     openEl.style.opacity = title.toFixed(3);
-    openEl.style.color = '#' + (guideOn ? boneCol : titleCol.copy(inkCol).lerp(boneCol, 1 - fog)).getHexString();
+    openEl.style.color = '#' + titleCol.copy(inkCol).lerp(boneCol, 1 - fog).getHexString();
     openEl.style.visibility = title > 0.005 ? 'visible' : 'hidden';
     // CJ, 2026-09-24: 「我比較希望是換這邊的顏色」, then 「那些小字的顏色不對」. The HUD is bone
     // (#f7f2e8) everywhere, a 1.6:1 contrast on the opening's faded-print fog. The title already
@@ -1357,7 +1356,6 @@
     post.uniforms.uRes.value.set(Math.floor(w * pr), Math.floor(h * pr));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    guideOn = !!guideEl && getComputedStyle(guideEl).display !== 'none';   // the phone guide is a media query; read it once per resize, not per frame
   }
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', ev => { mouseX = (ev.clientX / innerWidth - 0.5) * 2; mouseY = (ev.clientY / innerHeight - 0.5) * 2; });

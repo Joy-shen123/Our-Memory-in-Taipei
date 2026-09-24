@@ -207,22 +207,20 @@ html, body {
 .op-big span { display: block; white-space: nowrap; }
 .op-sub { margin-top: 22px; font-size: clamp(13px, 1.3vw, 20px); font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; opacity: 0.85; }
 /* the phone guide (CJ, 2026-09-24: 「手機版一開始套上一個黑屏然後給引導箭頭呢」, replacing the same day's SCROLL TO BEGIN text
-   hint): the opening screen starts dimmed under a bone arrow that swipes up, and it clears with the opening fog. app.js sets
-   its opacity to the fog value, so it is gone by OPENING.fogTo (0.08), and turns the wordmark bone while the dim is on so it
-   reads through it. Phone only. First child of .hud, so every HUD line paints over the dim; pointer-events: none inherited
-   from .hud, so it adds no tap target. */
-/* The dim is a band, not a sheet: the top 100px and the bottom 100px stay clear (fading in over the next 60px), because the
-   chapter block sits in the top strip and the music button, the credits button, the year and the title sit in the bottom
-   strip, and those blocks turn ink in the opening fog (the lead's HUD-contrast fix on main, CJ 2026-09-24: 「我比較希望是換這
-   邊的顏色」). Ink on a dark dim is unreadable; on the fog it is what that fix intends. The wordmark and the guide sit inside
-   the band, in bone. */
-.hud-guide { display: none; position: absolute; inset: 0; opacity: 0; visibility: hidden; will-change: opacity;
-  --dim: color-mix(in srgb, var(--ink) 62%, transparent);
-  background: linear-gradient(to bottom, transparent 100px, var(--dim) 160px, var(--dim) calc(100% - 160px), transparent calc(100% - 100px)); }
-.guide-arrow { position: absolute; left: 50%; bottom: 210px; width: 2px; height: 56px; margin-left: -1px; background: var(--bone); border-radius: 1px; animation: guide-swipe 1.8s ease-in-out infinite; }
+   hint; then, the same evening, 「手機版黑霧拿掉」 and 「首頁壓按不要 箭頭要」): an arrow that swipes up over the opening screen,
+   and it clears with the opening fog. There is no dim any more, and none comes back in a lighter form: the arrow stands on
+   its own. app.js sets the guide's opacity to the fog value, so it is gone by OPENING.fogTo (0.08). Phone only. First child
+   of .hud; pointer-events: none inherited from .hud, so it adds no tap target. */
+/* Ink, not bone: the guide only ever shows on the opening's faded-print fog (a cream ground), where bone is a 1.6:1 contrast
+   and ink is what the rest of the HUD already turns to there (the lead's HUD-contrast fix, CJ 2026-09-24: 「我比較希望是換這邊
+   的顏色」). The wordmark is ink in the fog for the same reason. A 2 px bone stroke (four offset drop-shadows, twice; the
+   words' ink text-shadow inverted and hardened) keeps the arrow readable while the fog thins and the girl's dark skirt
+   passes under it (scroll 0.02–0.06); a soft halo was not enough there. */
+.hud-guide { display: none; position: absolute; inset: 0; opacity: 0; visibility: hidden; will-change: opacity; }
+.guide-arrow { position: absolute; left: 50%; bottom: 210px; width: 2px; height: 56px; margin-left: -1px; background: var(--ink); border-radius: 1px; filter: drop-shadow(1px 0 0 var(--bone)) drop-shadow(-1px 0 0 var(--bone)) drop-shadow(0 1px 0 var(--bone)) drop-shadow(0 -1px 0 var(--bone)) drop-shadow(1px 0 0 var(--bone)) drop-shadow(-1px 0 0 var(--bone)) drop-shadow(0 1px 0 var(--bone)) drop-shadow(0 -1px 0 var(--bone)); animation: guide-swipe 1.8s ease-in-out infinite; }
 /* CJ, 2026-09-24: 「往上箭頭要有scroll字樣」: the word under the arrow, in the same caps as the sub line; its glyphs are in the hud subset */
-.guide-word { position: absolute; left: 0; right: 0; bottom: 182px; text-align: center; color: var(--bone); font-size: 11px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; }
-.guide-arrow::before { content: ""; position: absolute; left: -5px; top: 0; width: 12px; height: 12px; border-left: 2px solid var(--bone); border-top: 2px solid var(--bone); transform: rotate(45deg); }
+.guide-word { position: absolute; left: 0; right: 0; bottom: 182px; text-align: center; color: var(--ink); font-size: 11px; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; text-shadow: -1px -1px 0 var(--bone), 1px -1px 0 var(--bone), -1px 1px 0 var(--bone), 1px 1px 0 var(--bone), 0 0 4px var(--bone), 0 0 8px var(--bone); }
+.guide-arrow::before { content: ""; position: absolute; left: -5px; top: 0; width: 12px; height: 12px; border-left: 2px solid var(--ink); border-top: 2px solid var(--ink); transform: rotate(45deg); }
 @keyframes guide-swipe { 0% { transform: translateY(18px); opacity: 0; } 25% { opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(-18px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .guide-arrow { animation: none; } }
 
